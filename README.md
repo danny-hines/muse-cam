@@ -22,7 +22,7 @@ The web/API foundation is functional:
 - Neon Postgres and private/public Vercel Blob adapters.
 - In-memory development fallbacks and included demo frames.
 
-The Raspberry Pi client can call and exercise this API from a local image. Direct camera, display, touch, GPIO, and power integrations are the next milestone.
+The Raspberry Pi application now includes Picamera2 capture, native framebuffer and Display HAT Mini rendering, touch/HAT/GPIO input, safe shutdown, local SQLite queuing, offline retry, diagnostics, systemd startup, and a desktop simulator. Hardware profiles cover both the Pi 3B+ build and Pi Zero 2 W fallback; the physical display and camera orientation values will be tuned during final hardware bring-up.
 
 ## Local development
 
@@ -72,6 +72,17 @@ curl -X POST http://localhost:3000/api/device/generations \
 ```
 
 See [docs/API.md](docs/API.md) for the complete flow.
+
+## Raspberry Pi installation
+
+The same public installer supports both planned builds:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
+  | sudo bash -s -- --profile pi3bplus-imx415-tft35
+```
+
+Use `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and the hardware bring-up checklist.
 
 ## Privacy defaults
 
