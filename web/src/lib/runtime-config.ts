@@ -7,9 +7,7 @@ export function getRuntimeStatus() {
   const deviceAuthConfigured = Boolean(
     process.env.DEVICE_API_TOKEN || process.env.DEVICE_API_TOKEN_SHA256,
   );
-  const modelConfigured =
-    modelProvider === "mock" ||
-    Boolean(process.env.META_API_KEY && process.env.META_MODEL_API_URL && process.env.META_MODEL_ID);
+  const modelConfigured = modelProvider === "mock" || Boolean(process.env.META_API_KEY);
 
   const services = {
     database: hasPersistentDatabase() ? "neon" : "memory",

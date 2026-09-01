@@ -54,10 +54,10 @@ pnpm --dir web token:hash
 4. Connect their tokens as `PRIVATE_BLOB_READ_WRITE_TOKEN` and `PUBLISHED_BLOB_READ_WRITE_TOKEN`.
 5. Generate a device token with `pnpm --dir web token:hash`.
 6. Add the emitted hash as `DEVICE_API_TOKEN_SHA256`; keep the plaintext token for the camera.
-7. Add `SITE_URL`, `DEVICE_ID`, and the Meta variables from `web/.env.example`.
+7. Add `SITE_URL` and `DEVICE_ID`. When enabling Muse Image, add `META_API_KEY`; the documented endpoint and `muse-image-1.0` model are built-in defaults.
 8. Set `MODEL_PROVIDER=mock` for the first deployment smoke test.
 9. Run `pnpm --dir web db:migrate` once against the connected Neon database.
-10. Switch to `MODEL_PROVIDER=meta` after validating the authenticated Muse Image endpoint, model ID, and response shape.
+10. Switch to `MODEL_PROVIDER=meta` after adding the Meta API key and running a live image-edit smoke test.
 
 Production device mutations intentionally refuse to run until the database, both Blob stores, device authentication, and selected model provider are configured.
 
