@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
+import { getSiteUrl } from "@/lib/site-url";
+
 import "./styles.css";
 
-const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: getSiteUrl(),
   title: {
     default: "Muse Cam — A camera for impossible worlds",
     template: "%s · Muse Cam",
