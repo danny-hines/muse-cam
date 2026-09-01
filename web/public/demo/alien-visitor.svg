@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Alien visitor demo scene</title>
+  <desc id="desc">A cinematic alien figure standing in a purple desert beneath a hovering craft.</desc>
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#0b0920"/><stop offset=".58" stop-color="#393065"/><stop offset="1" stop-color="#ef7e69"/></linearGradient>
+    <radialGradient id="beam"><stop stop-color="#d7ff98" stop-opacity=".65"/><stop offset="1" stop-color="#9dffb0" stop-opacity="0"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#night)"/>
+  <g fill="#e2dbff"><circle cx="95" cy="92" r="3"/><circle cx="260" cy="172" r="4"/><circle cx="402" cy="72" r="2"/><circle cx="731" cy="129" r="3"/><circle cx="1108" cy="90" r="4"/><circle cx="987" cy="242" r="2"/></g>
+  <path d="M0 678c173-92 339-116 495-71 139 40 260 39 363 2 130-47 244-29 342 28v263H0z" fill="#321f50"/>
+  <path d="M0 767c248-64 462-65 643-3 191 65 376 60 557-17v153H0z" fill="#17132d"/>
+  <ellipse cx="594" cy="263" rx="283" ry="72" fill="#a8ffcf" opacity=".22" filter="url(#glow)"/>
+  <path d="M351 266c73-120 411-120 491 0-130 86-350 87-491 0z" fill="#bfc5cf" stroke="#18172a" stroke-width="14"/>
+  <ellipse cx="596" cy="261" rx="241" ry="45" fill="#2c2a42"/>
+  <g fill="#d7ff42"><circle cx="423" cy="272" r="12"/><circle cx="493" cy="289" r="12"/><circle cx="596" cy="298" r="12"/><circle cx="700" cy="289" r="12"/><circle cx="770" cy="271" r="12"/></g>
+  <path d="M475 297h242l224 552H244z" fill="url(#beam)"/>
+  <ellipse cx="597" cy="536" rx="93" ry="132" fill="#a9d0b6"/>
+  <ellipse cx="597" cy="508" rx="71" ry="105" fill="#bfe3c9"/>
+  <ellipse cx="566" cy="500" rx="24" ry="45" fill="#10121c" transform="rotate(-12 566 500)"/>
+  <ellipse cx="628" cy="500" rx="24" ry="45" fill="#10121c" transform="rotate(12 628 500)"/>
+  <path d="M582 564q15 10 31 0" fill="none" stroke="#5b7565" stroke-width="6" stroke-linecap="round"/>
+  <path d="M530 635q-48 67-34 183M663 635q49 68 35 183M561 644l-19 212M632 644l23 212" fill="none" stroke="#a9d0b6" stroke-width="34" stroke-linecap="round"/>
+  <ellipse cx="597" cy="858" rx="185" ry="28" fill="#070711" opacity=".65"/>
+</svg>

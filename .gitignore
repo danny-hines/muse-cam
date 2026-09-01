@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
+.next
+coverage
+dist
+data
+*.log
+*.tsbuildinfo
+__pycache__
+*.py[cod]
+.venv

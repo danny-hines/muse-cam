@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Kid drawing demo scene</title>
+  <desc id="desc">A cheerful crayon house, person, sun, and flowers on lined paper.</desc>
+  <defs>
+    <pattern id="paper" width="80" height="70" patternUnits="userSpaceOnUse"><rect width="80" height="70" fill="#fff9dc"/><path d="M0 68h80" stroke="#9ad0e4" stroke-width="3" opacity=".55"/></pattern>
+    <filter id="wobble"><feTurbulence baseFrequency=".018" numOctaves="2" seed="3" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="6"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#paper)"/>
+  <path d="M120 0v900" stroke="#ee7b87" stroke-width="5" opacity=".58"/>
+  <g filter="url(#wobble)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="975" cy="165" r="92" fill="#ffd92f" stroke="#f29b19" stroke-width="17"/>
+    <g stroke="#f29b19" stroke-width="14"><path d="M975 27v-58M975 359v-58M837 165h-58M1171 165h-58M876 66l-41-41M1110 300l-42-42M876 264l-41 41M1110 26l-42 42"/></g>
+    <path d="M250 473l284-226 286 226v287H250z" fill="#ff6d67" stroke="#613b91" stroke-width="20"/>
+    <path d="M222 475l312-250 316 250" fill="none" stroke="#2853a6" stroke-width="28"/>
+    <rect x="365" y="500" width="135" height="125" rx="8" fill="#74d5ec" stroke="#2853a6" stroke-width="15"/>
+    <path d="M432 505v115M370 562h125" stroke="#2853a6" stroke-width="12"/>
+    <rect x="605" y="512" width="116" height="248" rx="58" fill="#ffcf51" stroke="#613b91" stroke-width="16"/>
+    <circle cx="976" cy="563" r="50" fill="#f3ad78" stroke="#613b91" stroke-width="13"/>
+    <path d="M976 614v146M976 650l-87 75M976 650l83 72M976 759l-59 96M976 759l68 96" fill="none" stroke="#613b91" stroke-width="16"/>
+    <path d="M0 805c182-57 316-56 489 4 178 62 409 53 711-25v116H0z" fill="#6ecb57" stroke="#288d49" stroke-width="16"/>
+    <g stroke="#288d49" stroke-width="10"><path d="M152 836v-100M108 760l44 29 45-37"/><path d="M844 826V706M805 739l39 30 46-42"/></g>
+    <g fill="#f85b8a" stroke="#613b91" stroke-width="7"><circle cx="108" cy="744" r="23"/><circle cx="151" cy="724" r="23"/><circle cx="196" cy="741" r="23"/><circle cx="805" cy="716" r="23"/><circle cx="845" cy="689" r="23"/><circle cx="890" cy="711" r="23"/></g>
+  </g>
+</svg>

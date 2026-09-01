@@ -1,0 +1,42 @@
+import type { PublishedPhoto } from "@/lib/types";
+
+const demoNow = new Date("2026-08-31T20:00:00.000Z");
+
+export const demoPhotos: PublishedPhoto[] = [
+  {
+    id: "demo-apocalypse",
+    publicSlug: "after-the-end",
+    presetId: "post-apocalypse",
+    presetName: "After the End",
+    presetDescription: "Sun-scorched ruins, improvised survival gear, dust, and cinematic decay.",
+    imageUrl: "/demo/post-apocalypse.svg",
+    width: 1200,
+    height: 900,
+    capturedAt: new Date(demoNow.getTime() - 7 * 60 * 1_000),
+    sharedAt: new Date(demoNow.getTime() - 6 * 60 * 1_000),
+  },
+  {
+    id: "demo-drawing",
+    publicSlug: "fridge-masterpiece",
+    presetId: "kid-drawing",
+    presetName: "Fridge Masterpiece",
+    presetDescription: "Wobbly crayons, joyful colors, and the confidence of a five-year-old artist.",
+    imageUrl: "/demo/kid-drawing.svg",
+    width: 1200,
+    height: 900,
+    capturedAt: new Date(demoNow.getTime() - 43 * 60 * 1_000),
+    sharedAt: new Date(demoNow.getTime() - 42 * 60 * 1_000),
+  },
+  {
+    id: "demo-alien",
+    publicSlug: "first-contact",
+    presetId: "alien-visitor",
+    presetName: "First Contact",
+    presetDescription: "An uncanny visitor, impossible light, and a close encounter caught on camera.",
+    imageUrl: "/demo/alien-visitor.svg",
+    width: 1200,
+    height: 900,
+    capturedAt: new Date(demoNow.getTime() - 3 * 60 * 60 * 1_000),
+    sharedAt: new Date(demoNow.getTime() - 3 * 60 * 60 * 1_000),
+  },
+];

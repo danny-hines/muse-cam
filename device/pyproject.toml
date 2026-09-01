@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musecam-device"
+version = "0.1.0"
+description = "Raspberry Pi client for the Muse Cam API"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27,<1"]
+
+[project.scripts]
+musecam = "musecam.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

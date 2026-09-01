@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Post-apocalypse demo scene</title>
+  <desc id="desc">A stylized abandoned city under an orange sky.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff784d"/><stop offset=".55" stop-color="#c64031"/><stop offset="1" stop-color="#332727"/></linearGradient>
+    <linearGradient id="road" x1=".5" y1="0" x2=".5" y2="1"><stop stop-color="#342f2c"/><stop offset="1" stop-color="#11100f"/></linearGradient>
+    <filter id="grain"><feTurbulence baseFrequency=".75" numOctaves="3" seed="9" type="fractalNoise"/><feColorMatrix values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .16 0"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <circle cx="860" cy="205" r="105" fill="#ffd278" opacity=".74"/>
+  <g fill="#171615">
+    <path d="M0 350h145v-96h42v96h85v196H0z"/><path d="M185 303h62v-55h48v55h75v246H185z"/>
+    <path d="M846 280h112v-80h44v80h198v275H846z"/><path d="M724 352h155v203H724z"/>
+  </g>
+  <g fill="#ffb066" opacity=".5"><rect x="51" y="392" width="25" height="12"/><rect x="225" y="352" width="22" height="14"/><rect x="909" y="330" width="27" height="13"/><rect x="1032" y="365" width="30" height="12"/></g>
+  <path d="M0 900V565l438-68h310l452 80v323z" fill="url(#road)"/>
+  <path d="M556 900l65-400h33l81 400z" fill="#d6be83" opacity=".56"/>
+  <g fill="#0e0d0d"><path d="M386 705h252l34 94H350z"/><circle cx="400" cy="798" r="31"/><circle cx="620" cy="798" r="31"/></g>
+  <g fill="#656b46"><path d="M56 900c25-168 63-253 117-255 53-2 81 83 84 255z"/><path d="M1002 900c8-149 45-227 109-235 49-6 78 73 89 235z"/></g>
+  <rect width="1200" height="900" filter="url(#grain)" opacity=".6"/>
+</svg>

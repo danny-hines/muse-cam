@@ -1,0 +1,10 @@
+id = "pi3bplus-imx415-tft35"
+board = "Raspberry Pi 3 Model B Plus"
+display_backend = "framebuffer"
+display_width = 480
+display_height = 320
+input_backend = "evdev-touch"
+camera_backend = "picamera2"
+camera_overlay = "imx415"
+power_backend = "pisugar-s-plus"
+battery_telemetry = false
