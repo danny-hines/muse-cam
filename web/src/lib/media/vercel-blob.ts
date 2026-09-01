@@ -2,7 +2,7 @@ import { del, put } from "@vercel/blob";
 
 import type { MediaObject, MediaStore } from "./types";
 
-function requiredToken(name: "PRIVATE_BLOB_READ_WRITE_TOKEN" | "PUBLIC_BLOB_READ_WRITE_TOKEN") {
+function requiredToken(name: "PRIVATE_BLOB_READ_WRITE_TOKEN" | "PUBLISHED_BLOB_READ_WRITE_TOKEN") {
   const token = process.env[name];
   if (!token) {
     throw new Error(`${name} is not configured`);
@@ -58,12 +58,12 @@ export class VercelBlobMediaStore implements MediaStore {
       access: "public",
       addRandomSuffix: true,
       contentType,
-      token: requiredToken("PUBLIC_BLOB_READ_WRITE_TOKEN"),
+      token: requiredToken("PUBLISHED_BLOB_READ_WRITE_TOKEN"),
     });
     return blob.url;
   }
 
   async removePublic(ref: string): Promise<void> {
-    await del(ref, { token: requiredToken("PUBLIC_BLOB_READ_WRITE_TOKEN") });
+    await del(ref, { token: requiredToken("PUBLISHED_BLOB_READ_WRITE_TOKEN") });
   }
 }

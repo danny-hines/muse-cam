@@ -6,7 +6,7 @@ let mediaStore: MediaStore | null = null;
 
 export function hasPersistentMediaStore(): boolean {
   return Boolean(
-    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN && process.env.PUBLIC_BLOB_READ_WRITE_TOKEN,
+    process.env.PRIVATE_BLOB_READ_WRITE_TOKEN && process.env.PUBLISHED_BLOB_READ_WRITE_TOKEN,
   );
 }
 

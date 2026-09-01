@@ -51,7 +51,7 @@ pnpm --dir web token:hash
 1. Import this repository into Vercel and select `web` as the project root.
 2. Provision Neon Postgres from the Vercel Marketplace and connect it as `DATABASE_URL`.
 3. Create two Vercel Blob stores: one **private** and one **public**.
-4. Connect their tokens as `PRIVATE_BLOB_READ_WRITE_TOKEN` and `PUBLIC_BLOB_READ_WRITE_TOKEN`.
+4. Connect their tokens as `PRIVATE_BLOB_READ_WRITE_TOKEN` and `PUBLISHED_BLOB_READ_WRITE_TOKEN`.
 5. Generate a device token with `pnpm --dir web token:hash`.
 6. Add the emitted hash as `DEVICE_API_TOKEN_SHA256`; keep the plaintext token for the camera.
 7. Add `SITE_URL`, `DEVICE_ID`, and the Meta variables from `web/.env.example`.
