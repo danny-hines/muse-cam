@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -109,7 +110,7 @@ class InputManager:
         for _, device, _ in candidates[1:]:
             if device is not self._touch_device:
                 device.close()
-        self._touch_device.set_nonblocking(True)
+        os.set_blocking(self._touch_device.fd, False)
         self._touch_ecodes = ecodes
 
         x_code = ecodes.ABS_X if ecodes.ABS_X in absolute_codes else ecodes.ABS_MT_POSITION_X
