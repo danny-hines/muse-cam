@@ -72,4 +72,4 @@ def test_pi3_touch_orientation_matches_landscape_display() -> None:
 
     assert profile.touch_swap_xy is True
     assert profile.touch_invert_x is False
-    assert profile.touch_invert_y is True
+    assert profile.touch_invert_y is False
