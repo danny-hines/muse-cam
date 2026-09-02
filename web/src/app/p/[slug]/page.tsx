@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BeforeAfter } from "@/components/before-after";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getPublishedPhotoBySlug } from "@/lib/photos";
@@ -50,15 +51,23 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
         </Link>
         <div className="detail-layout">
           <div className="detail-image">
-            <Image
-              src={photo.imageUrl}
-              alt={`Muse Cam photo transformed with the ${photo.presetName} preset`}
-              fill
-              sizes="(max-width: 900px) 100vw, 70vw"
-              style={{ objectFit: "cover" }}
-              priority
-              unoptimized={photo.imageUrl.endsWith(".svg")}
-            />
+            {photo.originalImageUrl ? (
+              <BeforeAfter
+                transformedUrl={photo.imageUrl}
+                originalUrl={photo.originalImageUrl}
+                presetName={photo.presetName}
+              />
+            ) : (
+              <Image
+                src={photo.imageUrl}
+                alt={`Muse Cam photo transformed with the ${photo.presetName} preset`}
+                fill
+                sizes="(max-width: 900px) 100vw, 70vw"
+                style={{ objectFit: "cover" }}
+                priority
+                unoptimized={photo.imageUrl.endsWith(".svg")}
+              />
+            )}
           </div>
           <aside className="detail-copy">
             <p className="section-kicker">Preset</p>
@@ -72,8 +81,14 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
               </div>
               <div className="detail-fact">
                 <dt>Camera</dt>
-                <dd>Muse Cam 01</dd>
+                <dd>{photo.deviceName}</dd>
               </div>
+              {photo.eventName ? (
+                <div className="detail-fact">
+                  <dt>Event</dt>
+                  <dd>{photo.eventName}</dd>
+                </div>
+              ) : null}
               <div className="detail-fact">
                 <dt>Model</dt>
                 <dd>Muse Image</dd>

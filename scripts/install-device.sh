@@ -10,6 +10,7 @@ PROFILE=""
 RECONFIGURE=0
 START_SERVICE=1
 TOKEN_STDIN=0
+CLAIM_CODE=""
 REBOOT_REQUIRED=0
 
 MPI3501_DRIVER_REPOSITORY=https://github.com/goodtft/LCD-show.git
@@ -25,6 +26,7 @@ Usage:
 
 Profiles:
   pi3bplus-imx415-tft35
+  pi3bplus-imx415-dsi43
   zero2-cam3-displayhat
 
 Options:
@@ -32,6 +34,7 @@ Options:
   --server URL        Muse Cam server URL
   --reconfigure       Prompt for the server URL and device token again
   --token-stdin       Read the device token from standard input
+  --claim CODE        Register with a one-time code instead of entering a token
   --no-start          Install without enabling or starting the service
 EOF
 }
@@ -129,6 +132,10 @@ while [[ $# -gt 0 ]]; do
       TOKEN_STDIN=1
       shift
       ;;
+    --claim)
+      CLAIM_CODE="$2"
+      shift 2
+      ;;
     --no-start)
       START_SERVICE=0
       shift
@@ -151,7 +158,7 @@ if [[ ${EUID} -ne 0 ]]; then
 fi
 
 if [[ -z ${PROFILE} ]]; then
-  echo "Pass --profile pi3bplus-imx415-tft35 or --profile zero2-cam3-displayhat." >&2
+  echo "Pass a supported profile; run with --help to list them." >&2
   exit 2
 fi
 
@@ -161,7 +168,7 @@ if [[ ! -f /proc/device-tree/model ]]; then
 fi
 
 case "${PROFILE}" in
-  pi3bplus-imx415-tft35|zero2-cam3-displayhat) ;;
+  pi3bplus-imx415-tft35|pi3bplus-imx415-dsi43|zero2-cam3-displayhat) ;;
   *)
     echo "Unknown hardware profile: ${PROFILE}" >&2
     exit 2
@@ -181,7 +188,12 @@ apt-get install -y \
   python3-pygame \
   python3-gpiozero \
   python3-evdev \
+  curl \
   sudo
+
+if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  apt-get install -y chromium xserver-xorg xinit x11-xserver-utils
+fi
 
 if command -v raspi-config >/dev/null 2>&1; then
   raspi-config nonint do_spi 0
@@ -196,6 +208,16 @@ if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
   ensure_boot_config_setting \
     'dtoverlay=tft35a' \
     'dtoverlay=tft35a:rotate=90,speed=20000000'
+fi
+
+if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  ensure_boot_config_line 'dtoverlay=imx415'
+  ensure_boot_config_setting 'dtoverlay=vc4-kms-v3d' 'dtoverlay=vc4-kms-v3d'
+  if [[ -f "$(overlay_directory)/vc4-kms-dsi-waveshare-800x480.dtbo" ]]; then
+    ensure_boot_config_line 'dtoverlay=vc4-kms-dsi-waveshare-800x480'
+  else
+    ensure_boot_config_line 'dtoverlay=vc4-kms-dsi-7inch'
+  fi
 fi
 
 if systemctl is-active --quiet musecam.service 2>/dev/null; then
@@ -223,7 +245,7 @@ fi
 if ! id musecam >/dev/null 2>&1; then
   useradd --system --home-dir "${DATA_DIR}" --create-home --shell /usr/sbin/nologin musecam
 fi
-for group in video render input gpio spi; do
+for group in video render input gpio spi tty; do
   if getent group "${group}" >/dev/null 2>&1; then
     usermod -aG "${group}" musecam
   fi
@@ -239,8 +261,17 @@ fi
 
 install -d -o root -g musecam -m 0750 "${CONFIG_DIR}"
 CONFIG_FILE="${CONFIG_DIR}/device.env"
+DEVICE_ID=""
 if [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 ]]; then
-  if [[ ${TOKEN_STDIN} -eq 1 ]]; then
+  if [[ -n ${CLAIM_CODE} ]]; then
+    CLAIM_CONFIG=$(mktemp)
+    "${INSTALL_DIR}/.venv/bin/musecam" --config "${CLAIM_CONFIG}" claim \
+      "${CLAIM_CODE}" --server "${SERVER_URL}"
+    SERVER_URL=$(sed -n 's/^MUSECAM_SERVER_URL=//p' "${CLAIM_CONFIG}" | tail -1)
+    DEVICE_TOKEN=$(sed -n 's/^MUSECAM_DEVICE_TOKEN=//p' "${CLAIM_CONFIG}" | tail -1)
+    DEVICE_ID=$(sed -n 's/^MUSECAM_DEVICE_ID=//p' "${CLAIM_CONFIG}" | tail -1)
+    rm -f -- "${CLAIM_CONFIG}"
+  elif [[ ${TOKEN_STDIN} -eq 1 ]]; then
     IFS= read -r DEVICE_TOKEN
   elif [[ -t 0 || -r /dev/tty ]]; then
     read -r -p "Muse Cam server URL [${SERVER_URL}]: " ENTERED_SERVER </dev/tty
@@ -258,6 +289,7 @@ if [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 ]]; then
 else
   SERVER_URL=$(sed -n 's/^MUSECAM_SERVER_URL=//p' "${CONFIG_FILE}" | tail -1)
   DEVICE_TOKEN=$(sed -n 's/^MUSECAM_DEVICE_TOKEN=//p' "${CONFIG_FILE}" | tail -1)
+  DEVICE_ID=$(sed -n 's/^MUSECAM_DEVICE_ID=//p' "${CONFIG_FILE}" | tail -1)
 fi
 
 TEMP_CONFIG=$(mktemp)
@@ -265,6 +297,9 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
 {
   printf 'MUSECAM_SERVER_URL=%s\n' "${SERVER_URL%/}"
   printf 'MUSECAM_DEVICE_TOKEN=%s\n' "${DEVICE_TOKEN}"
+  if [[ -n ${DEVICE_ID} ]]; then
+    printf 'MUSECAM_DEVICE_ID=%s\n' "${DEVICE_ID}"
+  fi
   printf 'MUSECAM_PROFILE=%s\n' "${PROFILE}"
   printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
   printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
@@ -272,9 +307,20 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
 } >"${TEMP_CONFIG}"
 install -o root -g musecam -m 0640 "${TEMP_CONFIG}" "${CONFIG_FILE}"
 
-install -o root -g root -m 0644 \
-  "${INSTALL_DIR}/device/systemd/musecam.service" \
-  /etc/systemd/system/musecam.service
+if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  install -o root -g root -m 0644 \
+    "${INSTALL_DIR}/device/systemd/musecam-web.service" \
+    /etc/systemd/system/musecam.service
+  install -o root -g root -m 0644 \
+    "${INSTALL_DIR}/device/systemd/musecam-kiosk.service" \
+    /etc/systemd/system/musecam-kiosk.service
+else
+  systemctl disable --now musecam-kiosk.service 2>/dev/null || true
+  rm -f /etc/systemd/system/musecam-kiosk.service
+  install -o root -g root -m 0644 \
+    "${INSTALL_DIR}/device/systemd/musecam.service" \
+    /etc/systemd/system/musecam.service
+fi
 printf 'musecam ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff\n' \
   >/etc/sudoers.d/musecam-poweroff
 chmod 0440 /etc/sudoers.d/musecam-poweroff
@@ -286,8 +332,14 @@ runuser -u musecam -- "${INSTALL_DIR}/.venv/bin/musecam" --config "${CONFIG_FILE
 if [[ ${START_SERVICE} -eq 1 ]]; then
   if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then
     systemctl enable musecam.service
+    if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+      systemctl enable musecam-kiosk.service
+    fi
   else
     systemctl enable --now musecam.service
+    if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+      systemctl enable --now musecam-kiosk.service
+    fi
   fi
   echo
   if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then

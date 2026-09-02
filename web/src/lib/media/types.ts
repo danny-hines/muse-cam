@@ -13,4 +13,5 @@ export interface MediaStore {
   readPrivate(ref: string): Promise<MediaObject>;
   publish(ref: string, id: string, contentType: string): Promise<string>;
   removePublic(ref: string): Promise<void>;
+  removePrivate(ref: string): Promise<void>;
 }

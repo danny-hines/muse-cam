@@ -92,6 +92,24 @@ def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[Diag
                 str(device) if device.exists() else "SPI device /dev/spidev0.1 is missing",
             )
         )
+    elif profile.display_backend == "browser":
+        connectors = sorted(Path("/sys/class/drm").glob("card*-DSI-*/status"))
+        connected = [path for path in connectors if path.read_text().strip() == "connected"]
+        browser = shutil.which("chromium") or shutil.which("chromium-browser")
+        checks.append(
+            DiagnosticCheck(
+                "display",
+                "ok" if connected else "failed",
+                str(connected[0]) if connected else "No connected DSI display found",
+            )
+        )
+        checks.append(
+            DiagnosticCheck(
+                "kiosk browser",
+                "ok" if browser else "failed",
+                browser or "Chromium is not installed",
+            )
+        )
     else:
         framebuffers = sorted(Path("/dev").glob("fb*"))
         checks.append(

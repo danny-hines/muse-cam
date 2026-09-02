@@ -52,6 +52,7 @@ def test_load_config_requires_credentials(tmp_path: Path, monkeypatch: pytest.Mo
     ("profile_id", "width", "height", "input_backend"),
     (
         ("pi3bplus-imx415-tft35", 480, 320, "evdev-touch"),
+        ("pi3bplus-imx415-dsi43", 800, 480, "browser-touch"),
         ("zero2-cam3-displayhat", 320, 240, "displayhat-buttons"),
     ),
 )

@@ -23,7 +23,10 @@ export function PhotoCard({ photo, index }: { photo: PublishedPhoto; index: numb
           <span className="photo-index">{String(index + 1).padStart(2, "0")}</span>
         </div>
         <div className="photo-meta">
-          <p className="preset-name">{photo.presetName}</p>
+          <div>
+            <p className="preset-name">{photo.presetName}</p>
+            <p className="photo-origin">{photo.eventName ?? photo.deviceName}</p>
+          </div>
           <time className="photo-time" dateTime={photo.sharedAt.toISOString()}>
             {relativeTime(photo.sharedAt)}
           </time>

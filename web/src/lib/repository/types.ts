@@ -2,7 +2,13 @@ import type { PhotoRecord } from "@/lib/types";
 
 export type CreatePhotoInput = Pick<
   PhotoRecord,
-  "id" | "captureId" | "deviceId" | "presetId" | "presetVersion" | "capturedAtDevice"
+  | "id"
+  | "captureId"
+  | "deviceId"
+  | "eventId"
+  | "presetId"
+  | "presetVersion"
+  | "capturedAtDevice"
 >;
 
 export type CompletePhotoInput = {
@@ -19,8 +25,16 @@ export interface PhotoRepository {
   findByCaptureId(captureId: string): Promise<PhotoRecord | null>;
   findByPublicSlug(slug: string): Promise<PhotoRecord | null>;
   listShared(limit?: number): Promise<PhotoRecord[]>;
+  listAll(limit?: number): Promise<PhotoRecord[]>;
   markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord>;
   markFailed(id: string, errorCode: string): Promise<PhotoRecord>;
-  markShared(id: string, publicSlug: string, publicUrl: string): Promise<PhotoRecord>;
+  markShared(
+    id: string,
+    publicSlug: string,
+    publicUrl: string,
+    originalPublicUrl?: string | null,
+  ): Promise<PhotoRecord>;
   markUnshared(id: string): Promise<PhotoRecord>;
+  markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord>;
+  delete(id: string): Promise<void>;
 }

@@ -6,7 +6,20 @@ All camera routes except presets require:
 Authorization: Bearer <device token>
 ```
 
-The server stores only the SHA-256 digest of the production token. Capture IDs must be stable across retries; the API uses them as idempotency keys.
+The server stores only SHA-256 token digests. New cameras receive an individual, revocable token; the original environment-configured token remains as a migration fallback. A camera can only read or share its own generations. Capture IDs must be stable across retries because the API uses them as idempotency keys.
+
+## Register a camera
+
+An operator first creates a single-use setup code at `/admin`. It expires after 30 minutes.
+
+```http
+POST /api/device/claim
+Content-Type: application/json
+
+{"code":"XXXX-XXXX-XXXX-XXXX","name":"Lobby Camera"}
+```
+
+The response contains a new plaintext token exactly once. The device CLI stores it in `/etc/musecam/device.env`; the server retains only its digest. Claim codes are also stored only as digests and cannot be reused.
 
 ## List presets
 
@@ -76,7 +89,7 @@ Returns the generated image with private cache headers. Device authentication is
 POST /api/device/generations/:id/share
 ```
 
-Copies the result from private to public Blob storage, assigns an unguessable slug, and returns `shareUrl`. Repeated calls are idempotent.
+Copies the result from private to public Blob storage, assigns an unguessable slug, and returns `shareUrl`. Repeated calls are idempotent. The normalized original is published too only when the photo's event has explicitly enabled originals.
 
 ## Unshare
 
@@ -84,7 +97,7 @@ Copies the result from private to public Blob storage, assigns an unguessable sl
 DELETE /api/device/generations/:id/share
 ```
 
-Deletes the public Blob and removes the frame from the feed. The private result is retained for the configured retention period.
+Deletes all public copies and removes the frame from the feed. Private media is retained until an operator permanently deletes the capture.
 
 ## Health
 

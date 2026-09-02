@@ -5,9 +5,10 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "dev": "pnpm --dir web dev",
-    "build": "pnpm --dir web build",
+    "build": "pnpm --dir device-ui build && pnpm --dir web build",
+    "build:device-ui": "pnpm --dir device-ui build",
     "lint": "pnpm --dir web lint",
-    "typecheck": "pnpm --dir web typecheck",
+    "typecheck": "pnpm --dir device-ui typecheck && pnpm --dir web typecheck",
     "test": "pnpm --dir web test"
   }
 }

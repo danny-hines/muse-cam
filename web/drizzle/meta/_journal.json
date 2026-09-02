@@ -8,6 +8,13 @@
       "when": 1788223372273,
       "tag": "0000_zippy_steve_rogers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788388998002,
+      "tag": "0001_colorful_vindicator",
+      "breakpoints": true
     }
   ]
 }

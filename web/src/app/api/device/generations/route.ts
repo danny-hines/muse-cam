@@ -21,8 +21,9 @@ const generationFields = z.object({
 
 export async function POST(request: Request) {
   let deviceId: string;
+  let eventId: string | null;
   try {
-    ({ deviceId } = authenticateDevice(request));
+    ({ deviceId, eventId } = await authenticateDevice(request));
   } catch (error) {
     if (error instanceof DeviceAuthError) return apiError(error.message, error.status);
     return apiError("Unable to authenticate device", 401);
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
   const repository = getPhotoRepository();
   const existing = await repository.findByCaptureId(parsed.data.captureId);
   if (existing) {
+    if (existing.deviceId !== deviceId) return apiError("Capture ID is already in use", 409);
     const status = existing.status === "processing" ? 202 : 200;
     return Response.json(photoApiResponse(existing, request), { status });
   }
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
     id: randomUUID(),
     captureId: parsed.data.captureId,
     deviceId,
+    eventId,
     presetId: preset.id,
     presetVersion: preset.version,
     capturedAtDevice: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null,

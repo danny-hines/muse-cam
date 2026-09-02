@@ -7,7 +7,7 @@ name = "musecam-device"
 version = "0.2.0"
 description = "Portable Raspberry Pi camera application for Muse Cam"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27,<1", "Pillow>=9.4,<13"]
+dependencies = ["aiohttp>=3.12,<4", "httpx>=0.27,<1", "Pillow>=9.4,<13"]
 
 [project.optional-dependencies]
 sim = ["pygame-ce>=2.5,<3"]
@@ -18,6 +18,9 @@ musecam = "musecam.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+musecam = ["static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

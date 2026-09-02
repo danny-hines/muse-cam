@@ -47,3 +47,21 @@ def test_capture_lifecycle_and_preset_cache(tmp_path: Path) -> None:
         assert store.get("capture_0002") is not None
     finally:
         store.close()
+
+
+def test_interrupted_upload_is_recovered_on_startup(tmp_path: Path) -> None:
+    database = tmp_path / "musecam.sqlite3"
+    first = CaptureStore(database)
+    first.enqueue("capture_0001", "storybook", tmp_path / "capture.jpg")
+    first.mark_uploading("capture_0001")
+    first.close()
+
+    recovered = CaptureStore(database)
+    try:
+        pending = recovered.pending()
+        assert len(pending) == 1
+        assert pending[0].status == "queued"
+        assert pending[0].attempts == 1
+        assert pending[0].error == "Interrupted while uploading; queued for retry"
+    finally:
+        recovered.close()

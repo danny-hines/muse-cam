@@ -1,0 +1,344 @@
+:root {
+  color: #f7f3ea;
+  background: #090b0c;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #090b0c;
+  user-select: none;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+}
+
+.camera-shell {
+  --accent: #d7ff42;
+  position: relative;
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr) 92px;
+  width: 100%;
+  height: 100%;
+  min-width: 480px;
+  min-height: 320px;
+  background: #090b0c;
+}
+
+.top-bar {
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(9, 11, 12, 0.97);
+}
+
+.brand-lockup,
+.camera-health,
+.camera-health span {
+  display: flex;
+  align-items: center;
+}
+
+.brand-lockup {
+  gap: 10px;
+  font-size: 0.84rem;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+}
+
+.camera-mark {
+  position: relative;
+  display: grid;
+  width: 29px;
+  height: 23px;
+  place-items: center;
+  border: 2px solid #101313;
+  border-radius: 4px 4px 7px 7px;
+  color: #101313;
+  background: var(--accent);
+}
+
+.camera-mark::before {
+  position: absolute;
+  top: -6px;
+  left: 3px;
+  width: 8px;
+  height: 4px;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+  content: "";
+}
+
+.camera-mark span {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: #101313;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.camera-health {
+  gap: 17px;
+  color: rgba(247, 243, 234, 0.62);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.camera-health span {
+  gap: 7px;
+}
+
+.camera-health i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff6c51;
+}
+
+.camera-health .online i {
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
+.viewfinder {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: #182023;
+}
+
+.camera-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.viewfinder-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 32%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.34), transparent 34%);
+}
+
+.preset-card {
+  position: absolute;
+  bottom: 17px;
+  left: 20px;
+  display: flex;
+  align-items: flex-end;
+  gap: 13px;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.72);
+}
+
+.preset-card::before {
+  position: absolute;
+  bottom: -7px;
+  left: 0;
+  width: 52px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  content: "";
+}
+
+.preset-position {
+  padding-bottom: 4px;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.preset-card p {
+  margin: 0 0 2px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.57rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.preset-card h1 {
+  margin: 0;
+  font-family: "Arial Black", Inter, sans-serif;
+  font-size: clamp(1.35rem, 4.5vh, 2.1rem);
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.back-to-camera {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(8, 10, 11, 0.62);
+  backdrop-filter: blur(10px);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(72%, 420px);
+  min-height: 132px;
+  padding: 26px 30px 22px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 22px;
+  color: #f7f3ea;
+  background: rgba(7, 10, 11, 0.88);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(15px);
+}
+
+.status-overlay strong {
+  font-family: "Arial Black", Inter, sans-serif;
+  font-size: 1.18rem;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+
+.status-overlay > span:last-child {
+  color: rgba(247, 243, 234, 0.65);
+  font-size: 0.72rem;
+}
+
+.orbit {
+  width: 30px;
+  height: 30px;
+  border: 4px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: orbit 820ms linear infinite;
+}
+
+.status-error {
+  border-color: rgba(255, 108, 81, 0.58);
+}
+
+.control-deck {
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 1.16fr 1fr 1fr;
+  align-items: stretch;
+  background: #090b0c;
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.action-button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+.action-button:first-child {
+  border-left: 0;
+}
+
+.action-button:active:not(:disabled) {
+  color: #101313;
+  background: var(--accent);
+}
+
+.action-button:disabled {
+  color: rgba(247, 243, 234, 0.28);
+}
+
+.shutter-button {
+  grid-template-columns: 42px auto;
+  gap: 10px;
+  color: var(--accent);
+}
+
+.shutter-ring {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px #090b0c;
+  background: var(--accent);
+}
+
+.shutter-button:active:not(:disabled) .shutter-ring {
+  border-color: #101313;
+  box-shadow: inset 0 0 0 4px var(--accent);
+  background: #101313;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 390px) {
+  .camera-shell {
+    grid-template-rows: 44px minmax(0, 1fr) 72px;
+  }
+
+  .top-bar {
+    padding-inline: 14px;
+  }
+
+  .preset-card {
+    bottom: 12px;
+    left: 14px;
+  }
+
+  .shutter-ring {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit {
+    animation-duration: 1.8s;
+  }
+}
