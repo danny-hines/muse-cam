@@ -62,22 +62,6 @@ ensure_boot_config_line() {
   fi
 }
 
-ensure_boot_config_setting() {
-  local prefix="$1"
-  local line="$2"
-  local config
-  config=$(boot_config_path)
-  if grep -qxF "${line}" "${config}"; then
-    return
-  fi
-  if grep -q "^${prefix}" "${config}"; then
-    sed -i "s|^${prefix}.*$|${line}|" "${config}"
-  else
-    printf '\n%s\n' "${line}" >>"${config}"
-  fi
-  REBOOT_REQUIRED=1
-}
-
 install_mpi3501_overlay() {
   local overlays destination current_hash checkout
   overlays=$(overlay_directory)
@@ -193,9 +177,7 @@ fi
 if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
   install_mpi3501_overlay
   ensure_boot_config_line 'dtoverlay=imx415'
-  ensure_boot_config_setting \
-    'dtoverlay=tft35a' \
-    'dtoverlay=tft35a:rotate=90,speed=32000000,fps=15'
+  ensure_boot_config_line 'dtoverlay=tft35a:rotate=90'
 fi
 
 if systemctl is-active --quiet musecam.service 2>/dev/null; then

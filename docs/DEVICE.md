@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/i
   | sudo bash -s -- --profile zero2-cam3-displayhat
 ```
 
-The installer asks for the Vercel URL and plaintext device token through `/dev/tty`, creates a locked-down `musecam` system user, enables SPI, installs the reviewed MPI3501 overlay at a pinned revision, configures its SPI link at 32 MHz, enables the IMX415 overlay, installs the Python application, verifies the API, and enables `musecam.service`. It reboots automatically when a new hardware overlay must be activated. Rerunning the same command performs a fast-forward update and preserves the secret. Add `--reconfigure` to replace it.
+The installer asks for the Vercel URL and plaintext device token through `/dev/tty`, creates a locked-down `musecam` system user, enables SPI, installs the reviewed MPI3501 overlay at a pinned revision, enables the IMX415 overlay, installs the Python application, verifies the API, and enables `musecam.service`. It reboots automatically when a new hardware overlay must be activated. Rerunning the same command performs a fast-forward update and preserves the secret. Add `--reconfigure` to replace it.
 
 ## Validate before starting the enclosure
 
@@ -61,7 +61,7 @@ sudo nano /etc/musecam/device.env
 
 The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then falls back to `/dev/fb0` when the MPI3501 is the only screen. Override this by adding `MUSECAM_FRAMEBUFFER` to `/etc/musecam/device.env` only when diagnostics show an unusual framebuffer assignment. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`.
 
-The Pi 3 profile renders its preview at 10 FPS, leaving headroom for full-screen RGB565 transfers over SPI. If a particular display or long header extension is unstable at 32 MHz, lower the `speed` value on the `dtoverlay=tft35a` line in the boot config to `24000000` and reboot.
+The Pi 3 profile renders its preview at 10 FPS. Keep the display overlay at its conservative default SPI clock; higher clocks can cause severe corruption on some panels or GPIO header paths.
 
 ## Controls
 
