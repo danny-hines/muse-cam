@@ -128,7 +128,7 @@ class InputManager:
         ecodes = self._touch_ecodes
         actions: list[Action] = []
         try:
-            events = self._touch_device.read()
+            events = list(self._touch_device.read())
         except BlockingIOError:
             return []
         for event in events:

@@ -32,3 +32,19 @@ def test_swapped_and_inverted_touch_axes() -> None:
     manager._touch_invert_x = True
     manager._touch_invert_y = True
     assert manager._scaled_touch_position() == (239, 80)
+
+
+def test_empty_nonblocking_touch_read() -> None:
+    class TouchDevice:
+        def read(self):
+            def events():
+                raise BlockingIOError
+                yield
+
+            return events()
+
+    manager = make_input_manager()
+    manager._touch_device = TouchDevice()
+    manager._touch_ecodes = object()
+
+    assert manager._poll_touchscreen() == []
