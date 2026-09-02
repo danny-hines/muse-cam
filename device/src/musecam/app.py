@@ -23,6 +23,7 @@ from .store import CaptureStore
 from .ui import AppView, Renderer
 
 LOGGER = logging.getLogger(__name__)
+CAMERA_UNAVAILABLE_MESSAGE = "Camera unavailable — check ribbon cable"
 
 FALLBACK_PRESETS = [
     Preset("post-apocalypse", 1, "After the End", "Cinematic ruins and survival gear.", "#ff6c51"),
@@ -64,6 +65,7 @@ class MuseCamApp:
         self._store = CaptureStore(self._data_dir / "musecam.sqlite3")
         self._client = None if offline else MuseCamClient(config)
         self._camera: Camera = create_camera(profile, simulate=simulate)
+        self._camera_available = False
         self._display: Display = create_display(
             profile, config, simulate=simulate, windowed=windowed
         )
@@ -97,9 +99,15 @@ class MuseCamApp:
         import pygame
 
         self._load_presets()
-        self._camera.start()
-        self._state = ScreenState.LIVE
-        self._message = ""
+        try:
+            self._camera.start()
+            self._camera_available = True
+            self._state = ScreenState.LIVE
+            self._message = ""
+        except Exception:
+            LOGGER.exception("Camera startup failed")
+            self._state = ScreenState.ERROR
+            self._message = CAMERA_UNAVAILABLE_MESSAGE
         self._running = True
         clock = pygame.time.Clock()
         frames = 0
@@ -183,9 +191,9 @@ class MuseCamApp:
         }:
             delta = -1 if action == Action.PREVIOUS else 1
             self._preset_index = (self._preset_index + delta) % len(self._presets)
-            self._state = ScreenState.LIVE
+            self._state = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
             self._result = None
-            self._message = ""
+            self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
         elif action == Action.SHUTTER and self._state in {
             ScreenState.LIVE,
             ScreenState.RESULT,

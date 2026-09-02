@@ -126,7 +126,12 @@ class Renderer:
             )
             panel.fill((8, 14, 15, 225))
             self._surface.blit(panel, ((self._width - panel_width) // 2, self._height // 4))
-            title = self._medium.render("SAVED FOR LATER", True, accent)
+            title_text = (
+                "CHECK CAMERA"
+                if view.message.lower().startswith("camera unavailable")
+                else "SAVED FOR LATER"
+            )
+            title = self._medium.render(title_text, True, accent)
             self._surface.blit(title, (center[0] - title.get_width() // 2, self._height // 4 + 12))
             self._draw_centered_message(
                 view.message or "Try again when the connection returns.", self._height // 4 + 42
