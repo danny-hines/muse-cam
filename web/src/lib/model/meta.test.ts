@@ -9,6 +9,7 @@ import {
   extractImageCandidate,
   MetaMuseProvider,
 } from "./meta";
+import { ImageModelError } from "./errors";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -119,5 +120,32 @@ describe("MetaMuseProvider", () => {
         preset: presets[0],
       }),
     ).rejects.toThrow("Meta Model API request failed (400): The image was malformed.");
+  });
+
+  it("classifies Meta content-policy filtering", async () => {
+    vi.stubEnv("META_API_KEY", "test-meta-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            error: {
+              message:
+                "The response was filtered due to the prompt triggering our content management policy.",
+            },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const operation = new MetaMuseProvider().transform({
+      bytes: Buffer.from("not-used-by-the-mock"),
+      contentType: "image/jpeg",
+      preset: presets[0],
+    });
+
+    await expect(operation).rejects.toBeInstanceOf(ImageModelError);
+    await expect(operation).rejects.toMatchObject({ code: "content_filtered", providerStatus: 400 });
   });
 });

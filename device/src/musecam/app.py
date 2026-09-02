@@ -26,13 +26,35 @@ LOGGER = logging.getLogger(__name__)
 CAMERA_UNAVAILABLE_MESSAGE = "Camera unavailable — check ribbon cable"
 
 FALLBACK_PRESETS = [
-    Preset("post-apocalypse", 1, "After the End", "Cinematic ruins and survival gear.", "#ff6c51"),
+    Preset("post-apocalypse", 2, "After the End", "Cinematic ruins and survival gear.", "#ff6c51"),
     Preset("kid-drawing", 1, "Fridge Masterpiece", "Wobbly crayons and joyful color.", "#ffd84a"),
     Preset("alien-visitor", 1, "First Contact", "An uncanny close encounter.", "#d7ff42"),
     Preset("claymation", 1, "Tiny Clay World", "Hand-shaped stop-motion charm.", "#f39b69"),
     Preset("disposable-90s", 1, "Found in 1997", "Flash, grain, and candid energy.", "#5ac6c8"),
     Preset("storybook", 1, "Bedtime Legend", "A warm painted storybook page.", "#6657de"),
 ]
+
+
+def api_error_code(error: httpx.HTTPStatusError) -> str | None:
+    try:
+        payload = error.response.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    details = payload.get("details")
+    if not isinstance(details, dict):
+        return None
+    code = details.get("code")
+    return code if isinstance(code, str) else None
+
+
+def friendly_generation_error(code: str | None) -> str:
+    if code == "content_filtered":
+        return "Try another style or framing. Tap BACK."
+    if code in {"model_timeout", "model_rate_limited", "model_unavailable"}:
+        return "Muse Image is unavailable. Tap BACK and try again."
+    return "Remix failed. Tap BACK and try again."
 
 
 @dataclass(frozen=True)
@@ -180,10 +202,14 @@ class MuseCamApp:
             self._running = False
         elif action == Action.POWER:
             self._power_off()
+        elif self._state == ScreenState.ERROR and action in {
+            Action.BACK,
+            Action.SHUTTER,
+            Action.SHARE,
+        }:
+            self._return_to_live()
         elif action == Action.BACK:
-            self._state = ScreenState.LIVE
-            self._message = ""
-            self._result = None
+            self._return_to_live()
         elif action in {Action.PREVIOUS, Action.NEXT} and self._state in {
             ScreenState.LIVE,
             ScreenState.RESULT,
@@ -194,11 +220,7 @@ class MuseCamApp:
             self._state = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
             self._result = None
             self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
-        elif action == Action.SHUTTER and self._state in {
-            ScreenState.LIVE,
-            ScreenState.RESULT,
-            ScreenState.ERROR,
-        }:
+        elif action == Action.SHUTTER and self._state in {ScreenState.LIVE, ScreenState.RESULT}:
             self._capture()
         elif action == Action.SHARE and self._state == ScreenState.RESULT:
             self._share()
@@ -254,9 +276,7 @@ class MuseCamApp:
         try:
             generation = self._client.generate(job.source_path, job.capture_id, job.preset_id)
             if generation.status != "complete" or not generation.image_url:
-                error = (
-                    generation.error_code or f"Unexpected generation status: {generation.status}"
-                )
+                error = friendly_generation_error(generation.error_code)
                 self._store.mark_failed(job.capture_id, error)
                 return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
             self._client.download_result(generation.image_url, result_path)
@@ -268,8 +288,12 @@ class MuseCamApp:
         except httpx.TransportError as error:
             self._store.mark_queued(job.capture_id, str(error))
             return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
-        except (httpx.HTTPStatusError, OSError, ValueError) as error:
-            self._store.mark_failed(job.capture_id, str(error))
+        except httpx.HTTPStatusError as error:
+            message = friendly_generation_error(api_error_code(error))
+            self._store.mark_failed(job.capture_id, message)
+            return CaptureOutcome(self._store.get(job.capture_id) or job, None)
+        except (OSError, ValueError):
+            self._store.mark_failed(job.capture_id, friendly_generation_error(None))
             return CaptureOutcome(self._store.get(job.capture_id) or job, None)
 
     def _poll_future(self) -> None:
@@ -357,6 +381,11 @@ class MuseCamApp:
         if now - self._last_battery_read >= 5:
             self._last_battery_read = now
             self._battery_percentage = self._battery.percentage()
+
+    def _return_to_live(self) -> None:
+        self._state = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
+        self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
+        self._result = None
 
     def _prune_local_history(self) -> None:
         for path in self._store.prune_finished(keep=100):

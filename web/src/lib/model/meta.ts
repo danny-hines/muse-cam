@@ -1,5 +1,6 @@
 import sharp from "sharp";
 
+import { ImageModelError, type ImageModelErrorCode } from "./errors";
 import type { ImageModelProvider, TransformInput, TransformResult } from "./types";
 
 export const DEFAULT_META_IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits";
@@ -50,6 +51,15 @@ export function extractImageCandidate(payload: unknown): ImageCandidate | null {
 function metaErrorMessage(payload: unknown): string | null {
   if (!isRecord(payload) || !isRecord(payload.error)) return null;
   return typeof payload.error.message === "string" ? payload.error.message : null;
+}
+
+function metaErrorCode(status: number, detail: string | null): ImageModelErrorCode {
+  if (status === 429) return "model_rate_limited";
+  if (status >= 500) return "model_unavailable";
+  if (status === 400 && detail && /filtered|content management policy/i.test(detail)) {
+    return "content_filtered";
+  }
+  return "model_request_failed";
 }
 
 async function candidateToBytes(candidate: ImageCandidate): Promise<{ bytes: Buffer; contentType: string }> {
@@ -110,8 +120,10 @@ export class MetaMuseProvider implements ImageModelProvider {
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const detail = metaErrorMessage(payload);
-      throw new Error(
+      throw new ImageModelError(
+        metaErrorCode(response.status, detail),
         `Meta Model API request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+        response.status,
       );
     }
 

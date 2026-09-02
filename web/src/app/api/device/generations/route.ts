@@ -6,6 +6,7 @@ import { apiError, photoApiResponse } from "@/lib/api";
 import { authenticateDevice, DeviceAuthError } from "@/lib/device-auth";
 import { getMediaStore } from "@/lib/media";
 import { getImageModelProvider } from "@/lib/model";
+import { classifyGenerationError } from "@/lib/model/errors";
 import { InvalidImageError, MAX_IMAGE_BYTES, normalizeInputImage } from "@/lib/model/image";
 import { getPhotoRepository } from "@/lib/repository";
 import { deviceApiIsAvailable } from "@/lib/runtime-config";
@@ -17,11 +18,6 @@ const generationFields = z.object({
   presetId: z.string().min(1).max(80),
   capturedAt: z.iso.datetime({ offset: true }).optional(),
 });
-
-function errorCode(error: unknown): string {
-  if (error instanceof Error && error.name === "TimeoutError") return "model_timeout";
-  return "generation_failed";
-}
 
 export async function POST(request: Request) {
   let deviceId: string;
@@ -119,9 +115,9 @@ export async function POST(request: Request) {
     });
     return Response.json(photoApiResponse(completed, request), { status: 201 });
   } catch (error) {
-    const code = errorCode(error);
+    const { code, message, status } = classifyGenerationError(error);
     await repository.markFailed(photo.id, code);
     console.error("Generation failed", { photoId: photo.id, error });
-    return apiError("Image generation failed", 502, { code, id: photo.id });
+    return apiError(message, status, { code, id: photo.id });
   }
 }

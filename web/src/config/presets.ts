@@ -18,12 +18,12 @@ const preservationPrompt =
 export const presets: Preset[] = z.array(presetSchema).parse([
   {
     id: "post-apocalypse",
-    version: 1,
+    version: 2,
     name: "After the End",
     description: "Sun-scorched ruins, improvised survival gear, dust, and cinematic decay.",
     accent: "#ff6c51",
     hue: 18,
-    prompt: `Transform the supplied photograph into a cinematic post-apocalyptic world years after civilization collapsed. Add believable weathering, overgrown or dusty surroundings, improvised details, dramatic amber light, and grounded film realism. ${preservationPrompt}`,
+    prompt: `Transform the supplied photograph into a cinematic weathered retro-future adventure scene. Add sun-faded abandoned-city scenery, reclaimed greenery, dusty roads, patched travel details, dramatic amber light, and grounded film realism. Keep every person safe, uninjured, fully clothed, and non-threatening. Do not add weapons, violence, gore, or disaster victims. ${preservationPrompt}`,
   },
   {
     id: "kid-drawing",

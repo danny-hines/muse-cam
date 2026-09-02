@@ -129,7 +129,7 @@ class Renderer:
             title_text = (
                 "CHECK CAMERA"
                 if view.message.lower().startswith("camera unavailable")
-                else "SAVED FOR LATER"
+                else "TAP BACK"
             )
             title = self._medium.render(title_text, True, accent)
             self._surface.blit(title, (center[0] - title.get_width() // 2, self._height // 4 + 12))
@@ -192,6 +192,10 @@ class Renderer:
         labels = ("PREV", "SNAP", "NEXT", "SHARE")
         if view.state == ScreenState.RESULT:
             labels = ("PREV", "AGAIN", "NEXT", "SHARED" if view.shared else "SHARE")
+        elif view.state == ScreenState.ERROR and not view.message.lower().startswith(
+            "camera unavailable"
+        ):
+            labels = ("PREV", "BACK", "NEXT", "BACK")
         segment_width = self._width / 4
         for index, label in enumerate(labels):
             x = round(index * segment_width)
