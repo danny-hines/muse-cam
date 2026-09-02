@@ -6,19 +6,19 @@ Muse Cam uses a native Python/Pygame application rather than Chromium. Camera ca
 
 | Profile | Board | Display/input | Camera | Battery |
 | --- | --- | --- | --- | --- |
-| `pi3bplus-imx415-tft35` | Pi 3B+ | 480×320 RGB565 framebuffer plus evdev touch | Picamera2, 1920×1280 still | PiSugar S Plus; no telemetry |
+| `pi3bplus-imx415-tft35` | Pi 3B+ | MPI3501 ILI9486 480×320 framebuffer plus XPT2046 touch | Picamera2, 1920×1280 still | PiSugar S Plus; no telemetry |
 | `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Picamera2, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
 
 Both profiles reserve BCM GPIO 20 for the shutter and BCM GPIO 21 for safe shutdown. A button connects its GPIO to ground; the software enables the internal pull-up. Convenient physical pins are 38 (GPIO 20), 40 (GPIO 21), and 39 (ground). Hold the power button for 1.5 seconds to shut down cleanly.
 
 ## Prepare Raspberry Pi OS
 
-Use a current Raspberry Pi OS Bookworm image with SSH and Wi-Fi configured. The Lite image is sufficient. Before installing:
+Use **Raspberry Pi OS Lite (Legacy, 64-bit)** based on Debian Bookworm, with SSH and Wi-Fi configured in Raspberry Pi Imager. Before installing:
 
 1. Connect the CSI camera with the Pi powered off.
-2. Install the TFT vendor driver on the Pi 3 so the panel appears as a 480×320 framebuffer, normally `/dev/fb1`.
-3. Follow the exact camera vendor's overlay instructions. The IMX415 profile expects `dtoverlay=imx415`, but some Arducam Pivariety modules instead require `dtoverlay=arducam-pivariety`; confirm the module SKU before changing `config.txt`.
-4. Do not connect the external buttons until you have checked the display board's pin use.
+2. Seat the MPI3501 display directly on the GPIO header. Its white screen is normal until the installer activates the driver.
+3. Check the camera ribbon orientation at both ends before applying power.
+4. Connect the external shutter and power buttons only to the documented GPIO 20/21 pins. The MPI3501 uses GPIO 17, 24, and 25 in addition to the SPI pins, so it does not conflict with them.
 
 ## One-command installation
 
@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/i
   | sudo bash -s -- --profile zero2-cam3-displayhat
 ```
 
-The installer asks for the Vercel URL and plaintext device token through `/dev/tty`, creates a locked-down `musecam` system user, enables SPI, installs system packages and the Python application, verifies the API, and enables `musecam.service`. Rerunning the same command performs a fast-forward update and preserves the secret. Add `--reconfigure` to replace it.
+The installer asks for the Vercel URL and plaintext device token through `/dev/tty`, creates a locked-down `musecam` system user, enables SPI, installs the reviewed MPI3501 overlay at a pinned revision, enables the IMX415 overlay, installs the Python application, verifies the API, and enables `musecam.service`. It reboots automatically when a new hardware overlay must be activated. Rerunning the same command performs a fast-forward update and preserves the secret. Add `--reconfigure` to replace it.
 
 ## Validate before starting the enclosure
 
@@ -59,7 +59,7 @@ sudo systemctl restart musecam
 sudo nano /etc/musecam/device.env
 ```
 
-If the Pi 3 display is not `/dev/fb1`, update `MUSECAM_FRAMEBUFFER` in `/etc/musecam/device.env`. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`; these are intentionally left neutral until the actual panel reports its axis orientation.
+The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then falls back to `/dev/fb0` when the MPI3501 is the only screen. Override this by adding `MUSECAM_FRAMEBUFFER` to `/etc/musecam/device.env` only when diagnostics show an unusual framebuffer assignment. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`.
 
 ## Controls
 

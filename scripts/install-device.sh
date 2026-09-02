@@ -9,6 +9,12 @@ SERVER_URL=https://muse-cam.dannyhines.dev
 PROFILE=""
 RECONFIGURE=0
 START_SERVICE=1
+TOKEN_STDIN=0
+REBOOT_REQUIRED=0
+
+MPI3501_DRIVER_REPOSITORY=https://github.com/goodtft/LCD-show.git
+MPI3501_DRIVER_COMMIT=a36c00a55e11f0de3b4be0e66f0a2cec47076e23
+MPI3501_OVERLAY_SHA256=601ea7056da5d7864648798fd3656b4205f01d6b9a6a8a5cfad6ca5601bbbe1e
 
 usage() {
   cat <<'EOF'
@@ -25,8 +31,64 @@ Options:
   --repo URL          Public Git repository to install
   --server URL        Muse Cam server URL
   --reconfigure       Prompt for the server URL and device token again
+  --token-stdin       Read the device token from standard input
   --no-start          Install without enabling or starting the service
 EOF
+}
+
+boot_config_path() {
+  if [[ -f /boot/firmware/config.txt ]]; then
+    printf '%s\n' /boot/firmware/config.txt
+  else
+    printf '%s\n' /boot/config.txt
+  fi
+}
+
+overlay_directory() {
+  if [[ -d /boot/firmware/overlays ]]; then
+    printf '%s\n' /boot/firmware/overlays
+  else
+    printf '%s\n' /boot/overlays
+  fi
+}
+
+ensure_boot_config_line() {
+  local line="$1"
+  local config
+  config=$(boot_config_path)
+  if ! grep -qxF "${line}" "${config}"; then
+    printf '\n%s\n' "${line}" >>"${config}"
+    REBOOT_REQUIRED=1
+  fi
+}
+
+install_mpi3501_overlay() {
+  local overlays destination current_hash checkout
+  overlays=$(overlay_directory)
+  destination="${overlays}/tft35a.dtbo"
+  current_hash=""
+  if [[ -f ${destination} ]]; then
+    current_hash=$(sha256sum "${destination}" | awk '{print $1}')
+  fi
+  if [[ ${current_hash} == "${MPI3501_OVERLAY_SHA256}" ]]; then
+    return
+  fi
+
+  checkout=$(mktemp -d /tmp/musecam-lcdshow.XXXXXX)
+  case "${checkout}" in
+    /tmp/musecam-lcdshow.*) ;;
+    *) echo "Unexpected temporary display-driver path: ${checkout}" >&2; exit 1 ;;
+  esac
+  git -C "${checkout}" init --quiet
+  git -C "${checkout}" remote add origin "${MPI3501_DRIVER_REPOSITORY}"
+  git -C "${checkout}" fetch --quiet --depth 1 origin "${MPI3501_DRIVER_COMMIT}"
+  git -C "${checkout}" checkout --quiet --detach FETCH_HEAD
+  printf '%s  %s\n' \
+    "${MPI3501_OVERLAY_SHA256}" \
+    "${checkout}/usr/tft35a-overlay.dtb" | sha256sum --check --status
+  install -m 0644 "${checkout}/usr/tft35a-overlay.dtb" "${destination}"
+  rm -rf -- "${checkout}"
+  REBOOT_REQUIRED=1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -45,6 +107,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --reconfigure)
       RECONFIGURE=1
+      shift
+      ;;
+    --token-stdin)
+      TOKEN_STDIN=1
       shift
       ;;
     --no-start)
@@ -108,6 +174,12 @@ if command -v raspi-config >/dev/null 2>&1; then
   fi
 fi
 
+if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
+  install_mpi3501_overlay
+  ensure_boot_config_line 'dtoverlay=imx415'
+  ensure_boot_config_line 'dtoverlay=tft35a:rotate=90'
+fi
+
 if systemctl is-active --quiet musecam.service 2>/dev/null; then
   systemctl stop musecam.service
 fi
@@ -150,7 +222,9 @@ fi
 install -d -m 0750 "${CONFIG_DIR}"
 CONFIG_FILE="${CONFIG_DIR}/device.env"
 if [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 ]]; then
-  if [[ -t 0 || -r /dev/tty ]]; then
+  if [[ ${TOKEN_STDIN} -eq 1 ]]; then
+    IFS= read -r DEVICE_TOKEN
+  elif [[ -t 0 || -r /dev/tty ]]; then
     read -r -p "Muse Cam server URL [${SERVER_URL}]: " ENTERED_SERVER </dev/tty
     SERVER_URL="${ENTERED_SERVER:-${SERVER_URL}}"
     read -r -s -p "Device token: " DEVICE_TOKEN </dev/tty
@@ -177,9 +251,6 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
   printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
   printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
   printf 'MUSECAM_LOG_LEVEL=INFO\n'
-  if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
-    printf 'MUSECAM_FRAMEBUFFER=/dev/fb1\n'
-  fi
 } >"${TEMP_CONFIG}"
 install -o root -g musecam -m 0640 "${TEMP_CONFIG}" "${CONFIG_FILE}"
 
@@ -195,20 +266,30 @@ systemctl daemon-reload
 runuser -u musecam -- "${INSTALL_DIR}/.venv/bin/musecam" --config "${CONFIG_FILE}" health
 
 if [[ ${START_SERVICE} -eq 1 ]]; then
-  systemctl enable --now musecam.service
+  if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then
+    systemctl enable musecam.service
+  else
+    systemctl enable --now musecam.service
+  fi
   echo
-  echo "Muse Cam is installed and running."
+  if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then
+    echo "Muse Cam is installed and will start after the required reboot."
+  else
+    echo "Muse Cam is installed and running."
+  fi
   echo "Run: sudo -u musecam ${INSTALL_DIR}/.venv/bin/musecam --config ${CONFIG_FILE} doctor"
   echo "Logs: journalctl -u musecam -f"
 else
   echo "Muse Cam is installed. Start it with: systemctl enable --now musecam.service"
 fi
 
-if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
-  echo
-  echo "Hardware note: install the TFT vendor framebuffer driver and confirm the camera overlay"
-  echo "for the exact IMX415 board before running diagnostics. The profile defaults to /dev/fb1."
-elif [[ ! -S /tmp/pisugar-server.sock ]]; then
+if [[ ${PROFILE} == zero2-cam3-displayhat && ! -S /tmp/pisugar-server.sock ]]; then
   echo
   echo "Battery note: install PiSugar Power Manager to enable the on-screen battery percentage."
+fi
+
+if [[ ${START_SERVICE} -eq 1 && ${REBOOT_REQUIRED} -eq 1 ]]; then
+  echo
+  echo "Rebooting to activate the camera and display overlays."
+  systemctl reboot
 fi
