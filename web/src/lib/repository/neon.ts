@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
 import { photos } from "@/db/schema";
@@ -49,10 +49,19 @@ export class NeonPhotoRepository implements PhotoRepository {
     return getDb()
       .select()
       .from(photos)
-      .where(eq(photos.status, "complete"))
+      .where(
+        and(
+          eq(photos.status, "complete"),
+          isNotNull(photos.sharedAt),
+          isNotNull(photos.resultPublicUrl),
+        ),
+      )
       .orderBy(desc(photos.sharedAt))
-      .limit(limit)
-      .then((rows) => rows.filter((row) => row.sharedAt && row.resultPublicUrl));
+      .limit(limit);
+  }
+
+  async listAll(limit = 100): Promise<PhotoRecord[]> {
+    return getDb().select().from(photos).orderBy(desc(photos.createdAt)).limit(limit);
   }
 
   async markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord> {
@@ -74,11 +83,22 @@ export class NeonPhotoRepository implements PhotoRepository {
     return firstOrThrow(rows, id);
   }
 
-  async markShared(id: string, publicSlug: string, publicUrl: string): Promise<PhotoRecord> {
+  async markShared(
+    id: string,
+    publicSlug: string,
+    publicUrl: string,
+    originalPublicUrl: string | null = null,
+  ): Promise<PhotoRecord> {
     const now = new Date();
     const rows = await getDb()
       .update(photos)
-      .set({ publicSlug, resultPublicUrl: publicUrl, sharedAt: now, updatedAt: now })
+      .set({
+        publicSlug,
+        resultPublicUrl: publicUrl,
+        originalPublicUrl,
+        sharedAt: now,
+        updatedAt: now,
+      })
       .where(eq(photos.id, id))
       .returning();
     return firstOrThrow(rows, id);
@@ -87,9 +107,28 @@ export class NeonPhotoRepository implements PhotoRepository {
   async markUnshared(id: string): Promise<PhotoRecord> {
     const rows = await getDb()
       .update(photos)
-      .set({ publicSlug: null, resultPublicUrl: null, sharedAt: null, updatedAt: new Date() })
+      .set({
+        publicSlug: null,
+        resultPublicUrl: null,
+        originalPublicUrl: null,
+        sharedAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(photos.id, id))
       .returning();
     return firstOrThrow(rows, id);
+  }
+
+  async markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord> {
+    const rows = await getDb()
+      .update(photos)
+      .set({ originalPublicUrl, updatedAt: new Date() })
+      .where(eq(photos.id, id))
+      .returning();
+    return firstOrThrow(rows, id);
+  }
+
+  async delete(id: string): Promise<void> {
+    await getDb().delete(photos).where(eq(photos.id, id));
   }
 }

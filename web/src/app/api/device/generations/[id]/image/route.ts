@@ -6,8 +6,9 @@ import { getPhotoRepository } from "@/lib/repository";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, { params }: RouteContext) {
+  let deviceId: string;
   try {
-    authenticateDevice(request);
+    ({ deviceId } = await authenticateDevice(request));
   } catch (error) {
     if (error instanceof DeviceAuthError) return apiError(error.message, error.status);
     return apiError("Unable to authenticate device", 401);
@@ -18,6 +19,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!photo?.resultPrivateRef || photo.status !== "complete") {
     return apiError("Generated image is not available", 404);
   }
+  if (photo.deviceId !== deviceId) return apiError("Generated image is not available", 404);
 
   try {
     const image = await getMediaStore().readPrivate(photo.resultPrivateRef);

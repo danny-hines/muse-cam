@@ -35,7 +35,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -267,6 +268,12 @@ input {
   letter-spacing: -0.025em;
 }
 
+.photo-origin {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
 .photo-time {
   color: var(--muted);
   font-size: 0.77rem;
@@ -331,6 +338,407 @@ input {
   overflow: hidden;
   border-radius: 20px;
   background: #ded9cf;
+}
+
+.comparison {
+  position: absolute;
+  inset: 0;
+}
+
+.comparison-controls {
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(12, 12, 10, 0.66);
+  backdrop-filter: blur(12px);
+}
+
+.comparison-controls button {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.comparison-controls button[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--acid);
+}
+
+.admin-main,
+.admin-login {
+  width: min(100% - 32px, 1380px);
+  margin-inline: auto;
+}
+
+.admin-login {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.admin-login-card {
+  width: min(100%, 480px);
+  padding: clamp(28px, 6vw, 58px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 30px 90px rgba(23, 23, 19, 0.09);
+}
+
+.admin-login-card h1,
+.admin-header h1,
+.admin-panel h2 {
+  margin: 0;
+  font-family: var(--display);
+  letter-spacing: -0.06em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.admin-login-card h1 {
+  font-size: clamp(2.7rem, 7vw, 4.8rem);
+}
+
+.admin-login-card > p:not(.section-kicker, .admin-warning) {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.admin-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 28px;
+}
+
+.admin-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-form input:not([type="checkbox"]),
+.admin-form select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.admin-form button,
+.admin-header-actions button {
+  min-height: 46px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--acid);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.admin-warning,
+.form-error {
+  color: #a53322;
+  line-height: 1.55;
+}
+
+.admin-main {
+  padding: 38px 0 80px;
+}
+
+.admin-header,
+.admin-header-actions,
+.admin-panel-heading,
+.admin-list-row,
+.admin-photo-actions,
+.admin-photo-status {
+  display: flex;
+  align-items: center;
+}
+
+.admin-header {
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-header h1 {
+  font-size: clamp(2.7rem, 6vw, 6.2rem);
+}
+
+.admin-header-actions {
+  gap: 16px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-header-actions form {
+  margin: 0;
+}
+
+.admin-header-actions button {
+  min-height: 38px;
+  color: white;
+  background: var(--ink);
+}
+
+.admin-notice,
+.claim-banner {
+  margin: 20px 0 0;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(215, 255, 66, 0.62);
+}
+
+.compact-claim {
+  grid-template-columns: 1fr;
+  margin-top: 16px;
+}
+
+.claim-banner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 22px;
+  background: var(--violet);
+  color: white;
+}
+
+.claim-banner div {
+  display: grid;
+}
+
+.claim-banner div span {
+  opacity: 1;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.claim-banner > code {
+  align-self: center;
+  font-size: clamp(1.05rem, 2.5vw, 1.6rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.claim-banner p {
+  grid-column: 1 / -1;
+  margin: 5px 0 0;
+  font-size: 0.8rem;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.admin-stats div {
+  display: grid;
+  gap: 3px;
+  padding: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.admin-stats div:first-child {
+  border-left: 0;
+}
+
+.admin-stats strong {
+  font-family: var(--display);
+  font-size: 2rem;
+}
+
+.admin-stats span {
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.admin-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.admin-panel {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.admin-panel-heading {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-panel-heading .section-kicker {
+  margin-bottom: 8px;
+}
+
+.admin-panel h2 {
+  font-size: 2.15rem;
+}
+
+.compact-form {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.check-label {
+  grid-template-columns: auto 1fr !important;
+  align-items: center;
+}
+
+.check-label input {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-list {
+  display: grid;
+  margin-top: 10px;
+}
+
+.admin-list-row {
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.78rem;
+}
+
+.admin-list-row > div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-list-row span,
+.claim-history,
+.admin-empty,
+.admin-panel-heading > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.text-button,
+.admin-photo-actions button,
+.admin-photo-actions a {
+  padding: 0;
+  border: 0;
+  color: var(--violet);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-admin-panel {
+  margin-top: 22px;
+}
+
+.admin-photo-list {
+  display: grid;
+  margin-top: 18px;
+}
+
+.admin-photo-row {
+  display: grid;
+  grid-template-columns: 112px minmax(180px, 1fr) auto minmax(150px, auto);
+  gap: 18px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-thumb {
+  position: relative;
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  color: var(--muted);
+  background: #ded9cf;
+  text-align: center;
+  font-size: 0.64rem;
+}
+
+.admin-thumb img {
+  object-fit: cover;
+}
+
+.admin-photo-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-photo-copy span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.admin-photo-status {
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.status-pill {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: #ddd8ce;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.status-complete {
+  background: rgba(215, 255, 66, 0.72);
+}
+
+.status-failed {
+  background: rgba(255, 108, 81, 0.5);
+}
+
+.admin-photo-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px 13px;
+}
+
+.admin-photo-actions .danger-button {
+  color: #a53322;
 }
 
 .detail-copy {
@@ -427,6 +835,19 @@ input {
   .detail-copy {
     position: static;
   }
+
+  .admin-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-photo-row {
+    grid-template-columns: 92px 1fr auto;
+  }
+
+  .admin-photo-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 620px) {
@@ -468,6 +889,51 @@ input {
 
   .site-footer {
     flex-direction: column;
+  }
+
+  .admin-main,
+  .admin-login {
+    width: min(100% - 22px, 1380px);
+  }
+
+  .admin-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-stats div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .admin-stats div:nth-child(4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .claim-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .claim-banner p {
+    grid-column: auto;
+  }
+
+  .admin-panel {
+    padding: 18px;
+  }
+
+  .admin-photo-row {
+    grid-template-columns: 80px 1fr;
+  }
+
+  .admin-photo-status,
+  .admin-photo-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
 

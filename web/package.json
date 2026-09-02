@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
-    "token:hash": "node scripts/hash-device-token.mjs"
+    "token:hash": "node scripts/hash-device-token.mjs",
+    "admin:credentials": "node scripts/generate-admin-credentials.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.1.0",

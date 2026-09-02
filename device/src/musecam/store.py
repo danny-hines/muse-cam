@@ -38,6 +38,13 @@ class CaptureStore:
         self._lock = threading.Lock()
         with self._connection:
             self._connection.executescript(SCHEMA)
+            # A power loss can interrupt an upload after it is marked in-flight.
+            # No request survives a reboot, so make those jobs retryable again.
+            self._connection.execute(
+                "UPDATE captures SET status = 'queued', "
+                "error = 'Interrupted while uploading; queued for retry' "
+                "WHERE status = 'uploading'"
+            )
 
     def close(self) -> None:
         self._connection.close()

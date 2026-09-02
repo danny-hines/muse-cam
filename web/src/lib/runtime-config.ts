@@ -5,7 +5,7 @@ import { hasPersistentDatabase } from "@/lib/repository";
 export function getRuntimeStatus() {
   const modelProvider = configuredModelProvider();
   const deviceAuthConfigured = Boolean(
-    process.env.DEVICE_API_TOKEN || process.env.DEVICE_API_TOKEN_SHA256,
+    process.env.DEVICE_API_TOKEN || process.env.DEVICE_API_TOKEN_SHA256 || hasPersistentDatabase(),
   );
   const modelConfigured = modelProvider === "mock" || Boolean(process.env.META_API_KEY);
 
@@ -30,5 +30,9 @@ export function deviceApiIsAvailable(): boolean {
   if (process.env.VERCEL_ENV === "production") {
     return getRuntimeStatus().productionReady;
   }
-  return Boolean(process.env.DEVICE_API_TOKEN || process.env.DEVICE_API_TOKEN_SHA256);
+  return Boolean(
+    process.env.DEVICE_API_TOKEN ||
+      process.env.DEVICE_API_TOKEN_SHA256 ||
+      hasPersistentDatabase(),
+  );
 }

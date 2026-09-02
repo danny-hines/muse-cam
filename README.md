@@ -5,6 +5,7 @@ Muse Cam is a physical AI camera that captures a photograph, applies a playful M
 This repository contains both sides of the project:
 
 - `web/` — Next.js site and device API deployed to Vercel.
+- `device-ui/` — touch-first React interface compiled into the Raspberry Pi package.
 - `device/` — portable Python client and hardware profiles for Raspberry Pi.
 - `scripts/` — repeatable device installation tooling.
 - `docs/` — API and deployment documentation.
@@ -14,15 +15,18 @@ This repository contains both sides of the project:
 The web/API foundation is functional:
 
 - Responsive public feed and individual photo pages.
-- Device bearer-token authentication.
+- Individual, revocable device credentials plus a legacy single-token fallback.
+- Event assignment and 30-minute, single-use device setup codes.
 - Idempotent capture IDs.
 - Generation, status, image download, share, and unshare endpoints.
 - Six versioned image presets.
 - Mock image transformation for end-to-end development without a Meta key.
 - Neon Postgres and private/public Vercel Blob adapters.
+- A protected operator dashboard for registration, moderation, and deletion.
+- Opt-in original-photo publishing with an accessible before/after control.
 - In-memory development fallbacks and included demo frames.
 
-The Raspberry Pi application now includes Picamera2 capture, native framebuffer and Display HAT Mini rendering, touch/HAT/GPIO input, safe shutdown, local SQLite queuing, offline retry, diagnostics, systemd startup, and a desktop simulator. Hardware profiles cover both the Pi 3B+ build and Pi Zero 2 W fallback; the physical display and camera orientation values will be tuned during final hardware bring-up.
+The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. It has two interchangeable front ends: the proven native framebuffer app for SPI/HAT displays and a local Chromium interface for the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
 
 ## Local development
 
@@ -44,6 +48,7 @@ pnpm lint
 pnpm test
 pnpm build
 pnpm --dir web token:hash
+pnpm --dir web admin:credentials
 ```
 
 ## Deploying to Vercel
@@ -52,11 +57,11 @@ pnpm --dir web token:hash
 2. Provision Neon Postgres from the Vercel Marketplace and connect it as `DATABASE_URL`.
 3. Create two Vercel Blob stores: one **private** and one **public**.
 4. Connect their tokens as `PRIVATE_BLOB_READ_WRITE_TOKEN` and `PUBLISHED_BLOB_READ_WRITE_TOKEN`.
-5. Generate a device token with `pnpm --dir web token:hash`.
-6. Add the emitted hash as `DEVICE_API_TOKEN_SHA256`; keep the plaintext token for the camera.
-7. Add `SITE_URL` and `DEVICE_ID`. When enabling Muse Image, add `META_API_KEY`; the documented endpoint and `muse-image-1.0` model are built-in defaults.
-8. Set `MODEL_PROVIDER=mock` for the first deployment smoke test.
-9. Run `pnpm --dir web db:migrate` once against the connected Neon database.
+5. Run `pnpm --dir web db:migrate` against the connected Neon database.
+6. Generate operator credentials with `pnpm --dir web admin:credentials`, then add the two emitted environment variables to Vercel.
+7. Keep the existing `DEVICE_API_TOKEN_SHA256` and `DEVICE_ID` during migration. New cameras can use individual credentials created at `/admin`.
+8. Add `SITE_URL`. When enabling Muse Image, add `META_API_KEY`; the documented endpoint and `muse-image-1.0` model are built-in defaults.
+9. Set `MODEL_PROVIDER=mock` for the first deployment smoke test.
 10. Switch to `MODEL_PROVIDER=meta` after adding the Meta API key and running a live image-edit smoke test.
 
 Production device mutations intentionally refuse to run until the database, both Blob stores, device authentication, and selected model provider are configured.
@@ -79,15 +84,15 @@ The same public installer supports both planned builds:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-imx415-tft35
+  | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim YOUR-SETUP-CODE
 ```
 
-Use `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and the hardware bring-up checklist.
+Use `pi3bplus-imx415-tft35` for the current SPI screen or `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and hardware bring-up. See [docs/ADMIN.md](docs/ADMIN.md) for registration and moderation.
 
 ## Privacy defaults
 
 - Uploaded source images are normalized and stripped of EXIF before storage.
 - Originals and unshared results use a private Blob store.
 - A result is copied to the public Blob store only after the share endpoint is called.
-- The public feed never exposes the source photograph.
-- Retention and moderation controls will be added before a public event deployment.
+- The public feed never exposes the source photograph unless an operator explicitly enables originals for that photo or event.
+- Hiding a photo deletes both public copies but retains private media; permanent deletion removes the database record and all stored media.

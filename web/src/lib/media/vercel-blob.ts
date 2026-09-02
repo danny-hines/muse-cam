@@ -66,4 +66,8 @@ export class VercelBlobMediaStore implements MediaStore {
   async removePublic(ref: string): Promise<void> {
     await del(ref, { token: requiredToken("PUBLISHED_BLOB_READ_WRITE_TOKEN") });
   }
+
+  async removePrivate(ref: string): Promise<void> {
+    await del(ref, { token: requiredToken("PRIVATE_BLOB_READ_WRITE_TOKEN") });
+  }
 }

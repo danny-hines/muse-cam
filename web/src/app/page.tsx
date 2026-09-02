@@ -16,7 +16,7 @@ export default async function HomePage() {
           <div>
             <p className="hero-kicker">
               <span className="live-dot" aria-hidden="true" />
-              A live feed from the physical camera
+              A live feed from physical cameras
             </p>
             <h1 className="hero-title" id="hero-title">
               Point. Shoot. <span>Imagine.</span>

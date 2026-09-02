@@ -44,4 +44,8 @@ export class MemoryMediaStore implements MediaStore {
   async removePublic(): Promise<void> {
     // Data URLs have no separately persisted public object.
   }
+
+  async removePrivate(ref: string): Promise<void> {
+    getState().privateObjects.delete(ref);
+  }
 }

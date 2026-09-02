@@ -51,6 +51,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
       originalPrivateRef: null,
       resultPrivateRef: null,
       resultPublicUrl: null,
+      originalPublicUrl: null,
       resultMimeType: null,
       width: null,
       height: null,
@@ -77,6 +78,12 @@ export class MemoryPhotoRepository implements PhotoRepository {
       .slice(0, limit);
   }
 
+  async listAll(limit = 100): Promise<PhotoRecord[]> {
+    return [...getState().photos.values()]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
+  }
+
   async markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord> {
     const now = new Date();
     return save({
@@ -98,12 +105,18 @@ export class MemoryPhotoRepository implements PhotoRepository {
     });
   }
 
-  async markShared(id: string, publicSlug: string, publicUrl: string): Promise<PhotoRecord> {
+  async markShared(
+    id: string,
+    publicSlug: string,
+    publicUrl: string,
+    originalPublicUrl: string | null = null,
+  ): Promise<PhotoRecord> {
     const now = new Date();
     return save({
       ...requirePhoto(id),
       publicSlug,
       resultPublicUrl: publicUrl,
+      originalPublicUrl,
       sharedAt: now,
       updatedAt: now,
     });
@@ -114,8 +127,17 @@ export class MemoryPhotoRepository implements PhotoRepository {
       ...requirePhoto(id),
       publicSlug: null,
       resultPublicUrl: null,
+      originalPublicUrl: null,
       sharedAt: null,
       updatedAt: new Date(),
     });
+  }
+
+  async markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord> {
+    return save({ ...requirePhoto(id), originalPublicUrl, updatedAt: new Date() });
+  }
+
+  async delete(id: string): Promise<void> {
+    getState().photos.delete(id);
   }
 }

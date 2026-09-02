@@ -1,0 +1,23 @@
+[Unit]
+Description=Muse Cam local camera server
+After=local-fs.target network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/musecam/device.env
+
+[Service]
+Type=simple
+User=musecam
+Group=musecam
+WorkingDirectory=/var/lib/musecam
+EnvironmentFile=/etc/musecam/device.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/muse-cam/.venv/bin/musecam serve --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/musecam
+
+[Install]
+WantedBy=multi-user.target

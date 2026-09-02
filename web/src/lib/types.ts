@@ -6,6 +6,7 @@ export type PhotoRecord = {
   id: string;
   captureId: string;
   deviceId: string;
+  eventId: string | null;
   presetId: string;
   presetVersion: number;
   status: PhotoStatus;
@@ -18,6 +19,7 @@ export type PhotoRecord = {
   originalPrivateRef: string | null;
   resultPrivateRef: string | null;
   resultPublicUrl: string | null;
+  originalPublicUrl: string | null;
   resultMimeType: string | null;
   width: number | null;
   height: number | null;
@@ -31,8 +33,41 @@ export type PublishedPhoto = {
   presetName: string;
   presetDescription: string;
   imageUrl: string;
+  originalImageUrl: string | null;
+  deviceName: string;
+  eventName: string | null;
   width: number;
   height: number;
   capturedAt: Date;
   sharedAt: Date;
+};
+
+export type EventRecord = {
+  id: string;
+  slug: string;
+  name: string;
+  publishOriginals: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DeviceRecord = {
+  id: string;
+  name: string;
+  tokenHash: string;
+  eventId: string | null;
+  status: "active" | "revoked";
+  lastSeenAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DeviceClaimRecord = {
+  id: string;
+  codeHash: string;
+  suggestedName: string | null;
+  eventId: string | null;
+  expiresAt: Date;
+  claimedAt: Date | null;
+  createdAt: Date;
 };
