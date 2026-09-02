@@ -61,7 +61,7 @@ sudo nano /etc/musecam/device.env
 
 The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then falls back to `/dev/fb0` when the MPI3501 is the only screen. Override this by adding `MUSECAM_FRAMEBUFFER` to `/etc/musecam/device.env` only when diagnostics show an unusual framebuffer assignment. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`.
 
-The Pi 3 camera runs at 15 FPS while the display renders the newest available frame at 6 FPS. The framebuffer only writes changed scanlines, keeping static header and control rows off the SPI bus. The display link runs at a moderate requested clock of 24 MHz, leaving substantially more signal margin than the unstable 32 MHz setting while allowing each live-image update to finish before the next one begins.
+The Pi 3 camera runs at 15 FPS while the display renders the newest available frame at 6 FPS. The framebuffer only writes changed scanlines, keeping static header and control rows off the SPI bus. The display link runs at a moderate requested clock of 20 MHz, leaving substantially more signal margin than the unstable 24–32 MHz settings while allowing each live-image update to finish before the next one begins.
 
 ## Controls
 

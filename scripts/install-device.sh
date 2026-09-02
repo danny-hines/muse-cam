@@ -195,7 +195,7 @@ if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
   ensure_boot_config_line 'dtoverlay=imx415'
   ensure_boot_config_setting \
     'dtoverlay=tft35a' \
-    'dtoverlay=tft35a:rotate=90,speed=24000000'
+    'dtoverlay=tft35a:rotate=90,speed=20000000'
 fi
 
 if systemctl is-active --quiet musecam.service 2>/dev/null; then
