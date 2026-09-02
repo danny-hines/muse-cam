@@ -159,7 +159,9 @@ class Picamera2Camera:
         camera = Picamera2()
         preview_size = (self._profile.display_width, self._profile.display_height)
         preview_config = camera.create_preview_configuration(
-            main={"size": preview_size, "format": "RGB888"},
+            # Picamera2's format names follow the DRM/V4L2 convention. BGR888
+            # is RGB byte order in a numpy array, which is what Pillow expects.
+            main={"size": preview_size, "format": "BGR888"},
             controls={"FrameRate": self._profile.preview_fps},
             buffer_count=3,
         )
