@@ -63,4 +63,4 @@ def test_picamera_preview_uses_pillow_rgb_byte_order(monkeypatch) -> None:
     camera.start()
 
     assert fake.preview_config["main"] == {"size": (480, 320), "format": "BGR888"}
-    assert fake.preview_config["controls"] == {"FrameRate": 6}
+    assert fake.preview_config["controls"] == {"FrameRate": 15}

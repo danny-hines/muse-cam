@@ -7,6 +7,28 @@ from typing import Any, Protocol
 from .config import DeviceConfig, HardwareProfile
 
 
+def changed_row_bounds(
+    current: bytes,
+    previous: bytes | None,
+    *,
+    row_bytes: int,
+    height: int,
+) -> tuple[int, int] | None:
+    if previous is None or len(previous) != len(current):
+        return (0, height - 1)
+
+    first: int | None = None
+    last: int | None = None
+    for y in range(height):
+        start = y * row_bytes
+        end = start + row_bytes
+        if current[start:end] != previous[start:end]:
+            if first is None:
+                first = y
+            last = y
+    return None if first is None or last is None else (first, last)
+
+
 class Display(Protocol):
     surface: Any
     width: int
@@ -69,6 +91,7 @@ class FramebufferDisplay:
         if self._device_path is None:
             raise RuntimeError("No framebuffer found; set MUSECAM_FRAMEBUFFER to the TFT device")
         self._device = self._device_path.open("r+b", buffering=0)
+        self._last_pixels: bytes | None = None
         stride_path = Path("/sys/class/graphics") / self._device_path.name / "stride"
         self._stride = (
             int(stride_path.read_text(encoding="utf-8").strip())
@@ -82,14 +105,26 @@ class FramebufferDisplay:
             surface = self._pygame.transform.rotate(surface, self._rotation)
         pixels = bytes(surface.convert(16, 0).get_buffer())
         row_bytes = self.width * 2
-        self._device.seek(0)
+        dirty_rows = changed_row_bounds(
+            pixels,
+            self._last_pixels,
+            row_bytes=row_bytes,
+            height=self.height,
+        )
+        if dirty_rows is None:
+            return
+        first_row, last_row = dirty_rows
         if self._stride == row_bytes:
-            self._device.write(pixels)
+            start = first_row * row_bytes
+            end = (last_row + 1) * row_bytes
+            self._device.seek(first_row * self._stride)
+            self._device.write(pixels[start:end])
         else:
-            for y in range(self.height):
+            for y in range(first_row, last_row + 1):
                 self._device.seek(y * self._stride)
                 start = y * row_bytes
                 self._device.write(pixels[start : start + row_bytes])
+        self._last_pixels = pixels
 
     def save_screenshot(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

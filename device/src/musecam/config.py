@@ -32,6 +32,7 @@ class HardwareProfile:
     camera_overlay: str
     capture_width: int
     capture_height: int
+    camera_fps: int
     preview_fps: int
     shutter_gpio: int | None
     power_gpio: int | None
@@ -101,6 +102,7 @@ def load_profile(profile_id: str, profiles_dir: Path | None = None) -> HardwareP
     if values.get("id") != profile_id:
         raise ValueError(f"Profile ID mismatch in {path}")
 
+    preview_fps = max(1, int(values.get("preview_fps", 10)))
     return HardwareProfile(
         id=profile_id,
         board=str(values["board"]),
@@ -116,7 +118,8 @@ def load_profile(profile_id: str, profiles_dir: Path | None = None) -> HardwareP
         camera_overlay=str(values.get("camera_overlay", "auto")),
         capture_width=int(values.get("capture_width", 1920)),
         capture_height=int(values.get("capture_height", 1080)),
-        preview_fps=max(1, int(values.get("preview_fps", 10))),
+        camera_fps=max(1, int(values.get("camera_fps", preview_fps))),
+        preview_fps=preview_fps,
         shutter_gpio=_optional_int(values, "shutter_gpio"),
         power_gpio=_optional_int(values, "power_gpio"),
         power_backend=str(values.get("power_backend", "none")),

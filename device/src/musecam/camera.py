@@ -162,7 +162,7 @@ class Picamera2Camera:
             # Picamera2's format names follow the DRM/V4L2 convention. BGR888
             # is RGB byte order in a numpy array, which is what Pillow expects.
             main={"size": preview_size, "format": "BGR888"},
-            controls={"FrameRate": self._profile.preview_fps},
+            controls={"FrameRate": self._profile.camera_fps},
             buffer_count=3,
         )
         self._still_config = camera.create_still_configuration(

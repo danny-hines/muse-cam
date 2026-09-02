@@ -42,11 +42,11 @@ class Renderer:
             self._draw_empty_background()
 
         overlay = pygame.Surface((self._width, self._height), pygame.SRCALPHA)
-        pygame.draw.rect(overlay, (5, 10, 11, 160), (0, 0, self._width, max(34, self._height // 8)))
+        pygame.draw.rect(overlay, (5, 10, 11, 255), (0, 0, self._width, max(34, self._height // 8)))
         bottom_height = max(54, self._height // 5)
         pygame.draw.rect(
             overlay,
-            (5, 10, 11, 215),
+            (5, 10, 11, 255),
             (0, self._height - bottom_height, self._width, bottom_height),
         )
         self._surface.blit(overlay, (0, 0))
