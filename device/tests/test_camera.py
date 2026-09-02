@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,13 +57,10 @@ def test_picamera_preview_uses_pillow_rgb_byte_order(monkeypatch) -> None:
 
     fake = FakePicamera2()
     monkeypatch.setitem(sys.modules, "picamera2", SimpleNamespace(Picamera2=lambda: fake))
-    profile = replace(
-        load_profile("pi3bplus-imx415-tft35", Path(__file__).parents[1] / "profiles"),
-        preview_fps=10,
-    )
+    profile = load_profile("pi3bplus-imx415-tft35", Path(__file__).parents[1] / "profiles")
 
     camera = Picamera2Camera(profile)
     camera.start()
 
     assert fake.preview_config["main"] == {"size": (480, 320), "format": "BGR888"}
-    assert fake.preview_config["controls"] == {"FrameRate": 10}
+    assert fake.preview_config["controls"] == {"FrameRate": 6}
