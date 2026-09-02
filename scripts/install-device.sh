@@ -219,7 +219,7 @@ if [[ ${PROFILE} == zero2-cam3-displayhat ]]; then
   "${INSTALL_DIR}/.venv/bin/pip" install --disable-pip-version-check "displayhatmini>=0.0.2,<1"
 fi
 
-install -d -m 0750 "${CONFIG_DIR}"
+install -d -o root -g musecam -m 0750 "${CONFIG_DIR}"
 CONFIG_FILE="${CONFIG_DIR}/device.env"
 if [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 ]]; then
   if [[ ${TOKEN_STDIN} -eq 1 ]]; then
