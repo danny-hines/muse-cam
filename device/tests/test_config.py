@@ -63,3 +63,13 @@ def test_hardware_profiles_load(
     assert profile.input_backend == input_backend
     assert profile.shutter_gpio == 20
     assert profile.power_gpio == 21
+
+
+def test_pi3_touch_orientation_matches_landscape_display() -> None:
+    profile = load_profile(
+        "pi3bplus-imx415-tft35", Path(__file__).parents[1] / "profiles"
+    )
+
+    assert profile.touch_swap_xy is True
+    assert profile.touch_invert_x is False
+    assert profile.touch_invert_y is True
