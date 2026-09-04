@@ -224,6 +224,7 @@ fi
 
 if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
   disable_boot_config_setting 'dtoverlay=tft35a'
+  ensure_boot_config_setting 'display_auto_detect=' 'display_auto_detect=0'
   ensure_boot_config_line 'dtoverlay=imx415'
   ensure_boot_config_setting 'dtoverlay=vc4-kms-v3d' 'dtoverlay=vc4-kms-v3d'
   if [[ -f "$(overlay_directory)/vc4-kms-dsi-waveshare-800x480.dtbo" ]]; then
