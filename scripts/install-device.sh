@@ -81,6 +81,16 @@ ensure_boot_config_setting() {
   REBOOT_REQUIRED=1
 }
 
+disable_boot_config_setting() {
+  local prefix="$1"
+  local config
+  config=$(boot_config_path)
+  if grep -q "^${prefix}" "${config}"; then
+    sed -i "/^${prefix}/s/^/# disabled by Muse Cam: /" "${config}"
+    REBOOT_REQUIRED=1
+  fi
+}
+
 install_mpi3501_overlay() {
   local overlays destination current_hash checkout
   overlays=$(overlay_directory)
@@ -203,6 +213,8 @@ if command -v raspi-config >/dev/null 2>&1; then
 fi
 
 if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
+  disable_boot_config_setting 'dtoverlay=vc4-kms-dsi-waveshare-800x480'
+  disable_boot_config_setting 'dtoverlay=vc4-kms-dsi-7inch'
   install_mpi3501_overlay
   ensure_boot_config_line 'dtoverlay=imx415'
   ensure_boot_config_setting \
@@ -211,6 +223,7 @@ if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
 fi
 
 if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  disable_boot_config_setting 'dtoverlay=tft35a'
   ensure_boot_config_line 'dtoverlay=imx415'
   ensure_boot_config_setting 'dtoverlay=vc4-kms-v3d' 'dtoverlay=vc4-kms-v3d'
   if [[ -f "$(overlay_directory)/vc4-kms-dsi-waveshare-800x480.dtbo" ]]; then
