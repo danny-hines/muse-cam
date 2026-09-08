@@ -49,21 +49,21 @@ def test_load_config_requires_credentials(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 @pytest.mark.parametrize(
-    ("profile_id", "width", "height", "input_backend"),
+    ("profile_id", "width", "height", "input_backend", "power_gpio"),
     (
-        ("pi3bplus-imx415-tft35", 480, 320, "evdev-touch"),
-        ("pi3bplus-imx415-dsi43", 800, 480, "browser-touch"),
-        ("zero2-cam3-displayhat", 320, 240, "displayhat-buttons"),
+        ("pi3bplus-imx415-tft35", 480, 320, "evdev-touch", 21),
+        ("pi3bplus-imx415-dsi43", 800, 480, "browser-touch", None),
+        ("zero2-cam3-displayhat", 320, 240, "displayhat-buttons", 21),
     ),
 )
 def test_hardware_profiles_load(
-    profile_id: str, width: int, height: int, input_backend: str
+    profile_id: str, width: int, height: int, input_backend: str, power_gpio: int | None
 ) -> None:
     profile = load_profile(profile_id, Path(__file__).parents[1] / "profiles")
     assert (profile.display_width, profile.display_height) == (width, height)
     assert profile.input_backend == input_backend
     assert profile.shutter_gpio == 20
-    assert profile.power_gpio == 21
+    assert profile.power_gpio == power_gpio
 
 
 def test_pi3_touch_orientation_matches_landscape_display() -> None:

@@ -106,10 +106,50 @@ class CaptureStore:
     def pending(self, limit: int = 10) -> list[CaptureJob]:
         with self._lock:
             rows = self._connection.execute(
-                "SELECT * FROM captures WHERE status = 'queued' ORDER BY created_at LIMIT ?",
+                "SELECT * FROM captures WHERE status = 'queued' "
+                "ORDER BY attempts, created_at, rowid LIMIT ?",
                 (limit,),
             ).fetchall()
         return [self._to_job(row) for row in rows]
+
+    def gallery(self, limit: int = 40, offset: int = 0, status: str = "all") -> list[CaptureJob]:
+        filters = {
+            "all": "",
+            "complete": "WHERE status = 'complete'",
+            "failed": "WHERE status = 'failed'",
+            "waiting": "WHERE status IN ('queued', 'uploading')",
+        }
+        if status not in filters:
+            raise ValueError("Unknown gallery filter")
+        with self._lock:
+            rows = self._connection.execute(
+                f"SELECT * FROM captures {filters[status]} "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                (max(1, min(limit, 100)), max(0, offset)),
+            ).fetchall()
+        return [self._to_job(row) for row in rows]
+
+    def counts(self) -> dict[str, int]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT status, COUNT(*) AS count FROM captures GROUP BY status"
+            ).fetchall()
+        return {row["status"]: row["count"] for row in rows}
+
+    def setting(self, key: str, default: object = None) -> object:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT value FROM settings WHERE key = ?", (key,)
+            ).fetchone()
+        return json.loads(row["value"]) if row else default
+
+    def set_setting(self, key: str, value: object) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, json.dumps(value)),
+            )
 
     def save_presets(self, presets: Iterable[Preset]) -> None:
         value = json.dumps([preset.__dict__ for preset in presets], separators=(",", ":"))
@@ -165,4 +205,5 @@ class CaptureStore:
             attempts=row["attempts"],
             error=row["error"],
             share_url=row["share_url"],
+            created_at=row["created_at"],
         )

@@ -1,54 +1,67 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
+import { useCallback, useEffect, useState } from "react";
 import type { CameraAction, CameraState } from "./types";
 
-const FALLBACK_STATE: CameraState = {
+const preset = {
+  id: "starting",
+  name: "Warming up",
+  description: "Getting the camera ready",
+  accent: "#ffac71",
+};
+const FALLBACK: CameraState = {
   status: "starting",
-  preset: {
-    id: "starting",
-    name: "Warming up",
-    description: "The camera is getting ready.",
-    accent: "#d7ff42",
-  },
+  preset,
+  presets: [],
   presetIndex: 0,
-  presetCount: 1,
+  presetCount: 0,
   message: "Starting camera",
   networkOnline: true,
   queued: 0,
+  processingId: null,
+  sharingId: null,
   battery: null,
-  shared: false,
-  shareUrl: null,
-  resultUrl: null,
+  galleryRevision: 0,
+  galleryCount: 0,
+  notifications: [],
+  lastCaptureId: null,
+  volume: 35,
+  processingSound: true,
+  maintenance: false,
+  simulate: false,
   revision: 0,
+  sessionId: "",
 };
 
-export function useCamera() {
-  const [state, setState] = useState<CameraState>(FALLBACK_STATE);
-  const [connected, setConnected] = useState(false);
-  const actionPending = useRef(false);
+export async function api<T>(path: string, body?: object): Promise<T> {
+  const response = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    cache: "no-store",
+    headers:
+      body === undefined
+        ? undefined
+        : { "Content-Type": "application/json", "X-MuseCam-Request": "1" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok)
+    throw new Error(data.error || "Camera connection interrupted. Try again.");
+  return data as T;
+}
 
+export function useCamera() {
+  const [state, setState] = useState(FALLBACK);
+  const [connected, setConnected] = useState(false);
   useEffect(() => {
     let active = true;
-    const loadState = async () => {
-      try {
-        const response = await fetch("/api/state", { cache: "no-store" });
-        if (!response.ok) throw new Error(`Camera returned ${response.status}`);
-        const nextState = (await response.json()) as CameraState;
-        if (active) {
-          setState(nextState);
-          setConnected(true);
-        }
-      } catch {
-        if (active) setConnected(false);
-      }
-    };
-
-    void loadState();
+    // SSE sends the current state immediately and owns ordering after reconnect.
     const events = new EventSource("/api/events");
     events.onmessage = (event) => {
       if (!active) return;
-      setState(JSON.parse(event.data) as CameraState);
-      setConnected(true);
+      try {
+        setState(JSON.parse(event.data) as CameraState);
+        setConnected(true);
+      } catch {
+        setConnected(false);
+      }
     };
     events.onerror = () => {
       if (active) setConnected(false);
@@ -58,21 +71,10 @@ export function useCamera() {
       events.close();
     };
   }, []);
-
-  const act = useCallback(async (action: CameraAction) => {
-    if (actionPending.current) return;
-    actionPending.current = true;
-    try {
-      const response = await fetch(`/api/actions/${action}`, { method: "POST" });
-      if (!response.ok) throw new Error(`Action returned ${response.status}`);
-      setState((await response.json()) as CameraState);
-      setConnected(true);
-    } catch {
-      setConnected(false);
-    } finally {
-      actionPending.current = false;
-    }
-  }, []);
-
+  const act = useCallback(
+    (action: CameraAction, values: object = {}) =>
+      api<{ accepted: boolean }>(`/api/actions/${action}`, values),
+    [],
+  );
   return { state, connected, act };
 }

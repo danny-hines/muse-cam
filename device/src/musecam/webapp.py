@@ -8,14 +8,17 @@ import subprocess
 import threading
 import time
 import uuid
+from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from queue import Empty, Full, Queue
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from aiohttp import web
+from PIL import Image
 
 from .app import (
     CAMERA_UNAVAILABLE_MESSAGE,
@@ -24,16 +27,20 @@ from .app import (
     api_error_code,
     friendly_generation_error,
 )
+from .audio import SoundPlayer
 from .battery import create_battery
 from .camera import Camera, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
 from .models import CaptureJob, Generation, Preset, ScreenState
 from .store import CaptureStore
+from .system import DeviceSystem
 
 LOGGER = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).with_name("static")
-API_ACTIONS = {"previous", "next", "capture", "back", "share", "power"}
+API_ACTIONS = {"previous", "next", "select", "capture", "back", "share", "remix", "retry", "power"}
+MIN_FREE_BYTES = 150 * 1024 * 1024
+MAX_PENDING = 30
 
 
 class HardwareButtons:
@@ -69,7 +76,7 @@ class HardwareButtons:
 
 
 class CameraWebController:
-    """Own camera hardware and expose thread-safe state to the local web server."""
+    """Camera capture and cloud work have independent lifecycles; photos stay on disk."""
 
     def __init__(
         self,
@@ -79,42 +86,55 @@ class CameraWebController:
         simulate: bool = False,
         offline: bool = False,
     ) -> None:
-        self._config = config
-        self._profile = profile
-        self._simulate = simulate
-        self._offline = offline
+        self._config, self._profile = config, profile
+        self._simulate, self._offline = simulate, offline
         self._captures_dir = config.data_dir / "captures"
         self._results_dir = config.data_dir / "results"
-        self._captures_dir.mkdir(parents=True, exist_ok=True)
-        self._results_dir.mkdir(parents=True, exist_ok=True)
-
+        for directory in (self._captures_dir, self._results_dir):
+            directory.mkdir(parents=True, exist_ok=True)
         self._store = CaptureStore(config.data_dir / "musecam.sqlite3")
         self._client = None if offline else MuseCamClient(config)
         self._camera: Camera = create_camera(profile, simulate=simulate)
         self._battery = create_battery(profile.battery_telemetry and not simulate)
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-network")
-        self._actions: Queue[str] = Queue(maxsize=16)
+        self._system = DeviceSystem(config.data_dir, simulate=simulate)
+        self._sound = SoundPlayer(simulate=simulate, volume=int(self._store.setting("volume", 35)))
+        self._sound.configure(
+            self._sound.volume, bool(self._store.setting("processingSound", True))
+        )
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-generate")
+        self._share_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-share")
+        self._actions: Queue[tuple[str, dict]] = Queue(maxsize=16)
         self._stop = threading.Event()
         self._state_changed = threading.Condition(threading.RLock())
         self._frame_changed = threading.Condition(threading.RLock())
         self._thread: threading.Thread | None = None
         self._buttons: HardwareButtons | None = None
-
         self._presets: list[Preset] = FALLBACK_PRESETS
         self._preset_index = 0
         self._status = ScreenState.STARTING
         self._message = "Starting camera"
         self._network_online = not offline
         self._camera_available = False
-        self._active_job: CaptureJob | None = None
-        self._future: Future[CaptureOutcome | Generation] | None = None
-        self._future_kind: str | None = None
+        self._future: Future[CaptureOutcome] | None = None
+        self._processing_id: str | None = None
+        self._share_future: Future[Generation] | None = None
+        self._sharing_id: str | None = None
+        self._retry_after: dict[str, float] = {}
+        self._last_capture_id: str | None = None
+        self._last_result_id: str | None = None
         self._battery_percentage: int | None = None
         self._revision = 0
+        self._session_id = uuid.uuid4().hex
         self._frame_revision = 0
+        self._gallery_revision = 0
         self._preview_jpeg: bytes | None = None
+        self._preview_consumers = 0
         self._last_battery_read = 0.0
-        self._last_retry = 0.0
+        self._last_processing_sound = 0.0
+        self._notifications: deque[dict] = deque(maxlen=12)
+        self._notification_id = 0
+        self._maintenance = False
+        self._maintenance_job: str | None = None
 
     def start(self) -> None:
         self._load_presets()
@@ -123,277 +143,337 @@ class CameraWebController:
         self._buttons = HardwareButtons(self._profile, self.dispatch, simulate=self._simulate)
 
     def _load_presets(self) -> None:
-        presets: list[Preset] = []
+        presets = []
         if self._client is not None:
             try:
                 presets = self._client.presets()
                 self._store.save_presets(presets)
                 self._network_online = True
             except (httpx.HTTPError, ValueError, KeyError):
-                LOGGER.warning("Unable to refresh presets; using cache", exc_info=True)
+                LOGGER.warning("Unable to refresh presets; using cache")
                 self._network_online = False
         self._presets = presets or self._store.load_presets() or FALLBACK_PRESETS
+        selected = self._store.setting("presetId")
+        self._preset_index = next((i for i, p in enumerate(self._presets) if p.id == selected), 0)
 
-    def dispatch(self, action: str) -> None:
+    def dispatch(self, action: str, values: dict | None = None) -> None:
         if action not in API_ACTIONS:
-            raise ValueError(f"Unsupported camera action: {action}")
-        try:
-            self._actions.put_nowait(action)
-        except Full:
-            LOGGER.warning("Dropping action because the camera queue is full: %s", action)
+            raise ValueError("Unsupported camera action")
+        values = values or {}
+        if action == "select" and values.get("presetId") not in {p.id for p in self._presets}:
+            raise ValueError("Choose an available style")
+        if action in {"remix", "retry", "share"}:
+            if self._store.get(str(values.get("captureId", self._last_result_id))) is None:
+                raise ValueError("Photo was not found")
+        with self._state_changed:
+            if self._maintenance:
+                raise ValueError("An update is in progress")
+            try:
+                self._actions.put_nowait((action, values))
+            except Full as error:
+                raise ValueError("Camera is busy. Try again in a moment.") from error
 
     def _run(self) -> None:
         try:
             self._camera.start()
             with self._state_changed:
                 self._camera_available = True
-                self._status = ScreenState.LIVE
-                self._message = ""
+                self._status, self._message = ScreenState.LIVE, ""
                 self._publish_locked()
-            frame_interval = 1 / self._profile.preview_fps
             next_frame = 0.0
-
             while not self._stop.is_set():
                 self._poll_actions()
                 self._poll_future()
-                self._retry_pending()
+                self._poll_share()
+                self._start_pending()
                 self._refresh_battery()
                 now = time.monotonic()
-                if self._status == ScreenState.LIVE and now >= next_frame:
+                if self._future is not None and now - self._last_processing_sound > 7:
+                    self._sound.play("processing")
+                    self._last_processing_sound = now
+                if self._preview_consumers and now >= next_frame:
                     self._refresh_preview()
-                    next_frame = now + frame_interval
-                self._stop.wait(0.01)
+                    next_frame = now + 1 / self._profile.preview_fps
+                self._stop.wait(0.015)
         except Exception:
             LOGGER.exception("Camera runtime failed")
             with self._state_changed:
                 self._camera_available = False
-                self._status = ScreenState.ERROR
-                self._message = CAMERA_UNAVAILABLE_MESSAGE
+                self._status, self._message = ScreenState.ERROR, CAMERA_UNAVAILABLE_MESSAGE
                 self._publish_locked()
         finally:
             self._camera.close()
 
     def _poll_actions(self) -> None:
-        while True:
-            try:
-                action = self._actions.get_nowait()
-            except Empty:
-                return
-            try:
-                self._handle_action(action)
-            except Exception as error:
-                LOGGER.exception("Camera action failed: %s", action)
-                with self._state_changed:
-                    self._status = ScreenState.ERROR
-                    self._message = str(error)
-                    self._publish_locked()
+        # One capture per loop keeps completions and state updates responsive.
+        try:
+            action, values = self._actions.get_nowait()
+        except Empty:
+            return
+        try:
+            self._handle_action(action, values)
+        except Exception as error:
+            LOGGER.warning("Camera action failed: %s", action, exc_info=True)
+            self._notify("error", "Couldn’t do that", str(error)[:160])
+            self._sound.play("error")
+            with self._state_changed:
+                self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
+                self._publish_locked()
 
-    def _handle_action(self, action: str) -> None:
+    def _handle_action(self, action: str, values: dict) -> None:
         if action == "power":
             self._power_off()
-            return
-        if action == "back":
-            self._return_to_live()
-            return
-        if action in {"previous", "next"} and self._status in {
-            ScreenState.LIVE,
-            ScreenState.RESULT,
-            ScreenState.ERROR,
-        }:
-            delta = -1 if action == "previous" else 1
+        elif action == "back":
+            pass  # The browser owns navigation; background work keeps running.
+        elif action in {"previous", "next", "select"}:
             with self._state_changed:
-                self._preset_index = (self._preset_index + delta) % len(self._presets)
-                self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
-                self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
-                self._active_job = None
+                if action == "select":
+                    self._preset_index = next(
+                        i for i, p in enumerate(self._presets) if p.id == values["presetId"]
+                    )
+                else:
+                    self._preset_index = (
+                        self._preset_index + (-1 if action == "previous" else 1)
+                    ) % len(self._presets)
+                self._store.set_setting("presetId", self._presets[self._preset_index].id)
                 self._publish_locked()
-        elif action == "capture" and self._status in {ScreenState.LIVE, ScreenState.RESULT}:
+        elif action == "capture":
             self._capture()
-        elif action == "share" and self._status == ScreenState.RESULT:
-            self._share()
+        elif action in {"retry", "remix"}:
+            self._remix(values, retry=action == "retry")
+        elif action == "share":
+            self._share(str(values.get("captureId", self._last_result_id)))
+
+    def _can_save(self) -> None:
+        counts = self._store.counts()
+        if counts.get("queued", 0) + counts.get("uploading", 0) >= MAX_PENDING:
+            raise ValueError("30 photos are waiting. Let a few finish before taking more.")
+        if self._system.storage()["free"] < MIN_FREE_BYTES:
+            raise ValueError("Storage is nearly full. Free space before taking more photos.")
+
+    def _new_source(self) -> tuple[str, Path]:
+        capture_id = f"pi_{int(time.time())}_{uuid.uuid4().hex[:12]}"
+        return capture_id, self._captures_dir / f"{capture_id}.jpg"
 
     def _capture(self) -> None:
-        if self._future is not None:
-            return
+        if not self._camera_available:
+            raise ValueError(CAMERA_UNAVAILABLE_MESSAGE)
+        self._can_save()
         preset = self._presets[self._preset_index]
-        capture_id = f"pi_{int(time.time())}_{uuid.uuid4().hex[:8]}"
-        source_path = self._captures_dir / f"{capture_id}.jpg"
+        capture_id, source_path = self._new_source()
         with self._state_changed:
-            self._status = ScreenState.CAPTURING
-            self._message = "Hold still"
-            self._active_job = None
+            self._status, self._message = ScreenState.CAPTURING, "Hold steady"
             self._publish_locked()
+        self._sound.play("shutter")
         try:
             self._camera.capture(source_path)
             prepare_capture(source_path)
-        except Exception as error:
-            LOGGER.exception("Capture failed")
-            with self._state_changed:
-                self._status = ScreenState.ERROR
-                self._message = f"Camera error: {error}"
-                self._publish_locked()
-            return
-
-        self._store.enqueue(capture_id, preset.id, source_path)
-        job = self._store.get(capture_id)
-        if job is None:
-            raise RuntimeError("Could not save capture")
+            self._store.enqueue(capture_id, preset.id, source_path)
+        except Exception:
+            source_path.unlink(missing_ok=True)
+            raise
         with self._state_changed:
-            self._active_job = job
-            self._status = ScreenState.PROCESSING
-            self._message = "Sending to Muse Image"
-            self._future_kind = "generate"
-            self._future = self._executor.submit(self._process_job, job)
+            self._last_capture_id = capture_id
+            self._gallery_revision += 1
+            self._status, self._message = ScreenState.LIVE, ""
+            self._publish_locked()
+        self._notify("queued", "Photo saved", f"{preset.name} · keep shooting", capture_id)
+
+    def _remix(self, values: dict, *, retry: bool) -> None:
+        self._can_save()
+        original = self._store.get(values["captureId"])
+        if original is None or not original.source_path.is_file():
+            raise ValueError("The original photo is unavailable")
+        if retry and original.status != "failed":
+            raise ValueError("This photo is already complete or waiting to process")
+        preset_id = original.preset_id if retry else values.get("presetId")
+        if preset_id not in {p.id for p in self._presets}:
+            raise ValueError("Choose an available style")
+        capture_id, source_path = self._new_source()
+        # Each treatment owns its original, so future cleanup cannot break siblings.
+        shutil.copyfile(original.source_path, source_path)
+        try:
+            self._store.enqueue(capture_id, preset_id, source_path)
+        except Exception:
+            source_path.unlink(missing_ok=True)
+            raise
+        with self._state_changed:
+            self._gallery_revision += 1
+            self._publish_locked()
+        self._notify("queued", "New treatment queued", "Your original photo is kept", capture_id)
+
+    def _start_pending(self) -> None:
+        if self._future is not None or self._maintenance:
+            return
+        now = time.monotonic()
+        pending = next(
+            (
+                job
+                for job in self._store.pending(MAX_PENDING)
+                if self._retry_after.get(job.capture_id, 0) <= now
+            ),
+            None,
+        )
+        if pending is None:
+            return
+        self._store.mark_uploading(pending.capture_id)
+        with self._state_changed:
+            self._processing_id = pending.capture_id
+            self._future = self._executor.submit(self._process_job, pending)
+            self._gallery_revision += 1
+            self._last_processing_sound = now - 5  # First quiet chirp after two seconds.
             self._publish_locked()
 
     def _process_job(self, job: CaptureJob) -> CaptureOutcome:
-        self._store.mark_uploading(job.capture_id)
         result_path = self._results_dir / f"{job.capture_id}.jpg"
-        if self._client is None:
-            shutil.copyfile(job.source_path, result_path)
-            generation = Generation(
-                id=f"offline-{job.capture_id}",
-                capture_id=job.capture_id,
-                status="complete",
-                preset_id=job.preset_id,
-                image_url=None,
-                share_url=None,
-                error_code=None,
-            )
-            self._store.mark_complete(job.capture_id, generation.id, result_path)
-            self._prune_local_history()
-            return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
-
         try:
-            generation = self._client.generate(job.source_path, job.capture_id, job.preset_id)
-            if generation.status != "complete" or not generation.image_url:
-                message = friendly_generation_error(generation.error_code)
-                self._store.mark_failed(job.capture_id, message)
-                return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
-            self._client.download_result(generation.image_url, result_path)
+            if self._client is None:
+                # Simulated processing is intentionally visible for UX verification.
+                self._stop.wait(1.2)
+                with Image.open(job.source_path) as original:
+                    from PIL import ImageEnhance, ImageOps
+
+                    image = ImageEnhance.Color(original.convert("RGB")).enhance(0.5)
+                    ImageOps.posterize(image, 4).save(result_path, "JPEG", quality=88)
+                generation = Generation(
+                    f"offline-{job.capture_id}",
+                    job.capture_id,
+                    "complete",
+                    job.preset_id,
+                    None,
+                    None,
+                    None,
+                )
+            else:
+                generation = self._client.generate(job.source_path, job.capture_id, job.preset_id)
+                if generation.status != "complete" or not generation.image_url:
+                    self._store.mark_failed(
+                        job.capture_id, friendly_generation_error(generation.error_code)
+                    )
+                    return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
+                temporary = result_path.with_suffix(".download")
+                self._client.download_result(generation.image_url, temporary)
+                with Image.open(temporary) as image:
+                    image.verify()
+                temporary.replace(result_path)
             self._store.mark_complete(
                 job.capture_id, generation.id, result_path, generation.share_url
             )
-            self._prune_local_history()
             return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
-        except httpx.TransportError as error:
-            self._store.mark_queued(job.capture_id, str(error))
+        except httpx.TransportError:
+            self._store.mark_queued(
+                job.capture_id, "Connection interrupted. Saved for automatic retry."
+            )
             return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
         except httpx.HTTPStatusError as error:
-            message = friendly_generation_error(api_error_code(error))
-            self._store.mark_failed(job.capture_id, message)
-            return CaptureOutcome(self._store.get(job.capture_id) or job, None)
+            if error.response.status_code in {408, 429, 502, 503, 504}:
+                self._store.mark_queued(job.capture_id, "Service busy. Saved for automatic retry.")
+                return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
+            self._store.mark_failed(
+                job.capture_id, friendly_generation_error(api_error_code(error))
+            )
         except (OSError, ValueError):
-            self._store.mark_failed(job.capture_id, friendly_generation_error(None))
-            return CaptureOutcome(self._store.get(job.capture_id) or job, None)
+            self._store.mark_failed(
+                job.capture_id, "Couldn’t finish this photo. Your original is saved."
+            )
+        return CaptureOutcome(self._store.get(job.capture_id) or job, None)
 
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
             return
-        future = self._future
-        kind = self._future_kind
-        self._future = None
-        self._future_kind = None
+        future, capture_id = self._future, self._processing_id
+        self._future, self._processing_id = None, None
         try:
             result = future.result()
         except Exception:
-            LOGGER.exception("Background camera operation failed")
-            with self._state_changed:
-                if kind == "share":
-                    self._status = ScreenState.RESULT
-                    self._message = "Could not share. Try again when the connection returns."
-                    self._network_online = False
-                else:
-                    self._status = ScreenState.ERROR
-                    self._message = friendly_generation_error(None)
-                self._publish_locked()
-            return
-
-        if kind == "share" and isinstance(result, Generation):
-            if self._active_job and result.share_url:
-                self._store.mark_shared(self._active_job.capture_id, result.share_url)
-                self._active_job = self._store.get(self._active_job.capture_id)
-            with self._state_changed:
-                self._status = ScreenState.RESULT
-                self._message = "Shared to the public roll"
-                self._network_online = True
-                self._publish_locked()
-            return
-
-        if not isinstance(result, CaptureOutcome):
-            return
-        with self._state_changed:
-            self._active_job = result.job
-            if result.job.status == "complete" and result.job.result_path:
-                self._status = ScreenState.RESULT
-                self._message = ""
+            LOGGER.exception("Generation worker failed")
+            if capture_id:
+                self._store.mark_failed(capture_id, "Processing stopped. Your original is saved.")
+            self._notify("error", "Photo needs attention", "Open Gallery to try again", capture_id)
+            self._sound.play("error")
+        else:
+            job = result.job
+            if job.status == "complete":
+                self._last_result_id = job.capture_id
                 self._network_online = not self._offline
+                self._retry_after.pop(job.capture_id, None)
+                self._sound.play("success")
+                self._notify(
+                    "success",
+                    "Your photo is ready",
+                    self._preset_name(job.preset_id),
+                    job.capture_id,
+                )
             elif result.queued:
-                self._status = ScreenState.ERROR
-                self._message = "No connection. Your photo is safe and will retry."
                 self._network_online = False
+                self._retry_after[job.capture_id] = time.monotonic() + min(
+                    120, 15 * 2 ** min(job.attempts, 3)
+                )
+                if job.attempts <= 1:
+                    self._notify(
+                        "waiting",
+                        "Saved for later",
+                        job.error or "Waiting for connection",
+                        job.capture_id,
+                    )
             else:
-                self._status = ScreenState.ERROR
-                self._message = result.job.error or "Muse Image could not finish this photo."
+                self._sound.play("error")
+                self._notify(
+                    "error",
+                    "Photo needs attention",
+                    job.error or "Try another style in Gallery",
+                    job.capture_id,
+                )
+        with self._state_changed:
+            self._gallery_revision += 1
             self._publish_locked()
 
-    def _share(self) -> None:
-        if (
-            self._client is None
-            or self._future is not None
-            or self._active_job is None
-            or self._active_job.generation_id is None
-            or self._active_job.generation_id.startswith("offline-")
-        ):
-            with self._state_changed:
-                self._message = "Sharing needs a network connection"
-                self._publish_locked()
+    def _share(self, capture_id: str) -> None:
+        job = self._store.get(capture_id)
+        if job is None or job.status != "complete" or not job.generation_id:
+            raise ValueError("This photo isn’t ready to share")
+        if job.share_url:
             return
-        if self._active_job.share_url:
-            return
+        if self._client is None or job.generation_id.startswith("offline-"):
+            raise ValueError("Sharing is unavailable in the simulator")
+        if self._share_future is not None:
+            raise ValueError("Another photo is being shared")
         with self._state_changed:
-            self._status = ScreenState.SHARING
-            self._message = "Publishing your creation"
-            self._future_kind = "share"
-            self._future = self._executor.submit(self._client.share, self._active_job.generation_id)
+            self._sharing_id = job.capture_id
+            self._share_future = self._share_executor.submit(self._client.share, job.generation_id)
             self._publish_locked()
 
-    def _retry_pending(self) -> None:
-        now = time.monotonic()
-        if (
-            self._offline
-            or self._future is not None
-            or self._status not in {ScreenState.LIVE, ScreenState.ERROR}
-            or now - self._last_retry < 15
-        ):
+    def _poll_share(self) -> None:
+        if self._share_future is None or not self._share_future.done():
             return
-        self._last_retry = now
-        pending = self._store.pending(limit=1)
-        if not pending:
-            return
+        future, capture_id = self._share_future, self._sharing_id
+        self._share_future, self._sharing_id = None, None
+        try:
+            generation = future.result()
+            if not generation.share_url or not capture_id:
+                raise ValueError("No share link returned")
+            self._store.mark_shared(capture_id, generation.share_url)
+            self._notify(
+                "success", "Shared to the public roll", "Your creation is now public", capture_id
+            )
+        except Exception:
+            self._notify(
+                "error", "Couldn’t share", "Your photo is safe. Try again later.", capture_id
+            )
         with self._state_changed:
-            self._active_job = pending[0]
-            self._status = ScreenState.PROCESSING
-            self._message = "Retrying saved photo"
-            self._future_kind = "generate"
-            self._future = self._executor.submit(self._process_job, pending[0])
+            self._gallery_revision += 1
             self._publish_locked()
 
     def _refresh_preview(self) -> None:
         try:
-            frame = self._camera.preview()
             output = BytesIO()
-            frame.save(output, "JPEG", quality=76)
+            self._camera.preview().save(output, "JPEG", quality=72)
             with self._frame_changed:
                 self._preview_jpeg = output.getvalue()
                 self._frame_revision += 1
                 self._frame_changed.notify_all()
-        except Exception as error:
-            LOGGER.exception("Camera preview failed")
-            with self._state_changed:
-                self._status = ScreenState.ERROR
-                self._message = str(error)
-                self._publish_locked()
+        except Exception:
+            LOGGER.warning("Preview frame unavailable", exc_info=True)
 
     def _refresh_battery(self) -> None:
         now = time.monotonic()
@@ -406,32 +486,32 @@ class CameraWebController:
                 self._battery_percentage = percentage
                 self._publish_locked()
 
-    def _return_to_live(self) -> None:
-        with self._state_changed:
-            self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
-            self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
-            self._active_job = None
-            self._publish_locked()
-
     def _power_off(self) -> None:
+        if self._store.counts().get("uploading", 0) or self._future or self._share_future:
+            raise ValueError("Wait for processing to finish before shutting down")
         with self._state_changed:
             self._status = ScreenState.SHUTTING_DOWN
             self._message = "Safe to unplug when the screen turns off"
             self._publish_locked()
-        if self._simulate:
-            return
-        subprocess.run(
-            ["sudo", "-n", "/usr/bin/systemctl", "poweroff"],
-            check=True,
-            timeout=10,
-        )
+        if not self._simulate:
+            subprocess.run(["sudo", "-n", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10)
 
-    def _prune_local_history(self) -> None:
-        for path in self._store.prune_finished(keep=100):
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                LOGGER.warning("Could not remove old capture %s", path, exc_info=True)
+    def _notify(self, kind: str, title: str, message: str, capture_id: str | None = None) -> None:
+        with self._state_changed:
+            self._notification_id += 1
+            self._notifications.append(
+                {
+                    "id": self._notification_id,
+                    "kind": kind,
+                    "title": title,
+                    "message": message,
+                    "captureId": capture_id,
+                }
+            )
+            self._publish_locked()
+
+    def _preset_name(self, preset_id: str) -> str:
+        return next((p.name for p in self._presets if p.id == preset_id), preset_id)
 
     def _publish_locked(self) -> None:
         self._revision += 1
@@ -440,99 +520,234 @@ class CameraWebController:
     def state(self) -> dict[str, Any]:
         with self._state_changed:
             preset = self._presets[self._preset_index]
-            job = self._active_job
-            result_url = None
-            if job and job.result_path and job.result_path.is_file():
-                result_url = f"/media/result.jpg?v={self._revision}"
-            status = self._status.value.replace("-", "_")
+            counts = self._store.counts()
             return {
-                "status": status,
-                "preset": {
-                    "id": preset.id,
-                    "name": preset.name,
-                    "description": preset.description,
-                    "accent": preset.accent,
-                },
+                "status": self._status.value.replace("-", "_"),
+                "preset": self._preset_json(preset),
+                "presets": [self._preset_json(p) for p in self._presets],
                 "presetIndex": self._preset_index,
                 "presetCount": len(self._presets),
                 "message": self._message,
                 "networkOnline": self._network_online,
-                "queued": len(self._store.pending()),
+                "queued": counts.get("queued", 0),
+                "processingId": self._processing_id,
+                "sharingId": self._sharing_id,
                 "battery": self._battery_percentage,
-                "shared": bool(job and job.share_url),
-                "shareUrl": job.share_url if job else None,
-                "resultUrl": result_url,
+                "galleryRevision": self._gallery_revision,
+                "galleryCount": sum(counts.values()),
+                "notifications": list(self._notifications),
+                "lastCaptureId": self._last_capture_id,
+                "volume": self._sound.volume,
+                "processingSound": self._sound.processing_enabled,
+                "maintenance": self._maintenance,
+                "simulate": self._simulate,
                 "revision": self._revision,
+                "sessionId": self._session_id,
             }
 
-    def wait_for_state(self, revision: int, timeout: float = 15) -> dict[str, Any]:
+    @staticmethod
+    def _preset_json(preset: Preset) -> dict:
+        return {
+            "id": preset.id,
+            "name": preset.name,
+            "description": preset.description,
+            "accent": preset.accent,
+        }
+
+    def gallery_item(self, job: CaptureJob) -> dict:
+        thumbnail_kind = "result" if job.result_path else "source"
+        return {
+            "id": job.capture_id,
+            "presetId": job.preset_id,
+            "presetName": self._preset_name(job.preset_id),
+            "status": job.status,
+            "error": job.error,
+            "shareUrl": job.share_url,
+            "createdAt": job.created_at.replace(" ", "T") + "Z",
+            "attempts": job.attempts,
+            "sourceUrl": f"/api/gallery/{job.capture_id}/source",
+            "resultUrl": f"/api/gallery/{job.capture_id}/result" if job.result_path else None,
+            "thumbnailUrl": f"/api/gallery/{job.capture_id}/thumbnail?kind={thumbnail_kind}",
+        }
+
+    def gallery(self, offset: int = 0, status: str = "all") -> dict:
+        jobs = self._store.gallery(limit=40, offset=offset, status=status)
+        return {
+            "items": [self.gallery_item(job) for job in jobs],
+            "counts": self._store.counts(),
+            "nextOffset": offset + 40 if len(jobs) == 40 else None,
+        }
+
+    def media_path(self, capture_id: str, kind: str) -> Path:
+        job = self._store.get(capture_id)
+        if job is None or kind not in {"source", "result"}:
+            raise ValueError("Photo unavailable")
+        path = job.source_path if kind == "source" else job.result_path
+        if (
+            path is None
+            or not path.is_file()
+            or not path.resolve().is_relative_to(self._config.data_dir.resolve())
+        ):
+            raise ValueError("Photo unavailable")
+        return path
+
+    def settings(self) -> dict:
+        try:
+            device = self._system.request("status")
+        except ValueError as error:
+            device = {
+                "error": str(error),
+                "addresses": [],
+                "ssid": "Unavailable",
+                "job": {"phase": "idle"},
+            }
         with self._state_changed:
-            self._state_changed.wait_for(lambda: self._revision > revision, timeout=timeout)
+            job = device.get("job", {})
+            if (
+                self._maintenance_job
+                and job.get("id") == self._maintenance_job
+                and job.get("phase") in {"complete", "failed"}
+            ):
+                self._maintenance = False
+                self._maintenance_job = None
+                self._publish_locked()
+        return {
+            "volume": self._sound.volume,
+            "processingSound": self._sound.processing_enabled,
+            "audioAvailable": self._sound.available,
+            "audioError": self._sound.error,
+            "storage": self._system.storage(),
+            "counts": self._store.counts(),
+            "device": device,
+            "battery": {
+                "percentage": self._battery_percentage,
+                "supported": self._profile.battery_telemetry,
+                "message": "Battery sensor unavailable"
+                if self._profile.battery_telemetry
+                else "PiSugar S Plus does not report battery level. Check the power board LEDs.",
+            },
+        }
+
+    def save_settings(self, values: dict) -> dict:
+        volume = values.get("volume", self._sound.volume)
+        processing = values.get("processingSound", self._sound.processing_enabled)
+        if type(volume) is not int or not 0 <= volume <= 100 or type(processing) is not bool:
+            raise ValueError("Invalid sound settings")
+        self._store.set_setting("volume", volume)
+        self._store.set_setting("processingSound", processing)
+        self._sound.configure(volume, processing)
+        with self._state_changed:
+            self._publish_locked()
+        return {"volume": volume, "processingSound": processing}
+
+    def update(self) -> dict:
+        with self._state_changed:
+            counts = self._store.counts()
+            if (
+                self._maintenance
+                or self._future
+                or self._share_future
+                or not self._actions.empty()
+                or counts.get("queued", 0)
+                or counts.get("uploading", 0)
+                or self._status == ScreenState.CAPTURING
+            ):
+                raise ValueError("Let all queued photos finish before updating")
+            self._maintenance = True
+            self._publish_locked()
+        try:
+            result = self._system.request("update-apply")
+            with self._state_changed:
+                self._maintenance_job = result.get("id")
+                if result.get("phase") in {"complete", "failed"}:
+                    self._maintenance = False
+                    self._maintenance_job = None
+                    self._publish_locked()
+            return result
+        except Exception:
+            with self._state_changed:
+                self._maintenance = False
+                self._publish_locked()
+            raise
+
+    def wait_for_state(self, revision: int, timeout: float = 15) -> dict:
+        with self._state_changed:
+            self._state_changed.wait_for(
+                lambda: self._revision > revision or self._stop.is_set(), timeout
+            )
         return self.state()
 
     def wait_for_frame(self, revision: int, timeout: float = 2) -> tuple[int, bytes | None]:
         with self._frame_changed:
-            self._frame_changed.wait_for(lambda: self._frame_revision > revision, timeout=timeout)
+            self._frame_changed.wait_for(
+                lambda: self._frame_revision > revision or self._stop.is_set(), timeout
+            )
             return self._frame_revision, self._preview_jpeg
-
-    def result_path(self) -> Path | None:
-        with self._state_changed:
-            if self._active_job and self._active_job.result_path:
-                return self._active_job.result_path
-        return None
 
     def close(self) -> None:
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=5)
         if self._buttons is not None:
             self._buttons.close()
-        if self._future is not None:
-            self._future.cancel()
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        if self._thread is not None:
+            self._thread.join(timeout=10)
+        self._executor.shutdown(wait=True, cancel_futures=True)
+        self._share_executor.shutdown(wait=True, cancel_futures=True)
+        self._sound.close()
         if self._client is not None:
             self._client.close()
         self._store.close()
 
 
+@web.middleware
+async def local_requests(request: web.Request, handler: Any) -> web.StreamResponse:
+    # Privileged settings and private photos stay local, including against DNS rebinding.
+    if urlsplit(f"http://{request.host}").hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise web.HTTPForbidden(text="Local camera access only")
+    if request.method not in {"GET", "HEAD"}:
+        origin = request.headers.get("Origin")
+        if origin and origin != f"{request.scheme}://{request.host}":
+            raise web.HTTPForbidden(text="Local camera access only")
+        if request.headers.get("X-MuseCam-Request") != "1":
+            raise web.HTTPForbidden(text="Camera request header required")
+    try:
+        return await handler(request)
+    except ValueError as error:
+        return web.json_response({"error": str(error)}, status=400)
+
+
 async def _state(request: web.Request) -> web.Response:
-    controller: CameraWebController = request.app["controller"]
-    return web.json_response(controller.state(), headers={"Cache-Control": "no-store"})
+    return web.json_response(
+        request.app["controller"].state(), headers={"Cache-Control": "no-store"}
+    )
 
 
 async def _events(request: web.Request) -> web.StreamResponse:
-    controller: CameraWebController = request.app["controller"]
+    controller = request.app["controller"]
     response = web.StreamResponse(
-        headers={
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-store",
-            "Connection": "keep-alive",
-        }
+        headers={"Content-Type": "text/event-stream", "Cache-Control": "no-store"}
     )
     await response.prepare(request)
     revision = -1
     try:
-        while True:
+        while not controller._stop.is_set():
             state = await asyncio.to_thread(controller.wait_for_state, revision)
             revision = state["revision"]
-            payload = json.dumps(state, separators=(",", ":"))
-            await response.write(f"data: {payload}\n\n".encode())
+            await response.write(f"data: {json.dumps(state, separators=(',', ':'))}\n\n".encode())
     except (ConnectionResetError, asyncio.CancelledError):
         pass
     return response
 
 
 async def _action(request: web.Request) -> web.Response:
-    controller: CameraWebController = request.app["controller"]
-    action = request.match_info["action"]
-    if action not in API_ACTIONS:
-        raise web.HTTPNotFound()
-    controller.dispatch(action)
-    return web.json_response(controller.state(), headers={"Cache-Control": "no-store"})
+    values = await request.json()
+    if not isinstance(values, dict):
+        raise ValueError("Invalid action")
+    request.app["controller"].dispatch(request.match_info["action"], values)
+    return web.json_response({"accepted": True}, status=202)
 
 
 async def _preview(request: web.Request) -> web.StreamResponse:
-    controller: CameraWebController = request.app["controller"]
+    controller = request.app["controller"]
     response = web.StreamResponse(
         headers={
             "Content-Type": "multipart/x-mixed-replace; boundary=frame",
@@ -540,50 +755,129 @@ async def _preview(request: web.Request) -> web.StreamResponse:
         }
     )
     await response.prepare(request)
+    controller._preview_consumers += 1
     revision = -1
     try:
-        while True:
+        while not controller._stop.is_set():
             revision, frame = await asyncio.to_thread(controller.wait_for_frame, revision)
-            if frame is None:
-                continue
-            await response.write(
-                b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
-                + str(len(frame)).encode()
-                + b"\r\n\r\n"
-                + frame
-                + b"\r\n"
-            )
+            if frame is not None:
+                await response.write(
+                    b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                    + str(len(frame)).encode()
+                    + b"\r\n\r\n"
+                    + frame
+                    + b"\r\n"
+                )
     except (ConnectionResetError, asyncio.CancelledError):
         pass
+    finally:
+        controller._preview_consumers -= 1
     return response
 
 
-async def _result(request: web.Request) -> web.StreamResponse:
-    controller: CameraWebController = request.app["controller"]
-    path = controller.result_path()
-    if path is None or not path.is_file():
+async def _gallery(request: web.Request) -> web.Response:
+    offset = max(0, int(request.query.get("offset", "0")))
+    return web.json_response(
+        request.app["controller"].gallery(offset, request.query.get("filter", "all")),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _gallery_detail(request: web.Request) -> web.Response:
+    controller = request.app["controller"]
+    job = controller._store.get(request.match_info["capture_id"])
+    if job is None:
         raise web.HTTPNotFound()
-    return web.FileResponse(path, headers={"Cache-Control": "no-store"})
+    return web.json_response(controller.gallery_item(job), headers={"Cache-Control": "no-store"})
+
+
+async def _media(request: web.Request) -> web.StreamResponse:
+    controller = request.app["controller"]
+    capture_id, kind = request.match_info["capture_id"], request.match_info["kind"]
+    if kind == "thumbnail":
+        path = controller.media_path(capture_id, request.query.get("kind", "source"))
+
+        def thumbnail() -> bytes:
+            with Image.open(path) as original:
+                image = original.convert("RGB")
+                image.thumbnail((240, 180))
+                output = BytesIO()
+                image.save(output, "JPEG", quality=72)
+                return output.getvalue()
+
+        return web.Response(
+            body=await asyncio.to_thread(thumbnail),
+            content_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+    return web.FileResponse(
+        controller.media_path(capture_id, kind), headers={"Cache-Control": "private, max-age=86400"}
+    )
+
+
+async def _settings(request: web.Request) -> web.Response:
+    controller = request.app["controller"]
+    if request.method == "POST":
+        values = await request.json()
+        if not isinstance(values, dict) or values.keys() - {"volume", "processingSound"}:
+            raise ValueError("Invalid sound settings")
+        result = controller.save_settings(values)
+    else:
+        result = await asyncio.to_thread(controller.settings)
+    return web.json_response(result, headers={"Cache-Control": "no-store"})
+
+
+async def _sound(request: web.Request) -> web.Response:
+    controller = request.app["controller"]
+    values = await request.json()
+    if not isinstance(values, dict) or values.keys() - {"cue"}:
+        raise ValueError("Invalid sound request")
+    cue = values.get("cue", "shutter")
+    if not isinstance(cue, str):
+        raise ValueError("Invalid sound request")
+    if not controller._sound.available and not controller._simulate:
+        raise ValueError("Speaker unavailable. Check the audio setup.")
+    controller._sound.play(cue)
+    return web.json_response({"accepted": True})
+
+
+async def _system(request: web.Request) -> web.Response:
+    controller = request.app["controller"]
+    action = request.match_info["action"]
+    if action not in {"wifi-scan", "wifi-connect", "update-check", "update-apply"}:
+        raise web.HTTPNotFound()
+    values = await request.json()
+    allowed = {"ssid", "password", "hidden"} if action == "wifi-connect" else set()
+    if not isinstance(values, dict) or values.keys() - allowed:
+        raise ValueError("Invalid settings request")
+    if action == "update-apply":
+        result = await asyncio.to_thread(controller.update)
+    else:
+        result = await asyncio.to_thread(controller._system.request, action, **values)
+    return web.json_response(result, headers={"Cache-Control": "no-store"})
 
 
 async def _index(_: web.Request) -> web.StreamResponse:
-    index = STATIC_DIR / "index.html"
-    if not index.is_file():
-        raise web.HTTPServiceUnavailable(
-            text="Camera UI has not been built. Run `pnpm --dir device-ui build`."
-        )
-    return web.FileResponse(index, headers={"Cache-Control": "no-cache"})
+    if not (STATIC_DIR / "index.html").is_file():
+        raise web.HTTPServiceUnavailable(text="Camera UI has not been built")
+    return web.FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 def create_web_app(controller: CameraWebController) -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[local_requests], client_max_size=8192)
     app["controller"] = controller
     app.router.add_get("/", _index)
     app.router.add_get("/api/state", _state)
     app.router.add_get("/api/events", _events)
     app.router.add_post("/api/actions/{action}", _action)
     app.router.add_get("/preview.mjpg", _preview)
-    app.router.add_get("/media/result.jpg", _result)
+    app.router.add_get("/api/gallery", _gallery)
+    app.router.add_get("/api/gallery/{capture_id}", _gallery_detail)
+    app.router.add_get("/api/gallery/{capture_id}/{kind}", _media)
+    app.router.add_get("/api/settings", _settings)
+    app.router.add_post("/api/settings", _settings)
+    app.router.add_post("/api/sound", _sound)
+    app.router.add_post("/api/system/{action}", _system)
     if (STATIC_DIR / "assets").is_dir():
         app.router.add_static("/assets", STATIC_DIR / "assets")
     return app
@@ -598,12 +892,7 @@ def run_web_app(
     host: str,
     port: int,
 ) -> None:
-    controller = CameraWebController(
-        config,
-        profile,
-        simulate=simulate,
-        offline=offline,
-    )
+    controller = CameraWebController(config, profile, simulate=simulate, offline=offline)
     controller.start()
     try:
         web.run_app(create_web_app(controller), host=host, port=port, print=None)

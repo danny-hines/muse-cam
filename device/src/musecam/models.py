@@ -59,6 +59,7 @@ class CaptureJob:
     attempts: int
     error: str | None
     share_url: str | None
+    created_at: str = ""
 
 
 class ScreenState(StrEnum):
