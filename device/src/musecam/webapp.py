@@ -130,6 +130,8 @@ class CameraWebController:
         self._preview_jpeg: bytes | None = None
         self._preview_consumers = 0
         self._last_battery_read = 0.0
+        self._temperature: float | None = None
+        self._preview_throttled = False
         self._last_processing_sound = 0.0
         self._notifications: deque[dict] = deque(maxlen=12)
         self._notification_id = 0
@@ -193,7 +195,12 @@ class CameraWebController:
                     self._last_processing_sound = now
                 if self._preview_consumers and now >= next_frame:
                     self._refresh_preview()
-                    next_frame = now + 1 / self._profile.preview_fps
+                    fps = (
+                        min(5, self._profile.preview_fps)
+                        if self._preview_throttled
+                        else self._profile.preview_fps
+                    )
+                    next_frame = time.monotonic() + 1 / fps
                 self._stop.wait(0.015)
         except Exception:
             LOGGER.exception("Camera runtime failed")
@@ -348,7 +355,8 @@ class CameraWebController:
                 generation = self._client.generate(job.source_path, job.capture_id, job.preset_id)
                 if generation.status != "complete" or not generation.image_url:
                     self._store.mark_failed(
-                        job.capture_id, friendly_generation_error(generation.error_code)
+                        job.capture_id,
+                        friendly_generation_error(generation.error_code).replace(" Tap BACK.", ""),
                     )
                     return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
                 temporary = result_path.with_suffix(".download")
@@ -370,7 +378,8 @@ class CameraWebController:
                 self._store.mark_queued(job.capture_id, "Service busy. Saved for automatic retry.")
                 return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
             self._store.mark_failed(
-                job.capture_id, friendly_generation_error(api_error_code(error))
+                job.capture_id,
+                friendly_generation_error(api_error_code(error)).replace(" Tap BACK.", ""),
             )
         except (OSError, ValueError):
             self._store.mark_failed(
@@ -480,6 +489,12 @@ class CameraWebController:
         if now - self._last_battery_read < 5:
             return
         self._last_battery_read = now
+        self._temperature = self._system.temperature()
+        if self._temperature is not None:
+            if self._temperature >= 75:
+                self._preview_throttled = True
+            elif self._temperature <= 68:
+                self._preview_throttled = False
         percentage = self._battery.percentage()
         if percentage != self._battery_percentage:
             with self._state_changed:
@@ -561,7 +576,7 @@ class CameraWebController:
             "presetId": job.preset_id,
             "presetName": self._preset_name(job.preset_id),
             "status": job.status,
-            "error": job.error,
+            "error": job.error.replace(" Tap BACK.", "") if job.error else None,
             "shareUrl": job.share_url,
             "createdAt": job.created_at.replace(" ", "T") + "Z",
             "attempts": job.attempts,
@@ -619,6 +634,8 @@ class CameraWebController:
             "storage": self._system.storage(),
             "counts": self._store.counts(),
             "device": device,
+            "temperature": self._temperature,
+            "previewThrottled": self._preview_throttled,
             "battery": {
                 "percentage": self._battery_percentage,
                 "supported": self._profile.battery_telemetry,
