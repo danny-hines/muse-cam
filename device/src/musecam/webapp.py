@@ -43,6 +43,14 @@ MIN_FREE_BYTES = 150 * 1024 * 1024
 MAX_PENDING = 30
 
 
+def gallery_error(message: str | None) -> str | None:
+    if message is None:
+        return None
+    return message.replace(" Tap BACK.", "").replace(
+        "Tap BACK and try again.", "Use Retry or Restyle."
+    )
+
+
 class HardwareButtons:
     """Optional GPIO buttons for the browser runtime; touch remains in Chromium."""
 
@@ -356,7 +364,7 @@ class CameraWebController:
                 if generation.status != "complete" or not generation.image_url:
                     self._store.mark_failed(
                         job.capture_id,
-                        friendly_generation_error(generation.error_code).replace(" Tap BACK.", ""),
+                        gallery_error(friendly_generation_error(generation.error_code)),
                     )
                     return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
                 temporary = result_path.with_suffix(".download")
@@ -379,7 +387,7 @@ class CameraWebController:
                 return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
             self._store.mark_failed(
                 job.capture_id,
-                friendly_generation_error(api_error_code(error)).replace(" Tap BACK.", ""),
+                gallery_error(friendly_generation_error(api_error_code(error))),
             )
         except (OSError, ValueError):
             self._store.mark_failed(
@@ -576,7 +584,7 @@ class CameraWebController:
             "presetId": job.preset_id,
             "presetName": self._preset_name(job.preset_id),
             "status": job.status,
-            "error": job.error.replace(" Tap BACK.", "") if job.error else None,
+            "error": gallery_error(job.error),
             "shareUrl": job.share_url,
             "createdAt": job.created_at.replace(" ", "T") + "Z",
             "attempts": job.attempts,
