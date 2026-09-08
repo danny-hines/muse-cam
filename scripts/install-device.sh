@@ -202,7 +202,8 @@ apt-get install -y \
   sudo
 
 if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
-  apt-get install -y chromium xserver-xorg xinit x11-xserver-utils
+  apt-get install -y chromium xserver-xorg xinit x11-xserver-utils \
+    alsa-utils device-tree-compiler network-manager python3-dbus
 fi
 
 if command -v raspi-config >/dev/null 2>&1; then
@@ -234,10 +235,6 @@ if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
   fi
 fi
 
-if systemctl is-active --quiet musecam.service 2>/dev/null; then
-  systemctl stop musecam.service
-fi
-
 if [[ -d "${INSTALL_DIR}/.git" ]]; then
   if [[ -n $(git -C "${INSTALL_DIR}" status --porcelain) ]]; then
     echo "${INSTALL_DIR} has local changes; refusing to overwrite them." >&2
@@ -251,6 +248,10 @@ else
   git clone --depth 1 "${REPOSITORY_URL}" "${INSTALL_DIR}"
 fi
 
+if systemctl is-active --quiet musecam.service 2>/dev/null; then
+  systemctl stop musecam.service
+fi
+
 if [[ ! -f "${INSTALL_DIR}/device/profiles/${PROFILE}.toml" ]]; then
   echo "The selected profile is not present in the checkout: ${PROFILE}" >&2
   exit 2
@@ -259,7 +260,7 @@ fi
 if ! id musecam >/dev/null 2>&1; then
   useradd --system --home-dir "${DATA_DIR}" --create-home --shell /usr/sbin/nologin musecam
 fi
-for group in video render input gpio spi tty; do
+for group in video render input gpio spi tty audio; do
   if getent group "${group}" >/dev/null 2>&1; then
     usermod -aG "${group}" musecam
   fi
@@ -322,6 +323,12 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
 install -o root -g musecam -m 0640 "${TEMP_CONFIG}" "${CONFIG_FILE}"
 
 if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  install -d -o root -g root -m 0755 /usr/local/lib/musecam
+  install -o root -g root -m 0644 \
+    "${INSTALL_DIR}/device/system/control.py" /usr/local/lib/musecam/control.py
+  install -o root -g root -m 0644 \
+    "${INSTALL_DIR}/device/systemd/musecam-control.service" \
+    /etc/systemd/system/musecam-control.service
   install -o root -g root -m 0644 \
     "${INSTALL_DIR}/device/systemd/musecam-web.service" \
     /etc/systemd/system/musecam.service
@@ -341,6 +348,10 @@ chmod 0440 /etc/sudoers.d/musecam-poweroff
 visudo -cf /etc/sudoers.d/musecam-poweroff >/dev/null
 
 systemctl daemon-reload
+if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+  systemctl enable musecam-control.service
+  systemctl restart musecam-control.service
+fi
 runuser -u musecam -- "${INSTALL_DIR}/.venv/bin/musecam" --config "${CONFIG_FILE}" health
 
 if [[ ${START_SERVICE} -eq 1 ]]; then

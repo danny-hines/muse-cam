@@ -1,45 +1,246 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 import time
 from pathlib import Path
 
+import httpx
+import pytest
+from aiohttp.test_utils import TestClient, TestServer
+from PIL import Image
+
 from musecam.config import DeviceConfig, load_profile
-from musecam.webapp import CameraWebController
+from musecam.webapp import CameraWebController, create_web_app
 
 
-def wait_for_status(controller: CameraWebController, status: str, timeout: float = 2) -> dict:
+def wait_until(predicate, timeout: float = 6):
     deadline = time.monotonic() + timeout
-    state = controller.state()
-    while state["status"] != status and time.monotonic() < deadline:
-        state = controller.wait_for_state(state["revision"], timeout=0.1)
-    return state
+    while time.monotonic() < deadline:
+        result = predicate()
+        if result:
+            return result
+        time.sleep(0.02)
+    raise AssertionError("Timed out waiting for camera state")
 
 
-def test_browser_controller_capture_flow(tmp_path: Path) -> None:
-    profile = load_profile(
-        "pi3bplus-imx415-dsi43", Path(__file__).parents[1] / "profiles"
-    )
+def make_controller(tmp_path: Path) -> CameraWebController:
+    profiles = Path(__file__).parents[1] / "profiles"
+    profile = load_profile("pi3bplus-imx415-dsi43", profiles)
     config = DeviceConfig(
         server_url="http://127.0.0.1:3000",
-        device_token="unused",
+        device_token="do-not-expose",
         profile_id=profile.id,
         data_dir=tmp_path,
-        profiles_dir=Path(__file__).parents[1] / "profiles",
+        profiles_dir=profiles,
     )
-    controller = CameraWebController(config, profile, simulate=True, offline=True)
+    return CameraWebController(config, profile, simulate=True, offline=True)
+
+
+def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch) -> None:
+    controller = make_controller(tmp_path)
+    release = threading.Event()
+    entered = threading.Event()
+    process = controller._process_job
+
+    def delayed(job):
+        entered.set()
+        assert release.wait(5)
+        return process(job)
+
+    monkeypatch.setattr(controller, "_process_job", delayed)
     controller.start()
     try:
-        state = wait_for_status(controller, "live")
-        assert state["presetCount"] == 6
-
-        controller.dispatch("next")
-        changed = controller.wait_for_state(state["revision"])
-        assert changed["presetIndex"] == 1
-
+        wait_until(lambda: controller.state()["status"] == "live")
         controller.dispatch("capture")
-        result = wait_for_status(controller, "result")
-        assert result["resultUrl"].startswith("/media/result.jpg?v=")
-        assert result["shared"] is False
-        assert len(list((tmp_path / "results").glob("*.jpg"))) == 1
+        assert entered.wait(2)
+        first = controller.state()["processingId"]
+        next_style = controller.state()["presets"][1]["id"]
+        controller.dispatch("select", {"presetId": next_style})
+        controller.dispatch("capture")
+        wait_until(lambda: controller.state()["galleryCount"] == 2)
+        state = controller.state()
+        assert state["status"] == "live"
+        assert state["processingId"] == first
+        assert state["queued"] == 1
+        assert controller.gallery()["items"][0]["presetId"] == next_style
+        release.set()
+        wait_until(lambda: controller._store.counts().get("complete") == 2)
+        assert controller.state()["status"] == "live"
+        assert len([n for n in controller.state()["notifications"] if n["kind"] == "success"]) == 2
+    finally:
+        release.set()
+        controller.close()
+
+
+def test_gallery_retry_and_restyle_preserve_originals(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "old.jpg"
+    Image.new("RGB", (100, 80), "orange").save(source)
+    style = controller._presets[0].id
+    controller._store.enqueue("old", style, source)
+    controller._store.mark_failed("old", "Generation failed")
+    controller.start()
+    try:
+        controller.dispatch("retry", {"captureId": "old"})
+        wait_until(lambda: controller._store.counts().get("complete") == 1)
+        retried = controller.gallery()["items"][0]
+        assert retried["id"] != "old"
+        assert controller._store.get("old").status == "failed"
+        assert controller.media_path(retried["id"], "source").read_bytes() == source.read_bytes()
+        assert controller.media_path(retried["id"], "source") != source
+        controller.dispatch(
+            "remix", {"captureId": retried["id"], "presetId": controller._presets[2].id}
+        )
+        wait_until(lambda: controller._store.counts().get("complete") == 2)
+        newest = controller.gallery()["items"][0]
+        assert newest["id"] != retried["id"]
+        assert newest["presetId"] == controller._presets[2].id
+        assert controller._store.get(retried["id"]).preset_id == style
+        assert controller.state()["galleryCount"] == 3
+    finally:
+        controller.close()
+
+
+def test_failed_network_job_backs_off_and_allows_new_capture(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    controller.start()
+
+    class OfflineClient:
+        def generate(self, *args):
+            raise httpx.ConnectError("No network")
+
+        def close(self):
+            pass
+
+    controller._client = OfflineClient()
+    try:
+        controller.dispatch("capture")
+        wait_until(lambda: bool(controller._retry_after))
+        first = next(iter(controller._retry_after))
+        assert controller._store.get(first).attempts == 1
+        assert controller._store.get(first).status == "queued"
+        controller.dispatch("capture")
+        wait_until(lambda: len(controller._retry_after) == 2)
+        assert controller._store.get(first).attempts == 1
+        assert controller.state()["status"] == "live"
+        assert controller.state()["networkOnline"] is False
+    finally:
+        controller.close()
+
+
+def test_settings_and_history_survive_restart(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    controller.save_settings({"volume": 0, "processingSound": False})
+    source = tmp_path / "captures" / "persist.jpg"
+    Image.new("RGB", (80, 60), "blue").save(source)
+    controller._store.enqueue("persist", controller._presets[0].id, source)
+    controller._store.mark_uploading("persist")
+    session = controller.state()["sessionId"]
+    controller.close()
+    reopened = make_controller(tmp_path)
+    try:
+        assert reopened.state()["sessionId"] != session
+        assert reopened.state()["volume"] == 0
+        assert reopened.state()["processingSound"] is False
+        assert reopened.gallery()["items"][0]["status"] == "queued"
+        assert reopened.settings()["battery"]["percentage"] is None
+        assert reopened.settings()["battery"]["supported"] is False
+    finally:
+        reopened.close()
+
+
+def test_update_is_blocked_with_saved_pending_photos(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    try:
+        controller._store.enqueue("pending", "style", tmp_path / "pending.jpg")
+        with pytest.raises(ValueError, match="queued photos"):
+            controller.update()
+        assert controller.state()["maintenance"] is False
+    finally:
+        controller.close()
+
+
+def test_gallery_filter_finds_failures_older_than_first_page(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    try:
+        controller._store.enqueue("old-failed", "style", tmp_path / "old.jpg")
+        controller._store.mark_failed("old-failed", "Try again")
+        for index in range(45):
+            controller._store.enqueue(f"new-{index}", "style", tmp_path / "new.jpg")
+        assert "old-failed" not in [p["id"] for p in controller.gallery()["items"]]
+        assert controller.gallery(status="failed")["items"][0]["id"] == "old-failed"
+        assert len(controller.gallery(offset=40, status="waiting")["items"]) == 5
+    finally:
+        controller.close()
+
+
+def test_old_device_job_cannot_clear_update_maintenance(tmp_path: Path, monkeypatch) -> None:
+    controller = make_controller(tmp_path)
+    try:
+        controller._maintenance = True
+        controller._maintenance_job = "current-update"
+        monkeypatch.setattr(
+            controller._system,
+            "request",
+            lambda action: {"job": {"id": "old-wifi", "kind": "wifi", "phase": "complete"}},
+        )
+        controller.settings()
+        assert controller.state()["maintenance"] is True
+        monkeypatch.setattr(
+            controller._system,
+            "request",
+            lambda action: {"job": {"id": "current-update", "kind": "update", "phase": "failed"}},
+        )
+        controller.settings()
+        assert controller.state()["maintenance"] is False
+    finally:
+        controller.close()
+
+
+def test_http_gallery_and_local_settings_boundary(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "private.jpg"
+    Image.new("RGB", (160, 120), "red").save(source)
+    controller._store.enqueue("private", controller._presets[0].id, source)
+    headers = {"X-MuseCam-Request": "1"}
+
+    async def exercise():
+        async with TestClient(TestServer(create_web_app(controller))) as client:
+            assert (await client.post("/api/settings", json={"volume": 0})).status == 403
+            assert (
+                await client.post(
+                    "/api/settings",
+                    json={"volume": 0},
+                    headers={**headers, "Origin": "https://evil.example"},
+                )
+            ).status == 403
+            assert (
+                await client.get("/api/settings", headers={"Host": "evil.example"})
+            ).status == 403
+            response = await client.post("/api/settings", json={"volume": 0}, headers=headers)
+            assert response.status == 200
+            assert (await response.json())["volume"] == 0
+            assert (
+                await client.post("/api/settings", json={"volume": 999}, headers=headers)
+            ).status == 400
+            for path, body in [
+                ("/api/settings", []),
+                ("/api/sound", []),
+                ("/api/sound", {"cue": []}),
+                ("/api/system/wifi-scan", {"action": "update-apply"}),
+            ]:
+                assert (await client.post(path, json=body, headers=headers)).status == 400
+            response = await client.get("/api/gallery")
+            item = (await response.json())["items"][0]
+            assert item["id"] == "private"
+            assert "do-not-expose" not in await (await client.get("/api/state")).text()
+            assert (await client.get(item["sourceUrl"])).status == 200
+            assert (await client.get(item["thumbnailUrl"])).content_type == "image/jpeg"
+            assert (await client.get("/api/gallery/missing")).status == 404
+            assert (await client.get("/api/gallery/private/result")).status == 400
+
+    try:
+        asyncio.run(exercise())
     finally:
         controller.close()
