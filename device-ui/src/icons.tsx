@@ -5,6 +5,7 @@ const paths = {
   back: "M15 5l-7 7 7 7",
   next: "M9 5l7 7-7 7",
   close: "M6 6l12 12 M18 6L6 18",
+  trash: "M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7",
   wifi: "M3 8a15 15 0 0 1 18 0 M6 12a10 10 0 0 1 12 0 M9 16a5 5 0 0 1 6 0 M12 20h.01",
   volume: "M4 9h4l5-4v14l-5-4H4z M16 8a6 6 0 0 1 0 8 M19 5a10 10 0 0 1 0 14",
   mute: "M4 9h4l5-4v14l-5-4H4z M17 9l5 6 M22 9l-5 6",

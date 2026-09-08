@@ -156,6 +156,126 @@ def test_settings_and_history_survive_restart(tmp_path: Path) -> None:
         reopened.close()
 
 
+def test_delete_removes_one_photo_and_preserves_restyled_original(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "old.jpg"
+    result = tmp_path / "results" / "old.jpg"
+    Image.new("RGB", (100, 80), "orange").save(source)
+    Image.new("RGB", (100, 80), "blue").save(result)
+    style = controller._presets[0].id
+    controller._store.enqueue("old", style, source)
+    controller._store.mark_complete("old", "generation-old", result, "https://example.com/p/shared")
+    controller._remix({"captureId": "old", "presetId": style}, retry=False)
+    sibling = controller._store.pending()[0]
+    source_bytes = source.read_bytes()
+    controller._last_capture_id = controller._last_result_id = "old"
+    controller._notify("success", "Ready", "", "old")
+    revision = controller.state()["galleryRevision"]
+    try:
+        controller.delete_photo("old")
+        assert not source.exists() and not result.exists()
+        assert controller._store.get("old") is None
+        assert sibling.source_path.read_bytes() == source_bytes
+        assert controller._store.get(sibling.capture_id) is not None
+        assert controller.state()["galleryCount"] == 1
+        assert controller.state()["galleryRevision"] > revision
+        assert controller.state()["lastCaptureId"] is None
+        assert controller._last_result_id is None
+        assert not any(n["captureId"] == "old" for n in controller.state()["notifications"])
+        assert controller.state()["notifications"][-1]["kind"] == "deleted"
+        with pytest.raises(ValueError, match="unavailable"):
+            controller.media_path("old", "source")
+    finally:
+        controller.close()
+    reopened = make_controller(tmp_path)
+    try:
+        assert reopened._store.get("old") is None
+        assert reopened.state()["galleryCount"] == 1
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("status", ["queued", "failed"])
+def test_delete_waiting_or_failed_photo_cleans_partial_download(
+    tmp_path: Path, status: str
+) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "old.jpg"
+    source.write_bytes(b"original")
+    partial = tmp_path / "results" / "old.download"
+    partial.write_bytes(b"partial download")
+    controller._store.enqueue("old", controller._presets[0].id, source)
+    if status == "failed":
+        controller._store.mark_failed("old", "Could not finish")
+    controller._retry_after["old"] = time.monotonic() + 60
+    try:
+        controller.delete_photo("old")
+        assert not source.exists() and not partial.exists()
+        assert "old" not in controller._retry_after
+        controller._start_pending()
+        assert controller._future is None
+        assert controller.state()["galleryCount"] == 0
+    finally:
+        controller.close()
+
+
+@pytest.mark.parametrize("busy", ["uploading", "processing", "sharing", "maintenance"])
+def test_delete_refuses_busy_photo_without_removing_files(tmp_path: Path, busy: str) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "busy.jpg"
+    source.write_bytes(b"keep me")
+    controller._store.enqueue("busy", controller._presets[0].id, source)
+    controller._store.mark_failed("busy", "Previous failure")
+    if busy == "uploading":
+        controller._store.mark_uploading("busy")
+    elif busy == "processing":
+        controller._processing_id = "busy"  # Worker finished; publication is still pending.
+    elif busy == "sharing":
+        controller._sharing_id = "busy"
+    else:
+        controller._maintenance = True
+    try:
+        with pytest.raises(ValueError):
+            controller.delete_photo("busy")
+        assert source.read_bytes() == b"keep me"
+        assert controller._store.get("busy") is not None
+    finally:
+        controller.close()
+
+
+def test_delete_validates_all_paths_and_preserves_shared_legacy_files(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "shared.jpg"
+    source.write_bytes(b"shared original")
+    unrelated = tmp_path / "unrelated.txt"
+    unrelated.write_bytes(b"not a photo")
+    style = controller._presets[0].id
+    controller._store.enqueue("one", style, source)
+    controller._store.mark_complete("one", "gen-one", unrelated)
+    controller._store.enqueue("two", style, source)
+    try:
+        with pytest.raises(ValueError, match="outside"):
+            controller.delete_photo("one")
+        assert source.exists() and unrelated.exists()
+        result = tmp_path / "results" / "one.jpg"
+        result.symlink_to(unrelated)
+        controller._store.mark_complete("one", "gen-one", result)
+        with pytest.raises(ValueError, match="outside"):
+            controller.delete_photo("one")
+        assert source.exists() and unrelated.exists()
+        result.unlink()
+        controller.delete_photo("one")  # Missing result is also tolerated.
+        assert source.exists() and unrelated.exists()
+        assert controller._store.get("one") is None
+        assert controller._store.get("two") is not None
+        controller.delete_photo("two")
+        assert not source.exists()
+        with pytest.raises(ValueError, match="not found"):
+            controller.delete_photo("two")
+    finally:
+        controller.close()
+
+
 def test_update_is_blocked_with_saved_pending_photos(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     try:
@@ -259,6 +379,22 @@ def test_http_gallery_and_local_settings_boundary(tmp_path: Path) -> None:
             assert (await client.get(item["thumbnailUrl"])).content_type == "image/jpeg"
             assert (await client.get("/api/gallery/missing")).status == 404
             assert (await client.get("/api/gallery/private/result")).status == 400
+            delete_url = "/api/gallery/private/delete"
+            assert (await client.post(delete_url, json={})).status == 403
+            assert (
+                await client.post(
+                    delete_url, json={}, headers={**headers, "Origin": "https://evil.example"}
+                )
+            ).status == 403
+            assert source.exists()
+            response = await client.post(delete_url, json={}, headers=headers)
+            assert response.status == 200
+            assert (await response.json())["deleted"] is True
+            assert not source.exists()
+            assert (await client.get("/api/gallery/private")).status == 404
+            assert (await client.get(item["sourceUrl"])).status == 400
+            assert (await client.get("/api/gallery")).status == 200
+            assert (await client.post(delete_url, json={}, headers=headers)).status == 400
 
     try:
         asyncio.run(exercise())

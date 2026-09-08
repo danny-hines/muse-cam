@@ -103,6 +103,21 @@ class CaptureStore:
             ).fetchone()
         return self._to_job(row) if row else None
 
+    def delete(self, capture_id: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM captures WHERE capture_id = ?", (capture_id,))
+
+    def referenced_elsewhere(self, path: Path, capture_id: str) -> bool:
+        with self._lock:
+            return (
+                self._connection.execute(
+                    "SELECT 1 FROM captures WHERE capture_id != ? "
+                    "AND (source_path = ? OR result_path = ?) LIMIT 1",
+                    (capture_id, str(path), str(path)),
+                ).fetchone()
+                is not None
+            )
+
     def pending(self, limit: int = 10) -> list[CaptureJob]:
         with self._lock:
             rows = self._connection.execute(

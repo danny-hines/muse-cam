@@ -112,6 +112,7 @@ class CameraWebController:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-generate")
         self._share_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-share")
         self._actions: Queue[tuple[str, dict]] = Queue(maxsize=16)
+        self._photo_operations = threading.Lock()
         self._stop = threading.Event()
         self._state_changed = threading.Condition(threading.RLock())
         self._frame_changed = threading.Condition(threading.RLock())
@@ -192,10 +193,12 @@ class CameraWebController:
                 self._publish_locked()
             next_frame = 0.0
             while not self._stop.is_set():
-                self._poll_actions()
-                self._poll_future()
-                self._poll_share()
-                self._start_pending()
+                # Serialize deletion with capture, restyling, and worker handoffs.
+                with self._photo_operations:
+                    self._poll_actions()
+                    self._poll_future()
+                    self._poll_share()
+                    self._start_pending()
                 self._refresh_battery()
                 now = time.monotonic()
                 if self._future is not None and now - self._last_processing_sound > 7:
@@ -601,6 +604,50 @@ class CameraWebController:
             "nextOffset": offset + 40 if len(jobs) == 40 else None,
         }
 
+    def delete_photo(self, capture_id: str) -> None:
+        with self._photo_operations, self._state_changed:
+            if self._maintenance or self._stop.is_set():
+                raise ValueError("Camera is restarting or updating. Try again shortly.")
+            job = self._store.get(capture_id)
+            if job is None:
+                raise ValueError("Photo was not found")
+            if job.status == "uploading" or capture_id in {
+                self._processing_id,
+                self._sharing_id,
+            }:
+                raise ValueError(
+                    "Wait for this photo to finish processing or sharing before deleting."
+                )
+            # Validate every path before removing anything. Each restyle owns its
+            # own original, so removing one entry cannot break its other versions.
+            paths = [(job.source_path, self._captures_dir)]
+            if job.result_path is not None:
+                paths.append((job.result_path, self._results_dir))
+            else:
+                paths.append((self._results_dir / f"{capture_id}.jpg", self._results_dir))
+            paths.append((self._results_dir / f"{capture_id}.download", self._results_dir))
+            for path, directory in paths:
+                if path.is_symlink() or path.resolve().parent != directory.resolve():
+                    raise ValueError("Photo files are outside the camera gallery")
+            try:
+                for path, _ in paths:
+                    if not self._store.referenced_elsewhere(path, capture_id):
+                        path.unlink(missing_ok=True)
+            except OSError as error:
+                raise ValueError("Could not remove the photo files. Please try again.") from error
+            self._store.delete(capture_id)
+            self._retry_after.pop(capture_id, None)
+            self._notifications = deque(
+                (notice for notice in self._notifications if notice["captureId"] != capture_id),
+                maxlen=12,
+            )
+            if self._last_capture_id == capture_id:
+                self._last_capture_id = None
+            if self._last_result_id == capture_id:
+                self._last_result_id = None
+            self._gallery_revision += 1
+            self._notify("deleted", "Photo deleted", "Removed from this camera")
+
     def media_path(self, capture_id: str, kind: str) -> Path:
         job = self._store.get(capture_id)
         if job is None or kind not in {"source", "result"}:
@@ -816,6 +863,13 @@ async def _gallery_detail(request: web.Request) -> web.Response:
     return web.json_response(controller.gallery_item(job), headers={"Cache-Control": "no-store"})
 
 
+async def _gallery_delete(request: web.Request) -> web.Response:
+    await asyncio.to_thread(
+        request.app["controller"].delete_photo, request.match_info["capture_id"]
+    )
+    return web.json_response({"deleted": True})
+
+
 async def _media(request: web.Request) -> web.StreamResponse:
     controller = request.app["controller"]
     capture_id, kind = request.match_info["capture_id"], request.match_info["kind"]
@@ -909,6 +963,7 @@ def create_web_app(controller: CameraWebController) -> web.Application:
     app.router.add_get("/preview.mjpg", _preview)
     app.router.add_get("/api/gallery", _gallery)
     app.router.add_get("/api/gallery/{capture_id}", _gallery_detail)
+    app.router.add_post("/api/gallery/{capture_id}/delete", _gallery_delete)
     app.router.add_get("/api/gallery/{capture_id}/{kind}", _media)
     app.router.add_get("/api/settings", _settings)
     app.router.add_post("/api/settings", _settings)

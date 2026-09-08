@@ -92,6 +92,12 @@ Captures return to the viewfinder as soon as the original is saved. A single bac
 - Storage: free/used space and photo counts. Originals and every treatment remain on the camera.
 - Device: hostname, addresses, installed commit, battery capability, and update controls. PiSugar S Plus does not expose a percentage; the interface reports that limitation.
 
+Open a photo in **Your roll → Delete** to remove that entry, its original, and its
+imagined result from the camera. The confirmation defaults to **Keep photo**.
+Other restyled versions are preserved; shared copies remain online. Waiting
+photos can be deleted to cancel their queued processing. A photo being processed
+or shared must finish before deletion becomes available.
+
 Updates fetch `origin/main` and accept only clean, fast-forward releases with prebuilt UI assets. Pending processing/sharing blocks installation. The update worker installs the Python package and control service, verifies the camera starts, and restores the previous commit/package if startup fails. Photos, sound settings, Wi-Fi profiles, and device credentials live outside the release checkout and are preserved. Keep power connected during an update. Local source edits block the release updater rather than being discarded.
 
 This repository is private. The assembled camera uses a dedicated read-only GitHub deploy key under `/root/.ssh/musecam-update`, pinned GitHub host keys, and an SSH origin URL. The private key never leaves the camera. Other cameras need their own read-only repository access before update checks can fetch releases; do not copy an account-wide GitHub token onto a camera.
