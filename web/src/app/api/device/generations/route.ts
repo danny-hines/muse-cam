@@ -120,7 +120,13 @@ export async function POST(request: Request) {
   } catch (error) {
     const { code, message, status } = classifyGenerationError(error);
     await repository.markFailed(photo.id, code);
-    console.error("Generation failed", { photoId: photo.id, error });
+    console.error("Generation failed", {
+      photoId: photo.id,
+      presetId: preset.id,
+      presetVersion: preset.version,
+      errorCode: code,
+      error,
+    });
     return apiError(message, status, { code, id: photo.id });
   }
 }
