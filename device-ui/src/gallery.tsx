@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CameraAction,
   CameraState,
@@ -200,7 +200,11 @@ export function PhotoDetail({
   const [remixing, setRemixing] = useState(false);
   const [presetId, setPresetId] = useState("");
   const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   useEffect(() => {
+    if (deleting) return;
     let active = true;
     api<Photo>(`/api/gallery/${id}`)
       .then((next) => {
@@ -215,7 +219,7 @@ export function PhotoDetail({
     return () => {
       active = false;
     };
-  }, [id, state.galleryRevision, report]);
+  }, [id, state.galleryRevision, report, deleting]);
   useEffect(() => {
     setOriginal(false);
     const reset = () => setOriginal(false);
@@ -237,6 +241,22 @@ export function PhotoDetail({
       report((error as Error).message);
     } finally {
       setPending(false);
+    }
+  };
+  const busy =
+    photo?.status === "uploading" ||
+    state.processingId === id ||
+    state.sharingId === id;
+  const remove = async () => {
+    if (deleting || busy) return;
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await api(`/api/gallery/${encodeURIComponent(id)}/delete`, {});
+      onBack();
+    } catch (error) {
+      setDeleteError((error as Error).message);
+      setDeleting(false);
     }
   };
   return (
@@ -342,10 +362,36 @@ export function PhotoDetail({
                     : "Share"}
               </button>
             )}
+            <button
+              className="glass-button delete-photo-button"
+              disabled={pending || busy}
+              onClick={() => {
+                setDeleteError("");
+                setConfirmDelete(true);
+              }}
+              title={
+                busy
+                  ? "Available after processing or sharing finishes"
+                  : "Delete this photo"
+              }
+            >
+              <Icon name="trash" />
+              Delete
+            </button>
           </div>
         </div>
       )}
       {!photo && <div className="empty-state">Loading photo…</div>}
+      {confirmDelete && photo && (
+        <DeletePhotoDialog
+          photo={photo}
+          pending={deleting}
+          busy={busy}
+          error={deleteError}
+          onCancel={() => setConfirmDelete(false)}
+          onDelete={() => void remove()}
+        />
+      )}
       {remixing && (
         <div className="modal-scrim">
           <section
@@ -392,6 +438,82 @@ export function PhotoDetail({
         </div>
       )}
     </section>
+  );
+}
+
+function DeletePhotoDialog({
+  photo,
+  pending,
+  busy,
+  error,
+  onCancel,
+  onDelete,
+}: {
+  photo: Photo;
+  pending: boolean;
+  busy: boolean;
+  error: string;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current!;
+    element.showModal();
+    return () => element.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="delete-dialog"
+      aria-labelledby="delete-photo-title"
+      aria-describedby="delete-photo-description"
+      onKeyDown={(event) => event.stopPropagation()}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!pending) onCancel();
+      }}
+    >
+      <div className="delete-preview">
+        <img src={photo.thumbnailUrl} alt="" draggable={false} />
+        <div>
+          <span className="eyebrow">{photo.presetName}</span>
+          <h2 id="delete-photo-title">Delete this photo?</h2>
+        </div>
+      </div>
+      <div id="delete-photo-description">
+        <p>
+          {photo.resultUrl
+            ? "The original and this imagined version will be removed from the camera."
+            : "The saved original will be removed from the camera."}
+          {photo.status === "queued"
+            ? " Queued processing will be canceled."
+            : ""}
+        </p>
+        <p>Other style versions are kept. This can’t be undone.</p>
+        {photo.shareUrl && <p>Its shared link will remain online.</p>}
+      </div>
+      {busy && <p role="status">Wait for processing or sharing to finish.</p>}
+      {error && <p role="alert">{error}</p>}
+      <footer>
+        <button
+          className="glass-button"
+          autoFocus
+          disabled={pending}
+          onClick={onCancel}
+        >
+          Keep photo
+        </button>
+        <button
+          className="danger-button"
+          disabled={pending || busy}
+          onClick={onDelete}
+        >
+          <Icon name="trash" size={19} />
+          {pending ? "Deleting…" : "Delete photo"}
+        </button>
+      </footer>
+    </dialog>
   );
 }
 
