@@ -9,8 +9,8 @@ camera_backend = "picamera2"
 camera_overlay = "imx415"
 capture_width = 1920
 capture_height = 1280
-camera_fps = 20
-preview_fps = 15
+camera_fps = 15
+preview_fps = 10
 shutter_gpio = 20
 # GPIO21 carries I2S audio data on the enclosed build; no shutdown button is wired.
 # Omit power_gpio so the application does not claim the amplifier's data pin.

@@ -75,7 +75,7 @@ sudo nano /etc/musecam/device.env
 
 The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then falls back to `/dev/fb0` when the MPI3501 is the only screen. Override this by adding `MUSECAM_FRAMEBUFFER` to `/etc/musecam/device.env` only when diagnostics show an unusual framebuffer assignment. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`.
 
-The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. Its framebuffer writes only changed scanlines and requests a conservative 20 MHz SPI clock. The DSI profile supplies a 15 FPS local MJPEG preview to a hardware-composited 800×480 Chromium UI while the display itself refreshes at native DSI speed.
+The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. Its framebuffer writes only changed scanlines and requests a conservative 20 MHz SPI clock. The DSI profile captures a 15 FPS preview and supplies up to 10 FPS local MJPEG to the 800×480 Chromium UI. Above 75°C, preview delivery slows to at most 5 FPS until the Pi cools to 68°C; still-photo resolution is unchanged. The display itself refreshes at native DSI speed.
 
 ## DSI touchscreen controls (0.3)
 

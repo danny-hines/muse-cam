@@ -77,6 +77,8 @@ export type SettingsData = {
   storage: { total: number; used: number; free: number };
   counts: Record<string, number>;
   battery: { percentage: number | null; supported: boolean; message: string };
+  temperature: number | null;
+  previewThrottled: boolean;
   device: {
     hostname?: string;
     addresses: string[];

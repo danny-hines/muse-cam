@@ -92,3 +92,11 @@ class DeviceSystem:
     def storage(self) -> dict[str, int]:
         usage = shutil.disk_usage(self.data_dir)
         return {"total": usage.total, "used": usage.used, "free": usage.free}
+
+    def temperature(self) -> float | None:
+        if self.simulate:
+            return None
+        try:
+            return round(float(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
+        except (OSError, ValueError):
+            return None

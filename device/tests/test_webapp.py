@@ -198,6 +198,20 @@ def test_old_device_job_cannot_clear_update_maintenance(tmp_path: Path, monkeypa
         controller.close()
 
 
+def test_preview_slows_when_hot_and_recovers_after_cooling(tmp_path: Path, monkeypatch) -> None:
+    controller = make_controller(tmp_path)
+    try:
+        for temperature, expected in [(78, True), (72, True), (67, False)]:
+            monkeypatch.setattr(controller._system, "temperature", lambda value=temperature: value)
+            controller._last_battery_read = 0
+            controller._refresh_battery()
+            assert controller.settings()["previewThrottled"] is expected
+            assert controller.settings()["temperature"] == temperature
+        assert controller._profile.capture_width == 1920
+    finally:
+        controller.close()
+
+
 def test_http_gallery_and_local_settings_boundary(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     source = tmp_path / "captures" / "private.jpg"

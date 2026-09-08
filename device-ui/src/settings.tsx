@@ -444,6 +444,12 @@ export function Settings({
                   </p>
                 </div>
               </div>
+              {data?.previewThrottled && (
+                <p className="muted-copy">
+                  Camera is warm ({data.temperature}°C). Preview is slowed to
+                  reduce heat; photo quality stays the same.
+                </p>
+              )}
               <div className="update-row">
                 <div>
                   <strong>Software updates</strong>
