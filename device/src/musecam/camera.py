@@ -146,7 +146,6 @@ class Picamera2Camera:
     def __init__(self, profile: HardwareProfile) -> None:
         self._profile = profile
         self._camera = None
-        self._still_config = None
 
     def start(self) -> None:
         try:
@@ -156,44 +155,68 @@ class Picamera2Camera:
                 "Picamera2 is not installed; run the Muse Cam installer on Raspberry Pi OS"
             ) from error
 
-        camera = Picamera2()
-        preview_size = (self._profile.display_width, self._profile.display_height)
-        preview_config = camera.create_preview_configuration(
-            # Picamera2's format names follow the DRM/V4L2 convention. BGR888
-            # is RGB byte order in a numpy array, which is what Pillow expects.
-            main={"size": preview_size, "format": "BGR888"},
-            controls={"FrameRate": self._profile.camera_fps},
-            buffer_count=3,
-        )
-        self._still_config = camera.create_still_configuration(
-            main={
-                "size": (self._profile.capture_width, self._profile.capture_height),
-                "format": "RGB888",
-            },
-            buffer_count=2,
-        )
-        camera.options["quality"] = 90
-        camera.configure(preview_config)
-        camera.start()
-        self._camera = camera
+        self.close()
+        self._camera = camera = Picamera2()
+        try:
+            # Keep both streams allocated for the lifetime of the camera. Mode
+            # switches fragmented the Pi's CMA pool and could stop the preview
+            # while allocating another full-resolution raw buffer after a shot.
+            config = camera.create_still_configuration(
+                main={
+                    "size": (self._profile.capture_width, self._profile.capture_height),
+                    "format": "RGB888",
+                },
+                lores={
+                    "size": (self._profile.display_width, self._profile.display_height),
+                    "format": "YUV420",
+                },
+                raw=None,
+                controls={"FrameRate": self._profile.camera_fps},
+                buffer_count=3,
+                queue=False,
+            )
+            camera.options["quality"] = 90
+            camera.configure(config)
+            camera.start()
+        except Exception:
+            self.close()
+            raise
 
-    def preview(self) -> Image.Image:
+    def _request(self):
         if self._camera is None:
             raise RuntimeError("Camera is not started")
-        return Image.fromarray(self._camera.capture_array("main"))
+        # A stopped/disconnected camera must not block the controller forever.
+        # Close cancels timed-out jobs before releasing the camera.
+        return self._camera.capture_request(wait=3.0)
+
+    def preview(self) -> Image.Image:
+        request = self._request()
+        output = BytesIO()
+        try:
+            # Picamera2's JPEG encoder handles YUV plane padding and colour order.
+            # The Pi 3's low-resolution stream cannot output RGB directly.
+            request.save("lores", output, format="jpeg")
+        finally:
+            request.release()
+        with Image.open(output) as image:
+            return image.copy()
 
     def capture(self, output: Path) -> Path:
-        if self._camera is None or self._still_config is None:
-            raise RuntimeError("Camera is not started")
         output.parent.mkdir(parents=True, exist_ok=True)
-        self._camera.switch_mode_and_capture_file(self._still_config, str(output))
+        request = self._request()
+        try:
+            request.save("main", str(output))
+        finally:
+            request.release()
         return output
 
     def close(self) -> None:
-        if self._camera is not None:
-            self._camera.stop()
-            self._camera.close()
-            self._camera = None
+        camera, self._camera = self._camera, None
+        if camera is not None:
+            try:
+                camera.cancel_all_and_flush()
+            finally:
+                camera.close()
 
 
 def create_camera(profile: HardwareProfile, *, simulate: bool) -> Camera:

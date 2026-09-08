@@ -37,6 +37,73 @@ def make_controller(tmp_path: Path) -> CameraWebController:
     return CameraWebController(config, profile, simulate=True, offline=True)
 
 
+@pytest.mark.parametrize("failure", ["capture", "preview"])
+def test_camera_error_recovers_and_allows_another_photo(tmp_path, monkeypatch, failure):
+    controller = make_controller(tmp_path)
+    monkeypatch.setattr("musecam.webapp.CAMERA_RETRY_DELAY", 0.3)
+    original = getattr(controller._camera, failure)
+    fail_next = threading.Event()
+
+    def interrupt_once(*args):
+        if fail_next.is_set():
+            fail_next.clear()
+            if failure == "capture":
+                raise OSError(12, "Cannot allocate memory")
+            raise TimeoutError("No preview frame")
+        return original(*args)
+
+    monkeypatch.setattr(controller._camera, failure, interrupt_once)
+    controller._preview_consumers = 1
+    controller.start()
+    try:
+        wait_until(lambda: controller._preview_jpeg is not None)
+        fail_next.set()
+        if failure == "capture":
+            controller.dispatch("capture")
+        wait_until(lambda: controller.state()["status"] == "error")
+        assert not controller._camera_available
+        assert controller._preview_jpeg is None
+        assert controller.state()["message"] != "Hold steady"
+        assert controller.state()["galleryCount"] == 0
+        assert not list((tmp_path / "captures").iterdir())
+        controller.dispatch("next")
+        wait_until(lambda: controller.state()["presetIndex"] == 1)
+        wait_until(lambda: controller.state()["status"] == "live")
+        wait_until(lambda: controller._preview_jpeg is not None)
+        assert controller.state()["message"] == ""
+        controller.dispatch("capture")
+        wait_until(lambda: controller._store.counts().get("complete") == 1)
+    finally:
+        controller.close()
+
+
+def test_camera_start_retries_are_bounded_and_manual_restart_works(tmp_path, monkeypatch):
+    controller = make_controller(tmp_path)
+    monkeypatch.setattr("musecam.webapp.CAMERA_RETRY_DELAY", 0.01)
+    original_start = controller._camera.start
+
+    def fail_start():
+        raise OSError(12, "Cannot allocate memory")
+
+    monkeypatch.setattr(controller._camera, "start", fail_start)
+    controller.start()
+    try:
+        wait_until(lambda: controller._camera_start_attempts == 3)
+        wait_until(lambda: controller._camera_restart_at is None)
+        assert controller.state()["status"] == "error"
+        assert controller._thread.is_alive()
+        # The action loop remains available while the sensor is down.
+        controller.dispatch("next")
+        wait_until(lambda: controller.state()["presetIndex"] == 1)
+        monkeypatch.setattr(controller._camera, "start", original_start)
+        controller.dispatch("restart_camera")
+        wait_until(lambda: controller.state()["status"] == "live")
+        controller.dispatch("capture")
+        wait_until(lambda: controller._store.counts().get("complete") == 1)
+    finally:
+        controller.close()
+
+
 def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch) -> None:
     controller = make_controller(tmp_path)
     release = threading.Event()

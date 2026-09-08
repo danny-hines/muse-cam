@@ -83,6 +83,21 @@ The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to t
 
 Captures return to the viewfinder as soon as the original is saved. A single background worker processes the queue while you continue shooting. A quiet chirp accompanies processing; a tappable notice opens a completed or failed photo. Network interruptions retain the original and retry with the same capture ID and increasing delays. Newly captured photos take priority over repeated network retries. The queue survives restarts and pauses new captures at 30 pending photos or less than 150 MB free.
 
+The Picamera2 backend keeps the full-size still and a small YUV preview stream
+running in one configuration, with no application raw stream. Each shutter press
+saves the existing main stream; it does not reallocate camera buffers. On the
+Pi 3, switching modes previously exhausted contiguous DMA/CMA memory while
+returning to preview, even with ordinary system RAM free. Resolution remains
+1920×1280 on the enclosed IMX415 build.
+
+Frame requests time out after three seconds. The browser runtime clears stale
+preview state, closes the camera, and tries to reconnect. After three consecutive
+startup failures it pauses automatic retries and offers **Restart camera**.
+Gallery navigation and background photo processing remain available. A camera is
+only marked ready after delivering a frame, and restarting the service reconnects
+the browser's preview stream. See the [Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf)
+for the main/lores stream and camera-buffer model.
+
 **Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the public roll only when explicitly tapped.
 
 **Settings** includes:

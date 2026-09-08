@@ -43,6 +43,7 @@ export type CameraAction =
   | "share"
   | "remix"
   | "retry"
+  | "restart_camera"
   | "power";
 export type Photo = {
   id: string;
