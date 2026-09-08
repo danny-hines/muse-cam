@@ -11,11 +11,13 @@ describe("preset catalog", () => {
     expect(getPreset("alien-visitor")?.name).toBe("First Contact");
   });
 
-  it("uses the portrait-safe version of After the End", () => {
+  it("versions the revised scene prompts independently of the unchanged styles", () => {
     const preset = getPreset("post-apocalypse");
 
-    expect(preset?.version).toBe(2);
-    expect(preset?.prompt).not.toMatch(/civilization collapsed|post-apocalyptic/i);
-    expect(preset?.prompt).toContain("Do not add weapons, violence, gore, or disaster victims");
+    expect(preset?.version).toBe(3);
+    expect(getPreset("alien-visitor")?.version).toBe(2);
+    for (const id of ["kid-drawing", "claymation", "disposable-90s", "storybook"]) {
+      expect(getPreset(id)?.version).toBe(1);
+    }
   });
 });

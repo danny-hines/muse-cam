@@ -18,12 +18,12 @@ const preservationPrompt =
 export const presets: Preset[] = z.array(presetSchema).parse([
   {
     id: "post-apocalypse",
-    version: 2,
+    version: 3,
     name: "After the End",
-    description: "Sun-scorched ruins, improvised survival gear, dust, and cinematic decay.",
+    description: "A quiet world reclaimed by nature: weathered buildings, greenery, and amber light.",
     accent: "#ff6c51",
     hue: 18,
-    prompt: `Transform the supplied photograph into a cinematic weathered retro-future adventure scene. Add sun-faded abandoned-city scenery, reclaimed greenery, dusty roads, patched travel details, dramatic amber light, and grounded film realism. Keep every person safe, uninjured, fully clothed, and non-threatening. Do not add weapons, violence, gore, or disaster victims. ${preservationPrompt}`,
+    prompt: `Restyle the supplied photograph as a peaceful, long-abandoned retro-future world reclaimed by nature. Age the existing buildings, furniture, and objects with faded paint, worn surfaces, a little dust, and creeping greenery. Use warm amber sunlight, muted earth tones, and cinematic film texture. Keep the scene calm and habitable. Keep any people and animals healthy and relaxed, with their appearance and clothing intact. ${preservationPrompt}`,
   },
   {
     id: "kid-drawing",
@@ -36,12 +36,12 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   },
   {
     id: "alien-visitor",
-    version: 1,
+    version: 2,
     name: "First Contact",
-    description: "An uncanny visitor, impossible light, and a close encounter caught on camera.",
+    description: "A friendly visitor, green-violet light, and a little everyday science-fiction wonder.",
     accent: "#d7ff42",
     hue: 112,
-    prompt: `Transform the supplied photograph into a convincing cinematic first-contact scene. Introduce a mysterious but non-threatening alien presence, otherworldly green-violet illumination, subtle atmospheric haze, and tactile science-fiction production design. ${preservationPrompt}`,
+    prompt: `Restyle the supplied photograph as a warm, playful science-fiction movie scene about meeting a friendly visitor from another planet. Add one small, friendly robot-like alien companion in an open area of the background, soft green-violet accent lighting, and a few practical retro-futuristic details. Keep the existing people and animals unchanged, healthy, relaxed, and clearly separate from the new companion; keep their clothing intact. The mood is welcoming and curious. ${preservationPrompt}`,
   },
   {
     id: "claymation",
