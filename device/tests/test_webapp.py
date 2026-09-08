@@ -66,6 +66,12 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         assert controller.gallery()["items"][0]["presetId"] == next_style
         release.set()
         wait_until(lambda: controller._store.counts().get("complete") == 2)
+        # The worker commits first; the camera loop then publishes its completion notice.
+        wait_until(
+            lambda: (
+                len([n for n in controller.state()["notifications"] if n["kind"] == "success"]) == 2
+            )
+        )
         assert controller.state()["status"] == "live"
         assert len([n for n in controller.state()["notifications"] if n["kind"] == "success"]) == 2
     finally:
