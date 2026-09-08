@@ -113,6 +113,7 @@ export function App() {
       {screen === "camera" && (
         <section className="viewfinder" aria-label="Camera preview">
           <img
+            key={state.sessionId}
             className="live-image"
             src="/preview.mjpg"
             alt="Live camera preview"
@@ -128,7 +129,11 @@ export function App() {
             </div>
             <div className="camera-status">
               <span
-                className={connected ? "status-dot" : "status-dot offline"}
+                className={
+                  connected && state.status !== "error"
+                    ? "status-dot"
+                    : "status-dot offline"
+                }
               />
               {!connected
                 ? "Reconnecting"
@@ -138,6 +143,8 @@ export function App() {
                     ? "Updating"
                     : state.status === "starting"
                       ? "Warming up"
+                      : state.status === "error"
+                        ? "Camera unavailable"
                       : !state.networkOnline && !state.simulate
                         ? "Saved offline"
                         : "Ready"}
@@ -221,7 +228,13 @@ export function App() {
             <div className="current-style">
               <span className="eyebrow">Your next imagination</span>
               <strong>{state.preset.name}</strong>
-              <span className="shutter-hint">Press the shutter to capture</span>
+              <span className="shutter-hint">
+                {state.status === "live"
+                  ? "Press the shutter to capture"
+                  : state.status === "capturing"
+                    ? "Hold steady"
+                    : "Waiting for the camera"}
+              </span>
             </div>
             {working > 0 && (
               <button
@@ -259,6 +272,17 @@ export function App() {
                     : "Camera needs attention"}
               </strong>
               <p>{state.message}</p>
+              {state.status === "error" && (
+                <button
+                  className="glass-button"
+                  disabled={!connected}
+                  onClick={() =>
+                    void act("restart_camera").catch((error) => report(error.message))
+                  }
+                >
+                  Restart camera
+                </button>
+              )}
             </div>
           )}
         </section>

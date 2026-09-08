@@ -38,9 +38,22 @@ from .system import DeviceSystem
 
 LOGGER = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).with_name("static")
-API_ACTIONS = {"previous", "next", "select", "capture", "back", "share", "remix", "retry", "power"}
+API_ACTIONS = {
+    "previous",
+    "next",
+    "select",
+    "capture",
+    "back",
+    "share",
+    "remix",
+    "retry",
+    "power",
+    "restart_camera",
+}
 MIN_FREE_BYTES = 150 * 1024 * 1024
 MAX_PENDING = 30
+CAMERA_RETRY_DELAY = 3.0
+MAX_CAMERA_START_ATTEMPTS = 3
 
 
 def gallery_error(message: str | None) -> str | None:
@@ -124,6 +137,8 @@ class CameraWebController:
         self._message = "Starting camera"
         self._network_online = not offline
         self._camera_available = False
+        self._camera_restart_at: float | None = 0.0
+        self._camera_start_attempts = 0
         self._future: Future[CaptureOutcome] | None = None
         self._processing_id: str | None = None
         self._share_future: Future[Generation] | None = None
@@ -186,13 +201,14 @@ class CameraWebController:
 
     def _run(self) -> None:
         try:
-            self._camera.start()
-            with self._state_changed:
-                self._camera_available = True
-                self._status, self._message = ScreenState.LIVE, ""
-                self._publish_locked()
             next_frame = 0.0
             while not self._stop.is_set():
+                if (
+                    not self._camera_available
+                    and self._camera_restart_at is not None
+                    and time.monotonic() >= self._camera_restart_at
+                ):
+                    self._start_camera()
                 # Serialize deletion with capture, restyling, and worker handoffs.
                 with self._photo_operations:
                     self._poll_actions()
@@ -204,7 +220,7 @@ class CameraWebController:
                 if self._future is not None and now - self._last_processing_sound > 7:
                     self._sound.play("processing")
                     self._last_processing_sound = now
-                if self._preview_consumers and now >= next_frame:
+                if self._camera_available and self._preview_consumers and now >= next_frame:
                     self._refresh_preview()
                     fps = (
                         min(5, self._profile.preview_fps)
@@ -222,6 +238,47 @@ class CameraWebController:
         finally:
             self._camera.close()
 
+    def _start_camera(self) -> None:
+        self._camera_start_attempts += 1
+        with self._state_changed:
+            self._status, self._message = ScreenState.STARTING, "Connecting to camera"
+            self._publish_locked()
+        try:
+            self._camera.start()
+            # Do not advertise Ready until the sensor has delivered a real frame.
+            self._camera.preview()
+        except Exception:
+            LOGGER.exception("Camera startup failed")
+            self._camera_failed()
+            return
+        self._camera_start_attempts = 0
+        self._camera_restart_at = None
+        with self._state_changed:
+            self._camera_available = True
+            self._status, self._message = ScreenState.LIVE, ""
+            self._publish_locked()
+
+    def _camera_failed(self) -> None:
+        retry = self._camera_start_attempts < MAX_CAMERA_START_ATTEMPTS
+        with self._state_changed:
+            self._camera_available = False
+            self._status = ScreenState.ERROR
+            self._message = (
+                "Camera interrupted. Reconnecting shortly."
+                if retry
+                else "Camera could not start. Try Restart camera."
+            )
+            self._publish_locked()
+        with self._frame_changed:
+            self._preview_jpeg = None
+            self._frame_revision += 1
+            self._frame_changed.notify_all()
+        try:
+            self._camera.close()
+        except Exception:
+            LOGGER.exception("Camera cleanup failed")
+        self._camera_restart_at = time.monotonic() + CAMERA_RETRY_DELAY if retry else None
+
     def _poll_actions(self) -> None:
         # One capture per loop keeps completions and state updates responsive.
         try:
@@ -232,10 +289,17 @@ class CameraWebController:
             self._handle_action(action, values)
         except Exception as error:
             LOGGER.warning("Camera action failed: %s", action, exc_info=True)
-            self._notify("error", "Couldn’t do that", str(error)[:160])
+            message = (
+                "Camera interrupted. Please try again when it is ready."
+                if action == "capture" and not self._camera_available
+                else str(error)[:160]
+            )
+            self._notify("error", "Couldn’t do that", message)
             self._sound.play("error")
             with self._state_changed:
                 self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
+                if self._camera_available:
+                    self._message = ""
                 self._publish_locked()
 
     def _handle_action(self, action: str, values: dict) -> None:
@@ -243,6 +307,10 @@ class CameraWebController:
             self._power_off()
         elif action == "back":
             pass  # The browser owns navigation; background work keeps running.
+        elif action == "restart_camera":
+            if not self._camera_available:
+                self._camera_start_attempts = 0
+                self._camera_restart_at = 0.0
         elif action in {"previous", "next", "select"}:
             with self._state_changed:
                 if action == "select":
@@ -284,7 +352,11 @@ class CameraWebController:
             self._publish_locked()
         self._sound.play("shutter")
         try:
-            self._camera.capture(source_path)
+            try:
+                self._camera.capture(source_path)
+            except Exception:
+                self._camera_failed()
+                raise
             prepare_capture(source_path)
             self._store.enqueue(capture_id, preset.id, source_path)
         except Exception:
@@ -494,6 +566,7 @@ class CameraWebController:
                 self._frame_changed.notify_all()
         except Exception:
             LOGGER.warning("Preview frame unavailable", exc_info=True)
+            self._camera_failed()
 
     def _refresh_battery(self) -> None:
         now = time.monotonic()
