@@ -193,3 +193,21 @@ def test_wifi_names_with_colons_and_backslashes_parse(tmp_path):
         control.handle({"action": "wifi-connect", "ssid": "x\n", "password": "test1234"})
     with pytest.raises(ValueError, match="Unsupported"):
         control.handle({"action": "arbitrary-command"})
+
+
+def test_installed_files_are_readable_despite_private_daemon_umask(tmp_path):
+    import os
+
+    control = load_control(tmp_path)
+    destination = tmp_path / "installed.py"
+    previous_mask = os.umask(0o077)
+    try:
+        control.run(
+            sys.executable,
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('code')",
+            str(destination),
+        )
+    finally:
+        os.umask(previous_mask)
+    assert destination.stat().st_mode & 0o777 == 0o644

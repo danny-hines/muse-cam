@@ -264,3 +264,26 @@ def test_http_gallery_and_local_settings_boundary(tmp_path: Path) -> None:
         asyncio.run(exercise())
     finally:
         controller.close()
+
+
+def test_shutdown_ends_open_event_and_preview_streams(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    controller.start()
+
+    async def exercise():
+        client = TestClient(TestServer(create_web_app(controller)))
+        await client.start_server()
+        events = await client.get("/api/events")
+        preview = await client.get("/preview.mjpg")
+        await events.content.readline()
+        await preview.content.readline()
+        try:
+            await asyncio.wait_for(client.server.close(), timeout=3)
+            assert controller._stop.is_set()
+        finally:
+            await client.close()
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        controller.close()
