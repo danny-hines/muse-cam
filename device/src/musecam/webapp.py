@@ -891,6 +891,17 @@ async def _index(_: web.Request) -> web.StreamResponse:
 def create_web_app(controller: CameraWebController) -> web.Application:
     app = web.Application(middlewares=[local_requests], client_max_size=8192)
     app["controller"] = controller
+
+    async def stop_streams(_: web.Application) -> None:
+        # End persistent SSE/MJPEG responses before aiohttp waits for connections.
+        # Otherwise systemd's stop timeout can kill a healthy camera during updates.
+        controller._stop.set()
+        with controller._state_changed:
+            controller._state_changed.notify_all()
+        with controller._frame_changed:
+            controller._frame_changed.notify_all()
+
+    app.on_shutdown.append(stop_streams)
     app.router.add_get("/", _index)
     app.router.add_get("/api/state", _state)
     app.router.add_get("/api/events", _events)

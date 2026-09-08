@@ -26,7 +26,11 @@ JOB = {"phase": "idle", "message": ""}
 
 
 def run(*args: str, timeout: int = 20) -> str:
-    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=True)
+    # The daemon keeps its own state private, but installed code must be readable
+    # by the unprivileged camera user. Git/pip otherwise inherit UMask=0077.
+    result = subprocess.run(
+        args, capture_output=True, text=True, timeout=timeout, check=True, umask=0o022
+    )
     return result.stdout.strip()
 
 
