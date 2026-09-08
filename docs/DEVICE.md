@@ -147,6 +147,17 @@ sound cues are now implemented in `device/src/musecam/audio.py` and controlled f
 playback as `musecam` succeeded again, both camera services were active, and GPIO20
 remained configured as the shutter input.
 
+The application keeps one 48 kHz stereo PCM stream open and sends digital silence
+between cues, including while muted. Opening and closing the I²S device for each
+sound caused loud pops on the assembled camera; the amp's
+[setup guide](https://learn.adafruit.com/adafruit-max98357-i2s-class-d-mono-amp/raspberry-pi-usage)
+also recommends continuous silence to prevent start/stop popping. Cues and volume
+changes have short fades. A separate audio process keeps camera initialization
+and capture work from starving the playback buffer. If the stream fails, sounds
+remain disabled until an application restart, rather than repeatedly reopening
+the device. Settings shows
+the audio error. A service restart or power cycle still interrupts the stream.
+
 The standard amp signals use GPIO18 for BCLK (physical pin 12), GPIO19 for LRCLK
 (pin 35), and GPIO21 for DIN (pin 40). See the
 [Adafruit wiring guide](https://learn.adafruit.com/adafruit-max98357-i2s-class-d-mono-amp/raspberry-pi-wiring).
@@ -182,10 +193,14 @@ wire. See the [amp setup guide](https://learn.adafruit.com/adafruit-max98357-i2s
 Use `aplay -l` to confirm `MAX98357A` appears. `pinctrl get 18-21` should show
 PCM_CLK, PCM_FS, input, and PCM_DOUT respectively while Muse Cam is running.
 Play a deliberately quiet WAV through the named card, avoiding numeric card
-indices that can change between boots:
+indices that can change between boots. Stop Muse Cam first: its continuous stream
+owns the playback device. Standalone playback can itself pop when its stream
+starts or stops, so use Settings → Sounds for routine cue checks.
 
 ```bash
+sudo systemctl stop musecam
 sudo -u musecam aplay -D plughw:CARD=MAX98357A,DEV=0 /path/to/quiet-test.wav
+sudo systemctl start musecam
 ```
 
 The general device installer grants audio-group access, but these optional audio
