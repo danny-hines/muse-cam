@@ -38,30 +38,40 @@ def make_controller(tmp_path: Path) -> CameraWebController:
     return CameraWebController(config, profile, simulate=True, offline=True)
 
 
-def test_retired_styles_leave_cached_picker_but_keep_gallery_and_retry(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("preset_id", "replacement"),
+    [("elven-dawn", "age-of-legends")]
+    + [
+        (f"disc-2-{variant}", "memory-card")
+        for variant in ("smooth", "wide", "smooth-wide", "1996", "reference")
+    ],
+)
+def test_retired_styles_leave_cached_picker_but_keep_gallery_and_retry(
+    tmp_path: Path, preset_id: str, replacement: str
+) -> None:
     controller = make_controller(tmp_path)
     try:
         controller._store.save_presets([*FALLBACK_PRESETS, *RETIRED_PRESETS.values()])
-        controller._store.set_setting("presetId", "elven-dawn")
+        controller._store.set_setting("presetId", preset_id)
         controller._load_presets()
         state = controller.state()
         assert not {p["id"] for p in state["presets"]} & RETIRED_PRESETS.keys()
-        assert state["preset"]["id"] == "age-of-legends"
+        assert state["preset"]["id"] == replacement
 
         source = tmp_path / "captures" / "retired.jpg"
         Image.new("RGB", (100, 80), "orange").save(source)
-        controller._store.enqueue("retired", "elven-dawn", source)
+        controller._store.enqueue("retired", preset_id, source)
         controller._store.mark_failed("retired", "Generation failed")
-        assert controller.gallery()["items"][0]["presetName"] == "Elven Dawn"
+        assert controller.gallery()["items"][0]["presetName"] == RETIRED_PRESETS[preset_id].name
         with pytest.raises(ValueError, match="available style"):
-            controller.dispatch("select", {"presetId": "elven-dawn"})
+            controller.dispatch("select", {"presetId": preset_id})
         with pytest.raises(ValueError, match="available style"):
-            controller._remix({"captureId": "retired", "presetId": "elven-dawn"}, retry=False)
+            controller._remix({"captureId": "retired", "presetId": preset_id}, retry=False)
 
         controller._remix({"captureId": "retired"}, retry=True)
         pending = controller._store.pending()
         assert len(pending) == 1
-        assert pending[0].preset_id == "elven-dawn"
+        assert pending[0].preset_id == preset_id
         assert pending[0].source_path != source
         assert pending[0].source_path.read_bytes() == source.read_bytes()
         assert controller._store.get("retired").status == "failed"

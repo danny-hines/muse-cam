@@ -139,12 +139,12 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
   },
   {
     id: "memory-card",
-    version: 2,
+    version: 3,
     name: "Insert Disc 2",
-    description: "Chunky console-era models wrapped in low-resolution photographic textures.",
+    description: "Chunky console characters, soft photographic textures, and a wider view of close-up portraits.",
     accent: "#a6b987",
     hue: 82,
-    prompt: `Reconstruct only the subjects and setting present in the supplied photograph as a textured late-1990s console adventure-game cutscene. If people are present, build them from chunky low-polygon meshes with broad squared shoulders, thick prismatic arms, angular elbows, blocky hands, and simple solid hair shapes. Wrap every mesh in visibly low-resolution photographic bitmap textures: paint recognizable eyes, brows, lips, stubble, skin shading, hair strands, clothing folds, stitching, and fabric patterns into the texture maps. Facial detail should come primarily from a blurry painted face texture on a simple head mesh. Use roughly 64-to-128-pixel face textures and small clothing texture atlases with stretched texels and visible seams. Keep the coarse geometry clear at silhouettes and joints while smoothly shading across the large mesh faces. Render background surfaces with similarly low-resolution photographic materials and baked architectural detail. Aim for the imperfect realism of an old textured game cutscene, with muted colors, baked shadows, soft vertex lighting, and slightly jagged raster edges. Preserve the photographed subjects' recognizable appearance, clothing colors, pose, composition, camera angle, and scene layout. Keep unoccupied spaces unoccupied; do not invent additional people or animals. Do not add captions, logos, borders, signatures, or watermarks.`,
+    prompt: "Rebuild the photographed subjects and setting as an in-engine screenshot from a late-1990s 3D console adventure game. Use very simple chunky character meshes: broad torso slabs, thick box-shaped upper arms and forearms, angular elbows, blocky hands, and solid geometric hair. The coarse model should be most apparent in its outline and joints. Shade continuously across the mesh with smooth vertex shading so individual triangles do not become patches of different color. Map soft low-resolution photographic texture art onto these simple forms. Put recognizable facial features, skin shadows, eyebrows, lips, and facial hair into one blurry painted face texture; give the face a few broad contours and a simple nose. Paint clothing folds, seams, pockets, and material detail into small diffuse texture maps. Keep natural-looking blended color within these textures rather than a grid of colored blocks or a mosaic of triangles. Give the surroundings textured coarse geometry and baked lighting, with richly painted architectural surfaces where appropriate. Present the whole scene as a gently enlarged roughly 320-by-240-pixel game frame, with soft jagged edges, slightly muddy textures, muted colors, and simple lighting. Preserve the subjects' recognizable appearance, age, main clothing colors, and activity. Retain only the people and animals present in the photograph, including keeping empty spaces unoccupied. Do not add text, captions, game interfaces, borders, logos, or watermarks. For a close-up portrait, move the virtual game camera back to show the same person from the waist up with their shoulders, upper arms, and hands visible, so their chunky character model reads clearly. Infer a simple pose and the unseen parts of their outfit from the photograph. For an already wider photo, keep its framing and layout. Reuse the recognizable setting rather than replacing it with an unrelated game location.",
   },
   {
     id: "disc-2-smooth",
@@ -287,6 +287,11 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
 // Retired styles remain resolvable for existing photos, shared links, and queued jobs.
 // Only the active catalog is advertised in the capture and restyle pickers.
 const retiredIds = new Set([
+  "disc-2-smooth",
+  "disc-2-wide",
+  "disc-2-smooth-wide",
+  "disc-2-1996",
+  "disc-2-reference",
   "once-upon-a-cel",
   "cartridge-world",
   "elven-dawn",
