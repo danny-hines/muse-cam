@@ -1,7 +1,8 @@
 # MuseCam styles
 
-The camera has 18 active styles. Every active style works for new captures and
-for **Gallery → Restyle**, which creates a separate entry from a saved original.
+The camera has 23 active styles, including five Disc 2 test variants. Every active
+style works for new captures and for **Gallery → Restyle**, which creates a
+separate entry from a saved original.
 
 | Style | Treatment |
 | --- | --- |
@@ -18,6 +19,11 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Title Screen | Detailed pixel illustration with retro title-screen atmosphere |
 | Player One | Small playable sprites inside a full 16-bit game scene |
 | Insert Disc 2 | Chunky console-era models with low-resolution photographic textures |
+| Disc 2 · Smooth | Smooth shading and soft photographic textures, with original framing |
+| Disc 2 · Wide | Current Disc 2 rendering with close-up portraits pulled back to the waist |
+| Disc 2 · Smooth+Wide | Smooth shading combined with the wider portrait framing |
+| Disc 2 · 1996 | Text-guided 1996 console characters and pre-rendered scenery |
+| Disc 2 · Reference | Uses the supplied game screenshot as visual rendering guidance |
 | Age of Legends | One coherent fantasy mood chosen to suit each photo |
 | Paper Universe | Folded and layered paper dioramas |
 | Soft Spot | Stuffed felt puppets and embroidered textile scenery |
@@ -50,6 +56,21 @@ an old photo defaults to an active style; a saved Elven Dawn or Frost & Crown
 capture selection moves to Age of Legends.
 
 ## Prompt behavior
+
+The five **Disc 2** experiments sit beside the unchanged **Insert Disc 2 v2**.
+Each has its own ID and version-1 prompt, so saved results identify which variant
+was used. Use Gallery → Restyle repeatedly on one original to compare treatments;
+each result is a separate photo. The wider variants can invent unseen clothing
+and poses when pulling back from a close-up.
+
+**Disc 2 · Reference** sends the original photo first and a bundled rendering
+reference second. Its prompt limits the second image to rendering technique,
+preserving the first image's subjects and scene. The reference is the user-supplied
+1710×900 game screenshot, normalized with the standard input pipeline to JPEG and
+stored as base64 in `web/src/lib/model/references/disc-2.json`. Static import keeps
+it inside the server deployment; it is not a public asset or device catalog field.
+All other styles continue to send one image. The **1996** variant uses text guidance
+only. These are comparison modes, not a claim that one consistently looks better.
 
 Animation styles describe visual techniques and original character designs.
 Fantasy replaces modern clothing and accessories, adapts hair, and reinterprets

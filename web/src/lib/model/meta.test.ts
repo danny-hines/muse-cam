@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { presets } from "@/config/presets";
+import { getPreset, presets } from "@/config/presets";
 
 import {
   DEFAULT_META_IMAGE_EDIT_URL,
@@ -99,6 +99,37 @@ describe("MetaMuseProvider", () => {
     });
     expect(body.images).toHaveLength(1);
     expect(body.images[0].image_url).toBe(`data:image/jpeg;base64,${input.toString("base64")}`);
+  });
+
+  it("sends the bundled rendering reference after the original photo for the reference preset", async () => {
+    vi.stubEnv("META_API_KEY", "test-meta-key");
+    const original = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: "#e26f55" },
+    }).jpeg().toBuffer();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return Response.json({
+        data: [{ b64_json: original.toString("base64") }],
+        output_format: "jpeg",
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const preset = getPreset("disc-2-reference")!;
+    await new MetaMuseProvider().transform({ bytes: original, contentType: "image/jpeg", preset });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.prompt).toBe(preset.prompt);
+    expect(body.images).toHaveLength(2);
+    expect(body.images[0].image_url).toBe(`data:image/jpeg;base64,${original.toString("base64")}`);
+    expect(body.images[1].image_url).toMatch(/^data:image\/jpeg;base64,/);
+    const reference = Buffer.from(body.images[1].image_url.split(",")[1], "base64");
+    expect(await sharp(reference).metadata()).toMatchObject({
+      format: "jpeg", width: 1710, height: 900,
+    });
+    expect(reference.equals(original)).toBe(false);
   });
 
   it("surfaces the provider's structured error message", async () => {
