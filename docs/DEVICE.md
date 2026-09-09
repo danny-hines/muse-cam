@@ -14,8 +14,9 @@ For the physical parts list, enclosure plan, and printable assets, see [`../hard
 | `pi3bplus-cam3-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | Camera Module 3 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
 | `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Camera Module 3 continuous autofocus, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
 
-The IMX519 and Camera Module 3 DSI profiles are prepared in software and await
-physical validation. All cameras use Picamera2. See [Camera options and swaps](CAMERAS.md)
+The IMX519 DSI profile has passed initial physical focus and capture checks;
+Camera Module 3 still awaits physical validation. All cameras use Picamera2.
+See [Camera options and swaps](CAMERAS.md)
 for driver requirements, Standard/Wide variants, enclosure status, and the procedure
 for changing cameras without losing the local gallery.
 
@@ -69,6 +70,8 @@ Stop the UI while diagnosing so it does not hold the camera or display:
 sudo systemctl stop musecam
 sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env doctor
 sudo systemctl start musecam
+# DSI builds: stopping musecam also stops its dependent touchscreen service.
+sudo systemctl start musecam-kiosk
 ```
 
 The doctor checks the board model, detected sensor against the camera profile,
