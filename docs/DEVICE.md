@@ -8,11 +8,18 @@ For the physical parts list, enclosure plan, and printable assets, see [`../hard
 
 | Profile | Board | Display/input | Camera | Battery |
 | --- | --- | --- | --- | --- |
-| `pi3bplus-imx415-tft35` | Pi 3B+ | MPI3501 ILI9486 480×320 framebuffer plus XPT2046 touch | Picamera2, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `pi3bplus-imx415-dsi43` | Pi 3B+ | Waveshare 4.3-inch 800×480 DSI display plus capacitive touch | Picamera2, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Picamera2, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
+| `pi3bplus-imx415-tft35` | Pi 3B+ | MPI3501 ILI9486 480×320 framebuffer plus XPT2046 touch | IMX415 fixed focus, 1920×1280 still | PiSugar S Plus; no telemetry |
+| `pi3bplus-imx415-dsi43` | Pi 3B+ | Waveshare 4.3-inch 800×480 DSI display plus capacitive touch | IMX415 fixed focus, 1920×1280 still | PiSugar S Plus; no telemetry |
+| `pi3bplus-imx519-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | IMX519 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
+| `pi3bplus-cam3-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | Camera Module 3 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
+| `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Camera Module 3 continuous autofocus, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
 
-All three profiles reserve BCM GPIO 20 (physical pin 38) for the shutter. Connect the button to ground (for example physical pin 39); the software enables the internal pull-up. The SPI and Zero profiles also use GPIO21 (physical pin 40) for a shutdown button held for 1.5 seconds. The enclosed DSI build uses GPIO21 exclusively for amplifier DIN, so its profile omits the shutdown-button input. See the audio setup below before enabling I²S.
+The IMX519 and Camera Module 3 DSI profiles are prepared in software and await
+physical validation. All cameras use Picamera2. See [Camera options and swaps](CAMERAS.md)
+for driver requirements, Standard/Wide variants, enclosure status, and the procedure
+for changing cameras without losing the local gallery.
+
+All profiles reserve BCM GPIO 20 (physical pin 38) for the shutter. Connect the button to ground (for example physical pin 39); the software enables the internal pull-up. The SPI and Zero profiles also use GPIO21 (physical pin 40) for a shutdown button held for 1.5 seconds. The enclosed DSI build uses GPIO21 exclusively for amplifier DIN, so its profiles omit the shutdown-button input. See the audio setup below before enabling I²S.
 
 ## Prepare Raspberry Pi OS
 
@@ -25,7 +32,7 @@ Use **Raspberry Pi OS Lite (Legacy, 64-bit)** based on Debian Bookworm, with SSH
 
 ## One-command installation
 
-Pi 3B+ with the new Waveshare DSI display (preferred):
+Pi 3B+ with the Waveshare DSI display and IMX415:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
@@ -46,7 +53,11 @@ curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/i
   | sudo bash -s -- --profile zero2-cam3-displayhat
 ```
 
-The installer can exchange a 30-minute setup code from `/admin` for an individual device credential. Without `--claim`, it asks for the legacy plaintext token through `/dev/tty`. It creates a locked-down `musecam` system user, installs the selected display and IMX415 configuration, installs the Python package, verifies the API, and enables `musecam.service`. The DSI profile also installs and enables `musecam-kiosk.service` and `musecam-control.service` for local Wi-Fi and software updates. It reboots automatically when a hardware overlay changes. Rerunning performs a fast-forward update and preserves the secret; add `--reconfigure --claim CODE` to replace an existing credential.
+For IMX519 or Camera Module 3, substitute the corresponding DSI profile from the
+table and follow the [camera-specific setup](CAMERAS.md) first. IMX519 autofocus
+requires Arducam's camera packages.
+
+The installer can exchange a 30-minute setup code from `/admin` for an individual device credential. Without `--claim`, it asks for the legacy plaintext token through `/dev/tty`. It creates a locked-down `musecam` system user, installs the selected display and camera configuration, installs the Python package, verifies the API, and enables `musecam.service`. The DSI profiles also install and enable `musecam-kiosk.service` and `musecam-control.service` for local Wi-Fi and software updates. It reboots automatically when a hardware overlay changes. Rerunning performs a fast-forward update and preserves the secret; add `--reconfigure --claim CODE` to replace an existing credential.
 
 The DSI installer follows Waveshare's current 800×480 setup: it enables full KMS and uses the dedicated Waveshare panel overlay when the OS provides it, otherwise the compatible 7-inch DSI overlay. The display is driven at its native refresh rate rather than copying frames over SPI.
 
@@ -56,11 +67,14 @@ Stop the UI while diagnosing so it does not hold the camera or display:
 
 ```bash
 sudo systemctl stop musecam
-sudo -u musecam /opt/muse-cam/.venv/bin/musecam doctor
+sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env doctor
 sudo systemctl start musecam
 ```
 
-The doctor checks the board model, Picamera2 detection, camera overlay, framebuffer or SPI display device, GPIO, writable local storage, optional PiSugar service, and the production API.
+The doctor checks the board model, detected sensor against the camera profile,
+camera overlay conflicts, focus configuration, display, GPIO, writable local
+storage, optional PiSugar service, and the production API. Autofocus availability
+is verified when the application opens the camera.
 
 Useful commands:
 
@@ -88,7 +102,8 @@ running in one configuration, with no application raw stream. Each shutter press
 saves the existing main stream; it does not reallocate camera buffers. On the
 Pi 3, switching modes previously exhausted contiguous DMA/CMA memory while
 returning to preview, even with ordinary system RAM free. Resolution remains
-1920×1280 on the enclosed IMX415 build.
+1920×1280 across the Pi 3 DSI camera profiles. The autofocus profiles keep
+continuous focus active; see [CAMERAS.md](CAMERAS.md) for capture settling behavior.
 
 Frame requests time out after three seconds. The browser runtime clears stale
 preview state, closes the camera, and tries to reconnect. After three consecutive

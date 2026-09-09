@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass
@@ -8,6 +9,7 @@ from typing import Literal
 
 import httpx
 
+from .boot_config import CAMERA_OVERLAYS
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
 
@@ -29,7 +31,7 @@ def _boot_config() -> Path | None:
     return None
 
 
-def _camera_check() -> DiagnosticCheck:
+def _camera_check(profile: HardwareProfile) -> DiagnosticCheck:
     command = shutil.which("rpicam-hello") or shutil.which("libcamera-hello")
     if not command:
         return DiagnosticCheck("camera", "failed", "rpicam-hello is not installed")
@@ -48,8 +50,46 @@ def _camera_check() -> DiagnosticCheck:
         summary = next(
             (line.strip() for line in output.splitlines() if line.strip().startswith("0")), output
         )
+        sensor = re.match(r"0\s*:\s*(\S+)", summary)
+        if not profile.matches_camera_model(sensor[1] if sensor else "unknown"):
+            return DiagnosticCheck(
+                "camera", "failed",
+                f"{profile.id} expects {profile.camera_model}; detected {summary[:100]}. "
+                "Choose the matching hardware profile and reboot.",
+            )
         return DiagnosticCheck("camera", "ok", summary[:180])
     return DiagnosticCheck("camera", "failed", output[-180:] or "No camera detected")
+
+
+def _camera_overlay_check(
+    boot_config: Path | None, profile: HardwareProfile
+) -> DiagnosticCheck:
+    if boot_config is None:
+        return DiagnosticCheck("camera overlay", "warning", "Boot configuration is not available")
+    else:
+        lines = {
+            line.split("#", 1)[0].strip()
+            for line in boot_config.read_text(encoding="utf-8", errors="replace").splitlines()
+        }
+        manual = {
+            name for name in CAMERA_OVERLAYS
+            if any(re.fullmatch(rf"dtoverlay={name}([,:].*)?", line) for line in lines)
+        }
+        automatic = profile.camera_overlay == "auto"
+        expected = "camera_auto_detect=1" if automatic else f"dtoverlay={profile.camera_overlay}"
+        matches = expected in lines if automatic else profile.camera_overlay in manual
+        conflicts = manual if automatic else manual - {profile.camera_overlay}
+        status = "failed" if conflicts else "ok" if matches else "warning"
+        detail = (
+            f"{expected} found in {boot_config}"
+            if status == "ok"
+            else f"Confirm {expected} in {boot_config}"
+        )
+        if conflicts:
+            names = ", ".join(sorted(conflicts))
+            detail = f"Conflicting camera overlays: {names}. Rerun installer."
+        return DiagnosticCheck("camera overlay", status, detail)
+
 
 
 def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[DiagnosticCheck]:
@@ -61,27 +101,15 @@ def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[Diag
     else:
         checks.append(DiagnosticCheck("board", "warning", "Not running on Raspberry Pi hardware"))
 
-    checks.append(_camera_check())
+    checks.append(_camera_check(profile))
 
-    boot_config = _boot_config()
-    if profile.camera_overlay == "auto":
-        checks.append(
-            DiagnosticCheck("camera overlay", "ok", "Automatic camera detection selected")
-        )
-    elif boot_config is None:
-        checks.append(
-            DiagnosticCheck("camera overlay", "warning", "Boot configuration is not available")
-        )
-    else:
-        text = boot_config.read_text(encoding="utf-8", errors="replace")
-        expected = f"dtoverlay={profile.camera_overlay}"
-        status = "ok" if expected in text else "warning"
-        detail = (
-            f"{expected} found in {boot_config}"
-            if status == "ok"
-            else f"Confirm {expected} in {boot_config}"
-        )
-        checks.append(DiagnosticCheck("camera overlay", status, detail))
+    checks.append(_camera_overlay_check(_boot_config(), profile))
+
+    checks.append(DiagnosticCheck(
+        "focus configuration", "ok",
+        "Continuous autofocus requested; camera startup verifies driver support."
+        if profile.camera_autofocus else "Fixed-focus camera; no autofocus controls requested.",
+    ))
 
     if profile.display_backend == "displayhatmini":
         device = Path("/dev/spidev0.1")

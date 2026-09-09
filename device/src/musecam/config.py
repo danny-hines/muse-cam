@@ -38,6 +38,15 @@ class HardwareProfile:
     power_gpio: int | None
     power_backend: str
     battery_telemetry: bool
+    camera_model: str | None = None
+    camera_autofocus: bool = False
+
+    def matches_camera_model(self, detected: str) -> bool:
+        model = detected.lower()
+        if self.camera_model == "imx708":
+            # libcamera reports the lens/IR variants as distinct model names.
+            return model in {"imx708", "imx708_wide", "imx708_noir", "imx708_wide_noir"}
+        return self.camera_model is None or model == self.camera_model
 
 
 @dataclass(frozen=True)
@@ -124,4 +133,6 @@ def load_profile(profile_id: str, profiles_dir: Path | None = None) -> HardwareP
         power_gpio=_optional_int(values, "power_gpio"),
         power_backend=str(values.get("power_backend", "none")),
         battery_telemetry=bool(values.get("battery_telemetry", False)),
+        camera_model=str(values["camera_model"]).lower() if values.get("camera_model") else None,
+        camera_autofocus=bool(values.get("camera_autofocus", False)),
     )

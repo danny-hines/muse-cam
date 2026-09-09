@@ -1,0 +1,168 @@
+# Camera options and swaps
+
+Muse Cam uses one Picamera2 capture backend with explicit hardware profiles.
+Camera choice changes sensor setup and focusing; the gallery, styles, physical
+shutter, sounds, and photo queue use the same application code.
+
+## Pi 3B+ / Waveshare 4.3-inch DSI builds
+
+| Camera | Installer profile | Focus | Validation status |
+| --- | --- | --- | --- |
+| Arducam IMX415, B0569 | `pi3bplus-imx415-dsi43` | Fixed lens | Existing enclosed build; autofocus is not requested |
+| Arducam 16 MP IMX519 autofocus, B0371 | `pi3bplus-imx519-dsi43` | Continuous AF through Arducam's libcamera stack | Software prepared; physical bring-up pending |
+| Raspberry Pi Camera Module 3, IMX708 | `pi3bplus-cam3-dsi43` | Continuous AF through Raspberry Pi's camera stack | Software prepared; physical bring-up pending |
+
+All three DSI profiles use 1920×1280 stills, a 15 FPS camera stream, up to 10 FPS
+preview delivery, and the same GPIO20 shutter / GPIO21 amplifier wiring. The
+larger sensors are not captured at their maximum advertised resolution: the
+initial configuration preserves the Pi 3's established memory budget and upload
+sizes. Sensor mode, framing, focus quality, and repeated capture stability still
+need to be checked on each new physical module.
+
+Camera Module 3 Standard and Wide share the `cam3` profile. NoIR variants are also
+recognized, but the ordinary IR-filtered versions are the intended choice for
+normal color photography. The official module offers 75° diagonal coverage for
+Standard and 120° for Wide; these are lens specifications, not a promise about
+the application's cropped preview. See Raspberry Pi's
+[Camera Module 3 specifications and drawings](https://www.raspberrypi.com/products/camera-module-3/).
+
+The IMX519 profile targets the autofocus B0371, not a manual-focus IMX519 board.
+Arducam documents Pi 3B+ support and requires its libcamera packages for
+autofocus. Follow its OS-specific
+[IMX519 installation guide](https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/16MP-IMX519/)
+before enabling this profile. Muse Cam does not download or execute the vendor's
+installer automatically. Having an `imx519.dtbo` file alone does not prove that
+the autofocus driver and Python bindings are working.
+
+## First installation
+
+Use the Bookworm-based Raspberry Pi OS setup described in [DEVICE.md](DEVICE.md).
+Connect the selected module with all power disconnected, install any required
+vendor camera packages, and run the Muse Cam installer with the matching profile:
+
+```bash
+# IMX519 autofocus (after the Arducam driver setup):
+sudo bash install-device.sh --profile pi3bplus-imx519-dsi43 --claim YOUR-SETUP-CODE
+
+# Or official Camera Module 3, Standard or Wide:
+sudo bash install-device.sh --profile pi3bplus-cam3-dsi43 --claim YOUR-SETUP-CODE
+```
+
+Obtain `scripts/install-device.sh` from this repository as described in
+[DEVICE.md](DEVICE.md). Private deployments require their own repository access.
+Camera Module 3 uses the Raspberry Pi OS Picamera2/rpicam packages installed by
+Muse Cam. The installer may reboot to activate boot settings.
+
+## Swap an existing camera
+
+1. Let pending processing and sharing finish. Use **Settings → Device → Update**
+   to install the release containing the new profiles and installer. A normal
+   application update preserves the selected camera and does not edit boot settings.
+2. For IMX519, follow the linked Arducam driver instructions for your OS. Stop
+   Muse Cam while testing vendor camera commands; only one process may own the
+   camera. Follow any vendor reboot requirements before continuing.
+3. Run **one** of these on the Pi, choosing the module being fitted:
+
+   ```bash
+   sudo bash /opt/muse-cam/scripts/install-device.sh \
+     --profile pi3bplus-imx519-dsi43 --no-start
+
+   # Or:
+   sudo bash /opt/muse-cam/scripts/install-device.sh \
+     --profile pi3bplus-cam3-dsi43 --no-start
+   ```
+
+   The installer keeps the existing device credential and photo data, selects
+   the profile, and stops the camera service. `--no-start` prevents camera
+   startup and automatic reboot while the old module is still attached. Existing
+   service enablement is retained. Custom extra settings in `device.env` should
+   be saved separately before rerunning the installer, which rewrites that file.
+4. Run `sudo systemctl poweroff`, wait for shutdown, and disconnect **all** power,
+   including the PiSugar battery supply. Fit the module, its correct ribbon, and
+   matching enclosure bracket. The Pi 3 camera connector takes a 15-pin ribbon;
+   check the camera-end connector and contact orientation rather than assuming
+   the IMX415 cable can be reused. See Raspberry Pi's
+   [camera connection instructions](https://www.raspberrypi.com/documentation/accessories/camera.html).
+5. Restore power. The previously enabled services should start. If this was a
+   fresh installation using `--no-start`, enable them after boot:
+
+   ```bash
+   sudo systemctl enable --now musecam musecam-kiosk
+   ```
+
+The installer backs up the boot configuration before changing camera selection
+to `config.txt.musecam-<timestamp>.bak`. It disables previous IMX415/IMX519/IMX708
+directives and writes one selected camera in an `[all]` block, with automatic
+detection disabled for the Pi 3 profiles. The Zero 2 profile uses automatic
+detection. Same-camera reinstalls preserve existing camera overlay parameters,
+including rotation; a different module begins with its own default orientation.
+Existing KMS memory parameters and amplifier overlays are retained. Custom camera
+directives in included boot files or overlays outside these three sensor families
+need separate review.
+
+To return to the IMX415, repeat the swap steps with
+`--profile pi3bplus-imx415-dsi43`. A vendor camera-stack installation is separate
+from Muse Cam's profile selection; changing the profile does not uninstall it.
+
+## Validate each physical module
+
+With the selected camera installed and the Pi rebooted:
+
+```bash
+sudo systemctl stop musecam
+sudo -u musecam /opt/muse-cam/.venv/bin/musecam \
+  --config /etc/musecam/device.env doctor
+sudo systemctl start musecam
+journalctl -u musecam -b -n 80 --no-pager
+```
+
+Doctor checks the detected sensor against the profile and flags conflicting
+camera overlays. Camera Module 3's `imx708`, `imx708_wide`, `imx708_noir`, and
+`imx708_wide_noir` names are accepted by the same profile; these variants are
+registered separately in Raspberry Pi's
+[libcamera implementation](https://github.com/raspberrypi/libcamera/blob/main/src/ipa/rpi/cam_helper/cam_helper_imx708.cpp).
+Application startup verifies that autofocus controls exist and logs the sensor,
+capture size, and `autofocus=continuous` (or `off` for IMX415).
+
+Before marking a module physically validated, check:
+
+- Live preview and saved originals have the intended orientation and framing.
+- A nearby textured object and a distant scene both settle into focus; inspect
+  the original using gallery zoom, not only the generated treatment.
+- At least ten captures, including several close together and while previous
+  photos process, return to live view without allocation errors or a freeze.
+- Gallery originals/results, physical shutter, speaker cues, and a power cycle
+  continue working. Record the module, OS, camera package versions, and lens variant.
+
+## Focusing and failure behavior
+
+Autofocus profiles request Picamera2's continuous mode. At capture time, Muse Cam
+releases frames while the driver reports scanning, allowing up to 1.2 seconds
+for settling with a healthy frame stream. If scanning continues, it saves the
+latest frame. A failed or unavailable focus-state report also allows capture;
+focus lock is not guaranteed. Individual frame requests retain the existing
+three-second device timeout and camera recovery behavior. Still and preview
+streams stay allocated throughout; capture does not switch sensor modes.
+These controls and metadata are described in the
+[Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf).
+
+If startup reports the wrong sensor, select the matching profile and reboot.
+If it reports missing autofocus controls on IMX519, verify Arducam's libcamera
+installation and that the board is the autofocus model. Do not work around the
+error by silently disabling autofocus on a build advertised as autofocus-capable.
+Standalone `rpicam-hello`/Picamera2 tests must run with Muse Cam stopped.
+
+## Profiles and printable parts
+
+Profile TOML files live in `device/profiles/`. `camera_model` guards against a
+wrong sensor; `camera_autofocus` requests continuous focus. Omitting both keeps
+the earlier fixed-focus backend behavior for custom profiles. The installer
+accepts the five profiles listed in [DEVICE.md](DEVICE.md); new board/display
+combinations need their own profile, installer handling, and hardware validation.
+
+The IMX519 enclosure STL revision has been reported complete by the builder but
+has not yet been supplied to this checkout. A Camera Module 3 enclosure revision
+is planned. Neither is included as a validated print in this release. Keep
+camera-specific front mounts separately labeled, with the board/lens variant and
+revision recorded; use the manufacturer's dimensional drawings and the physical
+module to confirm lens clearance and ribbon routing before publishing prints.
