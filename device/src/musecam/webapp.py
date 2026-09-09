@@ -184,6 +184,14 @@ class CameraWebController:
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
             selected = "age-of-legends"
+        elif selected in {
+            "disc-2-smooth",
+            "disc-2-wide",
+            "disc-2-smooth-wide",
+            "disc-2-1996",
+            "disc-2-reference",
+        }:
+            selected = "memory-card"
         self._preset_index = next((i for i, p in enumerate(self._presets) if p.id == selected), 0)
 
     def dispatch(self, action: str, values: dict | None = None) -> None:

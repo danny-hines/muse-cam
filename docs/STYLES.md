@@ -1,8 +1,7 @@
 # MuseCam styles
 
-The camera has 23 active styles, including five Disc 2 test variants. Every active
-style works for new captures and for **Gallery → Restyle**, which creates a
-separate entry from a saved original.
+The camera has 18 active styles. Every active style works for new captures and
+for **Gallery → Restyle**, which creates a separate entry from a saved original.
 
 | Style | Treatment |
 | --- | --- |
@@ -18,12 +17,7 @@ separate entry from a saved original.
 | 3D Toon | Sculpted characters in a cinematic 3D animated feature |
 | Title Screen | Detailed pixel illustration with retro title-screen atmosphere |
 | Player One | Small playable sprites inside a full 16-bit game scene |
-| Insert Disc 2 | Chunky console-era models with low-resolution photographic textures |
-| Disc 2 · Smooth | Smooth shading and soft photographic textures, with original framing |
-| Disc 2 · Wide | Current Disc 2 rendering with close-up portraits pulled back to the waist |
-| Disc 2 · Smooth+Wide | Smooth shading combined with the wider portrait framing |
-| Disc 2 · 1996 | Text-guided 1996 console characters and pre-rendered scenery |
-| Disc 2 · Reference | Uses the supplied game screenshot as visual rendering guidance |
+| Insert Disc 2 | Smooth shading, chunky console characters, soft photographic textures, and wider portraits |
 | Age of Legends | One coherent fantasy mood chosen to suit each photo |
 | Paper Universe | Folded and layered paper dioramas |
 | Soft Spot | Stuffed felt puppets and embroidered textile scenery |
@@ -37,9 +31,10 @@ After School is now **Anime Cel**, Big Screen is **3D Toon**, and Pocket Arcade 
 unchanged. **Player One** is a separate version-1 preset that pulls back from
 close-up portraits to show small full-body gameplay sprites in tiled scenery.
 
-Memory Card keeps its ID and becomes **Insert Disc 2**, with a version-2 prompt.
-It specifies chunky limbs and silhouettes, blurry photographic face and clothing
-textures, baked lighting, and coarse early-console rendering. Empty spaces remain
+Memory Card keeps its ID and becomes **Insert Disc 2**. After comparing five test
+variants, **version 3** adopts the exact **Smooth+Wide** prompt: smooth shading,
+chunky silhouettes, blurry photographic textures, and a wider waist-up view for
+close-up portraits. Already wider photos keep their framing. Empty spaces remain
 unoccupied rather than gaining invented game characters.
 
 **Age of Legends v2** absorbs Elven Dawn and Frost & Crown. Its prompt asks the
@@ -57,20 +52,22 @@ capture selection moves to Age of Legends.
 
 ## Prompt behavior
 
-The five **Disc 2** experiments sit beside the unchanged **Insert Disc 2 v2**.
-Each has its own ID and version-1 prompt, so saved results identify which variant
-was used. Use Gallery → Restyle repeatedly on one original to compare treatments;
-each result is a separate photo. The wider variants can invent unseen clothing
-and poses when pulling back from a close-up.
+The five **Disc 2** test entries are retired from the capture and restyle pickers.
+Their IDs, names, and version-1 prompts remain available for saved gallery photos,
+shared links, and retries. Any saved test-mode capture selection moves to
+**Insert Disc 2**. The main style keeps ID `memory-card`, now at version 3; changing
+its prompt does not alter existing images. Pulling back from a close-up can invent
+unseen clothing and poses. Gallery → Restyle still creates a separate photo.
 
-**Disc 2 · Reference** sends the original photo first and a bundled rendering
-reference second. Its prompt limits the second image to rendering technique,
+For retries of the retired **Disc 2 · Reference** mode, the provider sends the
+original photo first and a bundled rendering reference second. Its prompt limits
+the second image to rendering technique,
 preserving the first image's subjects and scene. The reference is the user-supplied
 1710×900 game screenshot, normalized with the standard input pipeline to JPEG and
 stored as base64 in `web/src/lib/model/references/disc-2.json`. Static import keeps
 it inside the server deployment; it is not a public asset or device catalog field.
-All other styles continue to send one image. The **1996** variant uses text guidance
-only. These are comparison modes, not a claim that one consistently looks better.
+All active styles send one image. The retired **1996** variant uses text guidance
+only.
 
 Animation styles describe visual techniques and original character designs.
 Fantasy replaces modern clothing and accessories, adapts hair, and reinterprets
@@ -88,8 +85,8 @@ The original 17-style expansion completed 23 direct Meta requests, including six
 refinement renders, using one clothed portrait. That is historical validation of
 the earlier catalog, not a reliability measurement for the revised prompts.
 
-For this curation, the final prompts produced eight successful direct Meta samples:
-Insert Disc 2 on a portrait and empty room; Player One on a portrait and dog; and
+For the initial curation, the final prompts produced eight successful direct Meta samples:
+Insert Disc 2 v2 on a portrait and empty room; Player One on a portrait and dog; and
 Age of Legends on the portrait twice, room, and dog. All eight were visually
 reviewed. The two fantasy portraits chose a northern setting, while the room and
 dog chose woodland styling. The first fantasy draft had two portrait rejections
@@ -102,7 +99,7 @@ and its room sample did so.
 Direct provider checks used production input normalization and created no camera
 or server gallery entries or public images. Local synthetic fixtures exercise the
 800×480 capture and restyle flows, including photos made with retired styles.
-Regression tests cover shared links for all six retired presets, offline picker
+Regression tests cover shared links for all eleven retired presets, offline picker
 filtering, gallery labels, and retrying a failed retired style while preserving its
 original. The Python wheel contains and loads both catalogs.
 

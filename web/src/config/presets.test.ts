@@ -27,7 +27,7 @@ describe("preset catalog", () => {
     expect(getPreset("after-school")).toMatchObject({ name: "Anime Cel", version: 1 });
     expect(getPreset("big-screen")).toMatchObject({ name: "3D Toon", version: 1 });
     expect(getPreset("pocket-arcade")).toMatchObject({ name: "Title Screen", version: 1 });
-    expect(getPreset("memory-card")).toMatchObject({ name: "Insert Disc 2", version: 2 });
+    expect(getPreset("memory-card")).toMatchObject({ name: "Insert Disc 2", version: 3 });
     expect(getPreset("age-of-legends")?.version).toBe(2);
     expect(presets.some(({ id }) => id === "player-one")).toBe(true);
   });
@@ -36,13 +36,16 @@ describe("preset catalog", () => {
     expect(getPreset("alien-visitor")?.name).toBe("First Contact");
   });
 
-  it("keeps the Disc 2 experiments separately selectable and limits the visual reference to its own mode", () => {
+  it("promotes Smooth+Wide and preserves retired Disc 2 experiments for saved photos", () => {
     for (const suffix of ["smooth", "wide", "smooth-wide", "1996", "reference"]) {
-      expect(presets.find(({ id }) => id === `disc-2-${suffix}`)).toMatchObject({ version: 1 });
+      const id = `disc-2-${suffix}`;
+      expect(presets.some((preset) => preset.id === id)).toBe(false);
+      expect(retiredPresets.find((preset) => preset.id === id)).toMatchObject({ version: 1 });
     }
-    expect(getPreset("memory-card")).toMatchObject({ name: "Insert Disc 2", version: 2 });
-    expect(presets.filter(({ referenceImage }) => referenceImage).map(({ id }) => id))
-      .toEqual(["disc-2-reference"]);
+    expect(presets.find(({ id }) => id === "memory-card"))
+      .toMatchObject({ name: "Insert Disc 2", version: 3, prompt: getPreset("disc-2-smooth-wide")?.prompt });
+    expect(presets.some(({ referenceImage }) => referenceImage)).toBe(false);
+    expect(getPreset("disc-2-reference")?.referenceImage).toBe("disc-2");
   });
 
   it("ships the same public catalog to the API and the offline device", async () => {
