@@ -23,6 +23,7 @@ from PIL import Image
 from .app import (
     CAMERA_UNAVAILABLE_MESSAGE,
     FALLBACK_PRESETS,
+    RETIRED_PRESETS,
     CaptureOutcome,
     api_error_code,
     friendly_generation_error,
@@ -178,8 +179,11 @@ class CameraWebController:
             except (httpx.HTTPError, ValueError, KeyError):
                 LOGGER.warning("Unable to refresh presets; using cache")
                 self._network_online = False
-        self._presets = presets or self._store.load_presets() or FALLBACK_PRESETS
+        loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
+        self._presets = [p for p in loaded if p.id not in RETIRED_PRESETS] or FALLBACK_PRESETS
         selected = self._store.setting("presetId")
+        if selected in {"elven-dawn", "frost-and-crown"}:
+            selected = "age-of-legends"
         self._preset_index = next((i for i, p in enumerate(self._presets) if p.id == selected), 0)
 
     def dispatch(self, action: str, values: dict | None = None) -> None:
@@ -377,7 +381,9 @@ class CameraWebController:
         if retry and original.status != "failed":
             raise ValueError("This photo is already complete or waiting to process")
         preset_id = original.preset_id if retry else values.get("presetId")
-        if preset_id not in {p.id for p in self._presets}:
+        if preset_id not in {p.id for p in self._presets} and not (
+            retry and preset_id in RETIRED_PRESETS
+        ):
             raise ValueError("Choose an available style")
         capture_id, source_path = self._new_source()
         # Each treatment owns its original, so future cleanup cannot break siblings.
@@ -610,7 +616,11 @@ class CameraWebController:
             self._publish_locked()
 
     def _preset_name(self, preset_id: str) -> str:
-        return next((p.name for p in self._presets if p.id == preset_id), preset_id)
+        retired = RETIRED_PRESETS.get(preset_id)
+        return next(
+            (p.name for p in self._presets if p.id == preset_id),
+            retired.name if retired else preset_id,
+        )
 
     def _publish_locked(self) -> None:
         self._revision += 1

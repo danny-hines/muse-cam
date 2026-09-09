@@ -18,7 +18,7 @@ const preservationPrompt =
 const fantasyPreservationPrompt =
   "Preserve each person's recognizable facial identity, age, expression, and pose. Replace contemporary clothing and accessories with the requested fantasy designs. Replace modern headwear with a handcrafted period-style cloth cap or hood that keeps the face visible. Adapt hairstyles to the setting while retaining each person's facial identity. Preserve the composition, camera angle, and overall layout while reinterpreting surroundings as fantasy equivalents. Keep people comfortably clothed and the scene peaceful. Use original costumes, architecture, and heraldry. Do not add captions, logos, borders, signatures, or watermarks.";
 
-export const presets: Preset[] = z.array(presetSchema).parse([
+const presetCatalog: Preset[] = z.array(presetSchema).parse([
   {
     id: "post-apocalypse",
     version: 3,
@@ -85,7 +85,7 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   {
     id: "after-school",
     version: 1,
-    name: "After School",
+    name: "Anime Cel",
     description: "A nostalgic cel-anime frame with painted backgrounds and expressive faces.",
     accent: "#f89db7",
     hue: 342,
@@ -112,7 +112,7 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   {
     id: "big-screen",
     version: 1,
-    name: "Big Screen",
+    name: "3D Toon",
     description: "Expressive sculpted characters and warm cinematic 3D animation.",
     accent: "#f7a85c",
     hue: 30,
@@ -121,20 +121,29 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   {
     id: "pocket-arcade",
     version: 1,
-    name: "Pocket Arcade",
-    description: "Your whole world redrawn in crisp, colorful 16-bit pixels.",
+    name: "Title Screen",
+    description: "Detailed pixel illustration with the atmosphere of a retro title screen.",
     accent: "#75bdff",
     hue: 208,
     prompt: `Rebuild the entire supplied photograph as detailed 16-bit pixel art, as though drawn on a roughly 320-pixel-wide game canvas and enlarged with crisp nearest-neighbor pixels. Construct every subject and background object from deliberate square pixel clusters with a limited coordinated palette, stepped contours, simple sprite-like shading, and selective dithering. Preserve recognizable facial, hair, and clothing cues using carefully placed pixels. Apply the pixel-art construction throughout the scene. ${preservationPrompt}`,
   },
   {
-    id: "memory-card",
+    id: "player-one",
     version: 1,
-    name: "Memory Card",
-    description: "Faceted faces, boxy limbs, muddy textures: gloriously crude early 3D.",
+    name: "Player One",
+    description: "Small playable sprites in a full 16-bit game scene built from your photo.",
+    accent: "#8ac975",
+    hue: 106,
+    prompt: `Rebuild the photographed scene as an actual playable 16-bit pixel-art game screen. Translate each person or animal into a small full-body gameplay sprite, approximately 32-to-48 source pixels tall, within a roughly 256-by-224-pixel game scene enlarged with crisp nearest-neighbor pixels. Each character should occupy at most one third of the screen height, surrounded by a readable tile-based environment made from recognizable objects in the photograph. For a close-up portrait, pull the game camera back and reinterpret the person as a complete small sprite wearing a coherent outfit based on their visible clothing. Preserve distinctive hair, headwear, clothing colors, and recognizable character cues using very few pixels. Use simple sprite proportions, clear outlined silhouettes, economical three-tone shading, repeating environment tiles, and a limited coordinated palette. Adapt the pose and location into a coherent side-view or three-quarter-view game scene. Show the characters within their game environment rather than as large portrait artwork. Do not add a title, text, speech bubbles, HUD, menus, borders, logos, signatures, or watermarks.`,
+  },
+  {
+    id: "memory-card",
+    version: 2,
+    name: "Insert Disc 2",
+    description: "Chunky console-era models wrapped in low-resolution photographic textures.",
     accent: "#a6b987",
     hue: 82,
-    prompt: `Rebuild every visible surface of the supplied photograph as a visibly primitive late-1990s console 3D game render. Construct each head from only a few dozen large planar polygons, with angular ears, a wedge-like nose, crude blocky jaw, simple eye marks, rigid segmented limbs, and boxy mitten hands. Map tiny blurry 32-to-64-pixel photographic textures over these crude meshes; faces should have visibly stretched low-resolution texels and broad color patches. Represent hair as a solid angular mass and clothing as a small number of flat polygon faces. Use flat baked lighting, muted colors, dithering, and jagged low-resolution raster edges. Make the subjects as visibly crude and low-budget as the scenery. Keep the photograph's pose, viewpoint, scene layout, main colors, and distinguishing character cues recognizable at this deliberately coarse level of detail. Do not add captions, logos, borders, signatures, or watermarks.`,
+    prompt: `Reconstruct only the subjects and setting present in the supplied photograph as a textured late-1990s console adventure-game cutscene. If people are present, build them from chunky low-polygon meshes with broad squared shoulders, thick prismatic arms, angular elbows, blocky hands, and simple solid hair shapes. Wrap every mesh in visibly low-resolution photographic bitmap textures: paint recognizable eyes, brows, lips, stubble, skin shading, hair strands, clothing folds, stitching, and fabric patterns into the texture maps. Facial detail should come primarily from a blurry painted face texture on a simple head mesh. Use roughly 64-to-128-pixel face textures and small clothing texture atlases with stretched texels and visible seams. Keep the coarse geometry clear at silhouettes and joints while smoothly shading across the large mesh faces. Render background surfaces with similarly low-resolution photographic materials and baked architectural detail. Aim for the imperfect realism of an old textured game cutscene, with muted colors, baked shadows, soft vertex lighting, and slightly jagged raster edges. Preserve the photographed subjects' recognizable appearance, clothing colors, pose, composition, camera angle, and scene layout. Keep unoccupied spaces unoccupied; do not invent additional people or animals. Do not add captions, logos, borders, signatures, or watermarks.`,
   },
   {
     id: "cartridge-world",
@@ -147,12 +156,12 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   },
   {
     id: "age-of-legends",
-    version: 1,
+    version: 2,
     name: "Age of Legends",
-    description: "Cloaks, braided hair, and a cinematic world of forests and great halls.",
+    description: "One fantasy world, many moods: woodland courts, dragon dynasties, and royal castles.",
     accent: "#cba564",
     hue: 38,
-    prompt: `Reimagine the supplied photograph as a grounded live-action high-fantasy film scene during a peaceful everyday moment. Dress people in richly textured layered linen, wool, worn leather, embroidered cloaks, original clasps, and subtle ceremonial metalwork. Adapt hairstyles with natural braids, tied-back lengths, or elegant updos where appropriate to the person. Reinterpret the existing surroundings as fantasy equivalents: interiors become timber-and-stone great halls or workshops, streets become old hillside towns, and greenery becomes ancient woodland. Use natural materials, warm light, gentle mist where appropriate, and detailed practical-costume realism. ${fantasyPreservationPrompt}`,
+    prompt: `Reimagine the supplied photograph as a peaceful everyday moment in an original high-fantasy world, with the tangible realism of a live-action film set. Choose one coherent mood for this rendering: an elven woodland court with flowing sage fabrics, silver botanical ornaments, fine braids, and pale carved stone; a royal castle with embroidered velvet, elegant circlets, richly furnished halls, and candlelight; a dragon-themed palace with black-and-crimson tailoring, silver hair accents, elaborate braids, and dark stone; or a northern great hall with layered wool, worn leather, tied-back hair, timber, and cool daylight. Let the photo inspire the choice, and use that one mood throughout the people and surroundings. Repeated renderings may choose different moods. Use detailed practical costumes, natural materials, and original decorative designs. ${fantasyPreservationPrompt}`,
   },
   {
     id: "elven-dawn",
@@ -228,6 +237,20 @@ export const presets: Preset[] = z.array(presetSchema).parse([
   },
 ]);
 
+// Retired styles remain resolvable for existing photos, shared links, and queued jobs.
+// Only the active catalog is advertised in the capture and restyle pickers.
+const retiredIds = new Set([
+  "once-upon-a-cel",
+  "cartridge-world",
+  "elven-dawn",
+  "frost-and-crown",
+  "riso-club",
+  "blueprint-universe",
+]);
+
+export const presets = presetCatalog.filter((preset) => !retiredIds.has(preset.id));
+export const retiredPresets = presetCatalog.filter((preset) => retiredIds.has(preset.id));
+
 export function getPreset(id: string): Preset | undefined {
-  return presets.find((preset) => preset.id === id);
+  return presetCatalog.find((preset) => preset.id === id);
 }

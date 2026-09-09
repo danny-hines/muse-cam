@@ -1,0 +1,44 @@
+[
+  {
+    "id": "once-upon-a-cel",
+    "version": 1,
+    "name": "Once Upon a Cel",
+    "description": "Expressive hand-drawn characters against lush animated-film scenery.",
+    "accent": "#bd9be8"
+  },
+  {
+    "id": "cartridge-world",
+    "version": 1,
+    "name": "Cartridge World",
+    "description": "Chunky characters, soft textures, and bright early-3D platformer scenery.",
+    "accent": "#72d3a4"
+  },
+  {
+    "id": "elven-dawn",
+    "version": 1,
+    "name": "Elven Dawn",
+    "description": "Silver clasps, flowing fabrics, and luminous woodland craftsmanship.",
+    "accent": "#add3b0"
+  },
+  {
+    "id": "frost-and-crown",
+    "version": 1,
+    "name": "Frost & Crown",
+    "description": "Weathered castles, dark wool, braided hair, and cold cinematic daylight.",
+    "accent": "#98b2ce"
+  },
+  {
+    "id": "riso-club",
+    "version": 1,
+    "name": "Riso Club",
+    "description": "Three-color printmaking with grain and charmingly imperfect registration.",
+    "accent": "#f08a8e"
+  },
+  {
+    "id": "blueprint-universe",
+    "version": 1,
+    "name": "Blueprint Universe",
+    "description": "Fine white contours and dimensional technical drawing on deep cyan.",
+    "accent": "#74b9ed"
+  }
+]

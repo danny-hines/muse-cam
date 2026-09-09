@@ -51,7 +51,7 @@
   {
     "id": "after-school",
     "version": 1,
-    "name": "After School",
+    "name": "Anime Cel",
     "description": "A nostalgic cel-anime frame with painted backgrounds and expressive faces.",
     "accent": "#f89db7"
   },
@@ -63,60 +63,39 @@
     "accent": "#f2c94c"
   },
   {
-    "id": "once-upon-a-cel",
-    "version": 1,
-    "name": "Once Upon a Cel",
-    "description": "Expressive hand-drawn characters against lush animated-film scenery.",
-    "accent": "#bd9be8"
-  },
-  {
     "id": "big-screen",
     "version": 1,
-    "name": "Big Screen",
+    "name": "3D Toon",
     "description": "Expressive sculpted characters and warm cinematic 3D animation.",
     "accent": "#f7a85c"
   },
   {
     "id": "pocket-arcade",
     "version": 1,
-    "name": "Pocket Arcade",
-    "description": "Your whole world redrawn in crisp, colorful 16-bit pixels.",
+    "name": "Title Screen",
+    "description": "Detailed pixel illustration with the atmosphere of a retro title screen.",
     "accent": "#75bdff"
   },
   {
-    "id": "memory-card",
+    "id": "player-one",
     "version": 1,
-    "name": "Memory Card",
-    "description": "Faceted faces, boxy limbs, muddy textures: gloriously crude early 3D.",
+    "name": "Player One",
+    "description": "Small playable sprites in a full 16-bit game scene built from your photo.",
+    "accent": "#8ac975"
+  },
+  {
+    "id": "memory-card",
+    "version": 2,
+    "name": "Insert Disc 2",
+    "description": "Chunky console-era models wrapped in low-resolution photographic textures.",
     "accent": "#a6b987"
   },
   {
-    "id": "cartridge-world",
-    "version": 1,
-    "name": "Cartridge World",
-    "description": "Chunky characters, soft textures, and bright early-3D platformer scenery.",
-    "accent": "#72d3a4"
-  },
-  {
     "id": "age-of-legends",
-    "version": 1,
+    "version": 2,
     "name": "Age of Legends",
-    "description": "Cloaks, braided hair, and a cinematic world of forests and great halls.",
+    "description": "One fantasy world, many moods: woodland courts, dragon dynasties, and royal castles.",
     "accent": "#cba564"
-  },
-  {
-    "id": "elven-dawn",
-    "version": 1,
-    "name": "Elven Dawn",
-    "description": "Silver clasps, flowing fabrics, and luminous woodland craftsmanship.",
-    "accent": "#add3b0"
-  },
-  {
-    "id": "frost-and-crown",
-    "version": 1,
-    "name": "Frost & Crown",
-    "description": "Weathered castles, dark wool, braided hair, and cold cinematic daylight.",
-    "accent": "#98b2ce"
   },
   {
     "id": "paper-universe",
@@ -140,24 +119,10 @@
     "accent": "#b29bff"
   },
   {
-    "id": "riso-club",
-    "version": 1,
-    "name": "Riso Club",
-    "description": "Three-color printmaking with grain and charmingly imperfect registration.",
-    "accent": "#f08a8e"
-  },
-  {
     "id": "stained-in-light",
     "version": 1,
     "name": "Stained in Light",
     "description": "Luminous jewel-colored glass and carefully traced dark outlines.",
     "accent": "#78bed8"
-  },
-  {
-    "id": "blueprint-universe",
-    "version": 1,
-    "name": "Blueprint Universe",
-    "description": "Fine white contours and dimensional technical drawing on deep cyan.",
-    "accent": "#74b9ed"
   }
 ]
