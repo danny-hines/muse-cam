@@ -36,6 +36,15 @@ describe("preset catalog", () => {
     expect(getPreset("alien-visitor")?.name).toBe("First Contact");
   });
 
+  it("keeps the Disc 2 experiments separately selectable and limits the visual reference to its own mode", () => {
+    for (const suffix of ["smooth", "wide", "smooth-wide", "1996", "reference"]) {
+      expect(presets.find(({ id }) => id === `disc-2-${suffix}`)).toMatchObject({ version: 1 });
+    }
+    expect(getPreset("memory-card")).toMatchObject({ name: "Insert Disc 2", version: 2 });
+    expect(presets.filter(({ referenceImage }) => referenceImage).map(({ id }) => id))
+      .toEqual(["disc-2-reference"]);
+  });
+
   it("ships the same public catalog to the API and the offline device", async () => {
     const response = GET();
     const { presets: publicPresets } = await response.json();

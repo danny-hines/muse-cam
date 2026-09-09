@@ -91,6 +91,41 @@
     "accent": "#a6b987"
   },
   {
+    "id": "disc-2-smooth",
+    "version": 1,
+    "name": "Disc 2 · Smooth",
+    "description": "Test: smooth shading and soft photographic textures; keeps the original framing.",
+    "accent": "#8ebf96"
+  },
+  {
+    "id": "disc-2-wide",
+    "version": 1,
+    "name": "Disc 2 · Wide",
+    "description": "Test: the current Disc 2 look with close-up portraits pulled back to the waist.",
+    "accent": "#8ebf96"
+  },
+  {
+    "id": "disc-2-smooth-wide",
+    "version": 1,
+    "name": "Disc 2 · Smooth+Wide",
+    "description": "Test: smooth shading plus a wider view of close-up portraits.",
+    "accent": "#8ebf96"
+  },
+  {
+    "id": "disc-2-1996",
+    "version": 1,
+    "name": "Disc 2 · 1996",
+    "description": "Test: the textured characters and painted scenery of a 1996 console adventure.",
+    "accent": "#8ebf96"
+  },
+  {
+    "id": "disc-2-reference",
+    "version": 1,
+    "name": "Disc 2 · Reference",
+    "description": "Test: uses the supplied game screenshot to guide blocky shapes and photographic textures.",
+    "accent": "#8ebf96"
+  },
+  {
     "id": "age-of-legends",
     "version": 2,
     "name": "Age of Legends",
