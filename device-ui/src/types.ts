@@ -12,6 +12,8 @@ export type Notice = {
   captureId: string | null;
 };
 export type CameraState = {
+  focus: FocusState;
+  previewSize: { width: number; height: number };
   status: string;
   preset: Preset;
   presets: Preset[];
@@ -34,7 +36,15 @@ export type CameraState = {
   revision: number;
   sessionId: string;
 };
+export type FocusState = {
+  supported: boolean;
+  point: { x: number; y: number } | null;
+  mode: "auto" | "spot";
+  status: "idle" | "scanning" | "focused" | "failed" | "unavailable";
+};
 export type CameraAction =
+  | "focus"
+  | "focus_auto"
   | "previous"
   | "next"
   | "select"

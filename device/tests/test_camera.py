@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from musecam.camera import Picamera2Camera, SimulatorCamera, prepare_capture
+from musecam.camera import Picamera2Camera, SimulatorCamera, focus_window, prepare_capture
 from musecam.config import load_profile
 
 
@@ -45,6 +45,7 @@ def fake_picamera(monkeypatch):
             self.camera = camera
             self.released = False
             self.state = camera.focus_states.pop(0) if camera.focus_states else 2
+            self.metadata = camera.metadata.pop(0) if camera.metadata else {"AfState": self.state}
 
         def save(self, stream, output, format=None):
             if self.camera.save_error:
@@ -56,7 +57,7 @@ def fake_picamera(monkeypatch):
             self.released = True
 
         def get_metadata(self):
-            return {"AfState": self.state}
+            return self.metadata
 
     class FakePicamera2:
         def __init__(self) -> None:
@@ -71,6 +72,11 @@ def fake_picamera(monkeypatch):
             self.camera_properties = {"Model": "imx415"}
             self.camera_controls = {}
             self.focus_states = []
+            self.metadata = []
+            self.control_changes = []
+
+        def set_controls(self, values):
+            self.control_changes.append(values)
 
         def create_still_configuration(self, **kwargs):
             return kwargs
@@ -101,6 +107,9 @@ def fake_picamera(monkeypatch):
     monkeypatch.setitem(sys.modules, "picamera2", SimpleNamespace(Picamera2=lambda: fake))
     monkeypatch.setitem(sys.modules, "libcamera", SimpleNamespace(controls=SimpleNamespace(
         AfModeEnum=SimpleNamespace(Continuous=2), AfStateEnum=SimpleNamespace(Scanning=1),
+        AfMeteringEnum=SimpleNamespace(Auto=0, Windows=1),
+        AfPauseEnum=SimpleNamespace(Immediate=0, Resume=2),
+        AfPauseStateEnum=SimpleNamespace(Running=0, Paused=2),
     )))
     return fake
 
@@ -209,3 +218,109 @@ def test_wrong_sensor_or_missing_af_controls_fails_clearly(fake_picamera, wrong_
     with pytest.raises(RuntimeError, match=message):
         camera.start()
     assert fake_picamera.closed and camera._camera is None
+
+
+@pytest.mark.parametrize("point,expected", [
+    ((0.5, 0.5), (850, 700, 300, 180)),
+    ((0, 0), (0, 190, 300, 180)),
+    ((1, 1), (1700, 1210, 300, 180)),
+])
+def test_focus_window_respects_sensor_crop_offset_and_edges(point, expected):
+    assert focus_window(point, (0, 190, 2000, 1200)) == expected
+
+
+@pytest.fixture(params=["imx519", "cam3"])
+def autofocus_camera(fake_picamera, request):
+    model = "imx519" if request.param == "imx519" else "imx708"
+    fake_picamera.camera_properties = {"Model": model}
+    fake_picamera.camera_controls = dict.fromkeys(["AfMode", "AfWindows", "AfMetering", "AfPause"])
+    profile = load_profile(
+        f"pi3bplus-{request.param}-dsi43", Path(__file__).parents[1] / "profiles"
+    )
+    camera = Picamera2Camera(profile)
+    camera.start()
+    fake_picamera.metadata = [{"AfState": 2, "ScalerCrop": (0, 190, 2000, 1200)}]
+    camera.preview()
+    yield camera
+    camera.close()
+
+
+def finish_focus_scan(camera, fake, result=2):
+    # Old focused frames must never acknowledge the new target.
+    fake.metadata = ([{"AfState": 2, "AfPauseState": 0}] * 3
+                     + [{"AfState": 0, "AfPauseState": 2}]
+                     + [{"AfState": 2, "AfPauseState": 2}] * 3
+                     + [{"AfState": 1, "AfPauseState": 0}]
+                     + [{"AfState": result, "AfPauseState": 0}])
+    for _ in range(8):
+        camera.preview()
+        assert camera.focus.status == "scanning"
+    camera.preview()
+
+
+def test_tap_waits_for_fresh_focus_and_preserves_area_after_capture(
+    autofocus_camera, fake_picamera, tmp_path
+):
+    camera = autofocus_camera
+    assert camera.focus.supported
+    camera.focus_at((0.5, 0.5))
+    assert fake_picamera.control_changes[-1] == {
+        "AfMetering": 1, "AfPause": 0, "AfWindows": [(850, 700, 300, 180)],
+    }
+    finish_focus_scan(camera, fake_picamera)
+    assert camera.focus.status == "focused"
+    assert fake_picamera.control_changes[-1] == {"AfPause": 2}
+    camera.capture(tmp_path / "spot.jpg")
+    assert camera.focus.point == (0.5, 0.5)
+    assert fake_picamera.configurations == 1
+    assert all(request.released for request in fake_picamera.requests)
+
+    camera.focus_at(None)
+    assert camera.focus.point is None
+    assert fake_picamera.control_changes[-1] == {"AfMetering": 0, "AfPause": 0}
+    finish_focus_scan(camera, fake_picamera)
+    assert camera.focus.status == "focused"
+    camera.start()
+    assert camera.focus.point is None
+    assert camera.focus.status == "unavailable"
+
+
+def test_rapid_retarget_and_failed_focus_do_not_show_old_lock(autofocus_camera, fake_picamera):
+    camera = autofocus_camera
+    camera.focus_at((0.2, 0.3))
+    fake_picamera.metadata = [{"AfState": 2, "AfPauseState": 2}]
+    camera.preview()
+    camera.focus_at((0.8, 0.7))
+    finish_focus_scan(camera, fake_picamera, result=3)
+    assert camera.focus.point == (0.8, 0.7)
+    assert camera.focus.status == "failed"
+    fake_picamera.metadata = [{}]
+    camera.preview()
+    assert camera.focus.status == "unavailable"
+
+
+def test_missing_pause_metadata_times_out_and_resumes_af(
+    autofocus_camera, fake_picamera, monkeypatch
+):
+    camera = autofocus_camera
+    monkeypatch.setattr("musecam.camera.time.monotonic", lambda: 0)
+    camera.focus_at((0.5, 0.5))
+    monkeypatch.setattr("musecam.camera.time.monotonic", lambda: 6)
+    camera.preview()
+    assert camera.focus.status == "unavailable"
+    assert fake_picamera.control_changes[-1] == {"AfPause": 2}
+    camera.preview()  # Late Focused from the previous area is not confirmation.
+    assert camera.focus.status == "unavailable"
+
+
+def test_fixed_focus_rejects_tap_without_touching_hardware(fake_picamera):
+    profile = load_profile("pi3bplus-imx415-dsi43", Path(__file__).parents[1] / "profiles")
+    camera = Picamera2Camera(profile)
+    camera.start()
+    try:
+        assert not camera.focus.supported
+        with pytest.raises(ValueError, match="unavailable"):
+            camera.focus_at((0.5, 0.5))
+        assert not fake_picamera.control_changes
+    finally:
+        camera.close()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from dataclasses import dataclass, replace
 from io import BytesIO
 from pathlib import Path
 from typing import Protocol
@@ -15,6 +16,30 @@ MAX_UPLOAD_BYTES = 2_350_000
 MAX_UPLOAD_EDGE = 2_048
 FOCUS_SETTLE_SECONDS = 1.2
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class FocusState:
+    supported: bool = False
+    point: tuple[float, float] | None = None
+    status: str = "unavailable"
+
+    def to_dict(self) -> dict:
+        return {
+            "supported": self.supported,
+            "point": {"x": self.point[0], "y": self.point[1]} if self.point else None,
+            "mode": "spot" if self.point else "auto",
+            "status": self.status,
+        }
+
+
+def focus_window(point: tuple[float, float], crop: tuple[int, int, int, int]) -> tuple:
+    """Map a normalized preview point into the sensor's current scaler crop."""
+    x, y, width, height = crop
+    box_width, box_height = max(1, round(width * 0.15)), max(1, round(height * 0.15))
+    left = max(x, min(x + width - box_width, round(x + point[0] * width - box_width / 2)))
+    top = max(y, min(y + height - box_height, round(y + point[1] * height - box_height / 2)))
+    return left, top, box_width, box_height
 
 
 def prepare_capture(path: Path, max_bytes: int = MAX_UPLOAD_BYTES) -> Path:
@@ -48,6 +73,11 @@ def prepare_capture(path: Path, max_bytes: int = MAX_UPLOAD_BYTES) -> Path:
 
 
 class Camera(Protocol):
+    @property
+    def focus(self) -> FocusState: ...
+
+    def focus_at(self, point: tuple[float, float] | None) -> None: ...
+
     def start(self) -> None: ...
 
     def preview(self) -> Image.Image: ...
@@ -58,16 +88,27 @@ class Camera(Protocol):
 
 
 class SimulatorCamera:
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(self, width: int, height: int, *, autofocus: bool = False) -> None:
         self._width = max(width, 640)
         self._height = max(height, 480)
         self._started_at = time.monotonic()
         self._last_frame: Image.Image | None = None
+        self.focus = FocusState(supported=autofocus)
+        self._focus_at = 0.0
 
     def start(self) -> None:
         self._started_at = time.monotonic()
+        self.focus = FocusState(self.focus.supported, status="idle")
+
+    def focus_at(self, point: tuple[float, float] | None) -> None:
+        if not self.focus.supported:
+            raise ValueError("This camera has a fixed-focus lens")
+        self.focus = FocusState(True, point, "scanning")
+        self._focus_at = time.monotonic() + 0.6
 
     def preview(self) -> Image.Image:
+        if self.focus.status == "scanning" and time.monotonic() >= self._focus_at:
+            self.focus = replace(self.focus, status="focused")
         elapsed = time.monotonic() - self._started_at
         image = Image.new("RGB", (self._width, self._height), "#17252a")
         draw = ImageDraw.Draw(image)
@@ -143,6 +184,7 @@ class SimulatorCamera:
 
     def close(self) -> None:
         self._last_frame = None
+        self.focus = FocusState(self.focus.supported)
 
 
 class Picamera2Camera:
@@ -150,6 +192,11 @@ class Picamera2Camera:
         self._profile = profile
         self._camera = None
         self._af_scanning = None
+        self.focus = FocusState()
+        self._scaler_crop = None
+        self._focus_phase = ""
+        self._focus_frames = 0
+        self._focus_deadline = 0.0
 
     def start(self) -> None:
         try:
@@ -199,6 +246,9 @@ class Picamera2Camera:
             )
             camera.options["quality"] = 90
             camera.configure(config)
+            self.focus = FocusState(supported=self._profile.camera_autofocus and all(
+                key in camera.camera_controls for key in ("AfWindows", "AfMetering", "AfPause")
+            ))
             camera.start()
             LOGGER.info(
                 "Camera %s started: %sx%s, autofocus=%s",
@@ -208,6 +258,67 @@ class Picamera2Camera:
         except Exception:
             self.close()
             raise
+
+    def focus_at(self, point: tuple[float, float] | None) -> None:
+        if not self.focus.supported or self._camera is None:
+            raise ValueError("Tap to focus is unavailable on this camera")
+        if point is not None and self._scaler_crop is None:
+            raise ValueError("Waiting for camera framing. Try again in a moment.")
+        from libcamera import controls
+
+        values = {
+            "AfMetering": (
+                controls.AfMeteringEnum.Windows if point else controls.AfMeteringEnum.Auto
+            ),
+            "AfPause": controls.AfPauseEnum.Immediate,
+        }
+        if point is not None:
+            values["AfWindows"] = [focus_window(point, self._scaler_crop)]
+        # Changing the metering window alone does not trigger a new scan. Pause
+        # continuous AF, acknowledge it in frame metadata, then resume. All of
+        # this runs on the controller's camera thread without changing streams.
+        self._camera.set_controls(values)
+        self.focus = FocusState(True, point, "scanning")
+        self._focus_phase, self._focus_frames = "pausing", 0
+        self._focus_deadline = time.monotonic() + 5.0
+        LOGGER.info("Focus area: %s", values.get("AfWindows", "auto"))
+
+    def _read_focus(self, metadata: dict) -> None:
+        if crop := metadata.get("ScalerCrop"):
+            self._scaler_crop = tuple(crop)
+        if self._af_scanning is None:
+            return
+        status = {0: "idle", 1: "scanning", 2: "focused", 3: "failed"}.get(
+            metadata.get("AfState"), "unavailable"
+        )
+        if self._focus_phase:
+            from libcamera import controls
+
+            self._focus_frames += 1
+            if self._focus_phase == "unconfirmed":
+                # Without pause/resume acknowledgement, later AF metadata might
+                # still refer to the old area. Leave the target unconfirmed until
+                # another tap or Auto area starts a new, acknowledged cycle.
+                return
+            elif time.monotonic() >= self._focus_deadline:
+                self._camera.set_controls({"AfPause": controls.AfPauseEnum.Resume})
+                self._focus_phase = "unconfirmed"
+                self.focus = replace(self.focus, status="unavailable")
+                return
+            elif self._focus_frames <= 3:
+                # Drain the three configured buffers after each control change,
+                # including rapid retaps, so stale metadata cannot turn the box green.
+                return
+            elif self._focus_phase == "pausing":
+                if metadata.get("AfPauseState") == controls.AfPauseStateEnum.Paused:
+                    self._camera.set_controls({"AfPause": controls.AfPauseEnum.Resume})
+                    self._focus_phase, self._focus_frames = "resuming", 0
+                return
+            elif metadata.get("AfPauseState") != controls.AfPauseStateEnum.Running:
+                return
+            else:
+                self._focus_phase = ""
+        self.focus = replace(self.focus, status=status)
 
     def _request(self):
         if self._camera is None:
@@ -220,6 +331,7 @@ class Picamera2Camera:
         request = self._request()
         output = BytesIO()
         try:
+            self._read_focus(request.get_metadata())
             # Picamera2's JPEG encoder handles YUV plane padding and colour order.
             # The Pi 3's low-resolution stream cannot output RGB directly.
             request.save("lores", output, format="jpeg")
@@ -237,9 +349,9 @@ class Picamera2Camera:
                 request = self._request()
                 if self._af_scanning is None:
                     break
-                state = request.get_metadata().get("AfState")
-                if state != self._af_scanning or time.monotonic() >= deadline:
-                    if state == self._af_scanning:
+                self._read_focus(request.get_metadata())
+                if self.focus.status != "scanning" or time.monotonic() >= deadline:
+                    if self.focus.status == "scanning":
                         LOGGER.info("Autofocus is still scanning; saving the latest frame")
                     break
                 # Let continuous AF settle without switching sensor modes or holding a buffer.
@@ -254,6 +366,9 @@ class Picamera2Camera:
     def close(self) -> None:
         camera, self._camera = self._camera, None
         self._af_scanning = None
+        self.focus = FocusState()
+        self._scaler_crop = None
+        self._focus_phase = ""
         if camera is not None:
             try:
                 camera.cancel_all_and_flush()
@@ -263,7 +378,9 @@ class Picamera2Camera:
 
 def create_camera(profile: HardwareProfile, *, simulate: bool) -> Camera:
     if simulate:
-        return SimulatorCamera(profile.display_width, profile.display_height)
+        return SimulatorCamera(
+            profile.display_width, profile.display_height, autofocus=profile.camera_autofocus
+        )
     if profile.camera_backend == "picamera2":
         return Picamera2Camera(profile)
     raise ValueError(f"Unsupported camera backend: {profile.camera_backend}")

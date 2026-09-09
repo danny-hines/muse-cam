@@ -217,20 +217,56 @@ svg {
   border-radius: 12px;
   background: #ffffff08;
 }
+.focus-surface,
+.focus-surface:hover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+.focus-surface:focus-visible {
+  outline-offset: -4px;
+}
+.focus-target {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  color: #ffe0a5;
+  pointer-events: none;
+  z-index: 1;
+  filter: drop-shadow(0 1px 3px #000b);
+}
+.focus-target.focused { color: #b4efaa; }
+.focus-target.failed { color: #ffb4a5; }
+.focus-target.unavailable,
+.focus-target.idle { color: #e4e0d8; }
+.focus-target > span {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: #15201be0;
+}
 .focus-brackets {
   position: absolute;
-  left: 38%;
-  top: 38%;
-  width: 86px;
-  height: 66px;
-  opacity: 0.42;
-  pointer-events: none;
+  inset: 0;
 }
 .focus-brackets i {
   position: absolute;
   width: 13px;
   height: 13px;
-  border-color: #ffffffe0;
+  border-color: currentColor;
   border-style: solid;
 }
 .focus-brackets i:nth-child(1) {
@@ -254,6 +290,7 @@ svg {
   border-width: 0 1px 1px 0;
 }
 .style-rail {
+  z-index: 2;
   position: absolute;
   right: 16px;
   top: 72px;
@@ -335,6 +372,7 @@ svg {
   border-radius: 4px;
 }
 .camera-footer {
+  z-index: 2;
   position: absolute;
   left: 19px;
   right: 18px;

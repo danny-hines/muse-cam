@@ -96,7 +96,13 @@ The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. I
 
 ## DSI touchscreen controls (0.3)
 
-The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. The two top-right icons open the local gallery and settings. Keyboard testing supports arrows to change style, Space/Enter to capture, and Escape to return to the camera.
+The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. The two top-right icons open the local gallery and settings. Keyboard testing supports arrows to change style, Space/Enter to capture, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
+
+On autofocus camera profiles, tap the preview to focus on a subject. Amber
+brackets indicate focusing; green means the camera reports focus achieved.
+The selected area stays active after a shot. **Auto area** restores default
+automatic metering. Style scrolling and gallery gestures do not change focus.
+See [tap-to-focus behavior](CAMERAS.md#tap-to-focus-on-the-dsi-touchscreen).
 
 Captures return to the viewfinder as soon as the original is saved. A single background worker processes the queue while you continue shooting. A quiet chirp accompanies processing; a tappable notice opens a completed or failed photo. Network interruptions retain the original and retry with the same capture ID and increasing delays. Newly captured photos take priority over repeated network retries. The queue survives restarts and pauses new captures at 30 pending photos or less than 150 MB free.
 
