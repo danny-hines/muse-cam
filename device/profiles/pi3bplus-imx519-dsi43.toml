@@ -1,0 +1,20 @@
+id = "pi3bplus-imx519-dsi43"
+board = "Raspberry Pi 3 Model B Plus"
+display_backend = "browser"
+display_width = 800
+display_height = 480
+display_rotation = 0
+input_backend = "browser-touch"
+camera_backend = "picamera2"
+camera_overlay = "imx519"
+camera_model = "imx519"
+camera_autofocus = true
+capture_width = 1920
+capture_height = 1280
+camera_fps = 15
+preview_fps = 10
+shutter_gpio = 20
+# GPIO21 carries I2S audio data on the enclosed build; no shutdown button is wired.
+# Omit power_gpio so the application does not claim the amplifier's data pin.
+power_backend = "pisugar-s-plus"
+battery_telemetry = false

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -43,6 +44,7 @@ def fake_picamera(monkeypatch):
         def __init__(self, camera) -> None:
             self.camera = camera
             self.released = False
+            self.state = camera.focus_states.pop(0) if camera.focus_states else 2
 
         def save(self, stream, output, format=None):
             if self.camera.save_error:
@@ -50,7 +52,11 @@ def fake_picamera(monkeypatch):
             Image.new("RGB", self.camera.config[stream]["size"], "red").save(output, "JPEG")
 
         def release(self):
+            assert not self.released
             self.released = True
+
+        def get_metadata(self):
+            return {"AfState": self.state}
 
     class FakePicamera2:
         def __init__(self) -> None:
@@ -62,6 +68,9 @@ def fake_picamera(monkeypatch):
             self.request_error = None
             self.closed = False
             self.cancelled = False
+            self.camera_properties = {"Model": "imx415"}
+            self.camera_controls = {}
+            self.focus_states = []
 
         def create_still_configuration(self, **kwargs):
             return kwargs
@@ -90,6 +99,9 @@ def fake_picamera(monkeypatch):
 
     fake = FakePicamera2()
     monkeypatch.setitem(sys.modules, "picamera2", SimpleNamespace(Picamera2=lambda: fake))
+    monkeypatch.setitem(sys.modules, "libcamera", SimpleNamespace(controls=SimpleNamespace(
+        AfModeEnum=SimpleNamespace(Continuous=2), AfStateEnum=SimpleNamespace(Scanning=1),
+    )))
     return fake
 
 
@@ -148,3 +160,52 @@ def test_picamera_releases_device_on_failed_start_and_cancels_timed_out_jobs(fak
         camera.preview()
     camera.close()
     assert fake_picamera.cancelled and camera._camera is None
+
+
+@pytest.mark.parametrize("model,profile_id", [
+    ("imx519", "pi3bplus-imx519-dsi43"), ("imx708", "pi3bplus-cam3-dsi43"),
+    ("imx708_wide", "pi3bplus-cam3-dsi43"), ("imx708_noir", "pi3bplus-cam3-dsi43"),
+    ("imx708_wide_noir", "pi3bplus-cam3-dsi43"),
+])
+def test_autofocus_cameras_settle_without_reconfiguring(fake_picamera, tmp_path, model, profile_id):
+    fake_picamera.camera_properties = {"Model": model}
+    fake_picamera.camera_controls = {"AfMode": (0, 2, 0)}
+    fake_picamera.focus_states = [1, 1, 2]
+    profile = load_profile(profile_id, Path(__file__).parents[1] / "profiles")
+    camera = Picamera2Camera(profile)
+    camera.start()
+    try:
+        camera.capture(tmp_path / "focused.jpg")
+        assert fake_picamera.config["controls"]["AfMode"] == 2
+        assert len(fake_picamera.requests) == 3
+        assert all(request.released for request in fake_picamera.requests)
+        assert fake_picamera.configurations == 1 and fake_picamera.config["raw"] is None
+    finally:
+        camera.close()
+
+
+def test_focus_timeout_still_saves_photo(fake_picamera, tmp_path, monkeypatch):
+    profile = load_profile("pi3bplus-imx415-dsi43", Path(__file__).parents[1] / "profiles")
+    fake_picamera.camera_controls = {"AfMode": (0, 2, 0)}
+    fake_picamera.focus_states = [1] * 20
+    clock = iter([0, 0.5, 1.3])
+    monkeypatch.setattr("musecam.camera.time.monotonic", lambda: next(clock))
+    camera = Picamera2Camera(replace(profile, camera_autofocus=True))
+    camera.start()
+    try:
+        assert camera.capture(tmp_path / "still-scanning.jpg").is_file()
+        assert len(fake_picamera.requests) == 2
+        assert all(request.released for request in fake_picamera.requests)
+    finally:
+        camera.close()
+
+
+@pytest.mark.parametrize("wrong_model", [True, False])
+def test_wrong_sensor_or_missing_af_controls_fails_clearly(fake_picamera, wrong_model):
+    profile = load_profile("pi3bplus-imx519-dsi43", Path(__file__).parents[1] / "profiles")
+    fake_picamera.camera_properties = {"Model": "imx415" if wrong_model else "imx519"}
+    camera = Picamera2Camera(profile)
+    message = "expects imx519" if wrong_model else "Autofocus is unavailable"
+    with pytest.raises(RuntimeError, match=message):
+        camera.start()
+    assert fake_picamera.closed and camera._camera is None

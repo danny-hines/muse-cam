@@ -27,6 +27,8 @@ Usage:
 Profiles:
   pi3bplus-imx415-tft35
   pi3bplus-imx415-dsi43
+  pi3bplus-imx519-dsi43
+  pi3bplus-cam3-dsi43
   zero2-cam3-displayhat
 
 Options:
@@ -35,7 +37,7 @@ Options:
   --reconfigure       Prompt for the server URL and device token again
   --token-stdin       Read the device token from standard input
   --claim CODE        Register with a one-time code instead of entering a token
-  --no-start          Install without enabling or starting the service
+  --no-start          Install without enabling/starting the camera or rebooting
 EOF
 }
 
@@ -79,6 +81,16 @@ ensure_boot_config_setting() {
     printf '\n%s\n' "${line}" >>"${config}"
   fi
   REBOOT_REQUIRED=1
+}
+
+ensure_boot_config_overlay() {
+  local overlay="$1"
+  local config
+  config=$(boot_config_path)
+  # Preserve existing parameters, particularly the Pi 3's CMA allocation.
+  if ! grep -qE "^[[:space:]]*dtoverlay=${overlay}([,:[:space:]#]|$)" "${config}"; then
+    ensure_boot_config_line "dtoverlay=${overlay}"
+  fi
 }
 
 disable_boot_config_setting() {
@@ -178,7 +190,7 @@ if [[ ! -f /proc/device-tree/model ]]; then
 fi
 
 case "${PROFILE}" in
-  pi3bplus-imx415-tft35|pi3bplus-imx415-dsi43|zero2-cam3-displayhat) ;;
+  pi3bplus-imx415-tft35|pi3bplus-imx415-dsi43|pi3bplus-imx519-dsi43|pi3bplus-cam3-dsi43|zero2-cam3-displayhat) ;;
   *)
     echo "Unknown hardware profile: ${PROFILE}" >&2
     exit 2
@@ -201,7 +213,7 @@ apt-get install -y \
   curl \
   sudo
 
-if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
   apt-get install -y chromium xserver-xorg xinit x11-xserver-utils \
     alsa-utils device-tree-compiler network-manager python3-dbus
 fi
@@ -217,21 +229,19 @@ if [[ ${PROFILE} == pi3bplus-imx415-tft35 ]]; then
   disable_boot_config_setting 'dtoverlay=vc4-kms-dsi-waveshare-800x480'
   disable_boot_config_setting 'dtoverlay=vc4-kms-dsi-7inch'
   install_mpi3501_overlay
-  ensure_boot_config_line 'dtoverlay=imx415'
   ensure_boot_config_setting \
     'dtoverlay=tft35a' \
     'dtoverlay=tft35a:rotate=90,speed=20000000'
 fi
 
-if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
   disable_boot_config_setting 'dtoverlay=tft35a'
   ensure_boot_config_setting 'display_auto_detect=' 'display_auto_detect=0'
-  ensure_boot_config_line 'dtoverlay=imx415'
-  ensure_boot_config_setting 'dtoverlay=vc4-kms-v3d' 'dtoverlay=vc4-kms-v3d'
+  ensure_boot_config_overlay 'vc4-kms-v3d'
   if [[ -f "$(overlay_directory)/vc4-kms-dsi-waveshare-800x480.dtbo" ]]; then
-    ensure_boot_config_line 'dtoverlay=vc4-kms-dsi-waveshare-800x480'
+    ensure_boot_config_overlay 'vc4-kms-dsi-waveshare-800x480'
   else
-    ensure_boot_config_line 'dtoverlay=vc4-kms-dsi-7inch'
+    ensure_boot_config_overlay 'vc4-kms-dsi-7inch'
   fi
 fi
 
@@ -272,6 +282,17 @@ python3 -m venv --system-site-packages "${INSTALL_DIR}/.venv"
 "${INSTALL_DIR}/.venv/bin/pip" install --disable-pip-version-check "${INSTALL_DIR}/device"
 if [[ ${PROFILE} == zero2-cam3-displayhat ]]; then
   "${INSTALL_DIR}/.venv/bin/pip" install --disable-pip-version-check "displayhatmini>=0.0.2,<1"
+fi
+
+# A hardware-profile change is explicit: ordinary in-app updates do not run this.
+CAMERA_CONFIG_RESULT=$("${INSTALL_DIR}/.venv/bin/python" -m musecam.boot_config \
+  --profile "${PROFILE}" --profiles-dir "${INSTALL_DIR}/device/profiles" \
+  --boot-config "$(boot_config_path)" --overlays-dir "$(overlay_directory)")
+if [[ ${CAMERA_CONFIG_RESULT} == changed ]]; then
+  REBOOT_REQUIRED=1
+fi
+if [[ ${PROFILE} == pi3bplus-imx519-dsi43 ]]; then
+  echo "IMX519 autofocus requires Arducam libcamera. See ${INSTALL_DIR}/docs/CAMERAS.md."
 fi
 
 install -d -o root -g musecam -m 0750 "${CONFIG_DIR}"
@@ -322,7 +343,7 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
 } >"${TEMP_CONFIG}"
 install -o root -g musecam -m 0640 "${TEMP_CONFIG}" "${CONFIG_FILE}"
 
-if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
   install -d -o root -g root -m 0755 /usr/local/lib/musecam
   install -o root -g root -m 0644 \
     "${INSTALL_DIR}/device/system/control.py" /usr/local/lib/musecam/control.py
@@ -348,7 +369,7 @@ chmod 0440 /etc/sudoers.d/musecam-poweroff
 visudo -cf /etc/sudoers.d/musecam-poweroff >/dev/null
 
 systemctl daemon-reload
-if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
   systemctl enable musecam-control.service
   systemctl restart musecam-control.service
 fi
@@ -357,12 +378,12 @@ runuser -u musecam -- "${INSTALL_DIR}/.venv/bin/musecam" --config "${CONFIG_FILE
 if [[ ${START_SERVICE} -eq 1 ]]; then
   if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then
     systemctl enable musecam.service
-    if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+    if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
       systemctl enable musecam-kiosk.service
     fi
   else
     systemctl enable --now musecam.service
-    if [[ ${PROFILE} == pi3bplus-imx415-dsi43 ]]; then
+    if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
       systemctl enable --now musecam-kiosk.service
     fi
   fi
@@ -375,7 +396,11 @@ if [[ ${START_SERVICE} -eq 1 ]]; then
   echo "Run: sudo -u musecam ${INSTALL_DIR}/.venv/bin/musecam --config ${CONFIG_FILE} doctor"
   echo "Logs: journalctl -u musecam -f"
 else
-  echo "Muse Cam is installed. Start it with: systemctl enable --now musecam.service"
+  if [[ ${REBOOT_REQUIRED} -eq 1 ]]; then
+    echo "Muse Cam is installed. Reboot after connecting the selected camera with power off."
+  else
+    echo "Muse Cam is installed. Start it with: systemctl enable --now musecam.service"
+  fi
 fi
 
 if [[ ${PROFILE} == zero2-cam3-displayhat && ! -S /tmp/pisugar-server.sock ]]; then

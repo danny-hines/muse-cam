@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import time
 from io import BytesIO
@@ -12,6 +13,8 @@ from .config import HardwareProfile
 
 MAX_UPLOAD_BYTES = 2_350_000
 MAX_UPLOAD_EDGE = 2_048
+FOCUS_SETTLE_SECONDS = 1.2
+LOGGER = logging.getLogger(__name__)
 
 
 def prepare_capture(path: Path, max_bytes: int = MAX_UPLOAD_BYTES) -> Path:
@@ -146,6 +149,7 @@ class Picamera2Camera:
     def __init__(self, profile: HardwareProfile) -> None:
         self._profile = profile
         self._camera = None
+        self._af_scanning = None
 
     def start(self) -> None:
         try:
@@ -158,6 +162,24 @@ class Picamera2Camera:
         self.close()
         self._camera = camera = Picamera2()
         try:
+            model = str(camera.camera_properties.get("Model", "unknown")).lower()
+            if not self._profile.matches_camera_model(model):
+                raise RuntimeError(
+                    f"Profile {self._profile.id} expects {self._profile.camera_model}, "
+                    f"but detected {model}. Select the matching camera profile and reboot."
+                )
+            camera_controls = {"FrameRate": self._profile.camera_fps}
+            if self._profile.camera_autofocus:
+                if "AfMode" not in camera.camera_controls:
+                    raise RuntimeError(
+                        f"Autofocus is unavailable on {model}. Check the camera profile, "
+                        "focus motor connection, and camera driver installation. "
+                        "IMX519 autofocus requires Arducam's libcamera packages."
+                    )
+                from libcamera import controls
+
+                camera_controls["AfMode"] = controls.AfModeEnum.Continuous
+                self._af_scanning = controls.AfStateEnum.Scanning
             # Keep both streams allocated for the lifetime of the camera. Mode
             # switches fragmented the Pi's CMA pool and could stop the preview
             # while allocating another full-resolution raw buffer after a shot.
@@ -171,13 +193,18 @@ class Picamera2Camera:
                     "format": "YUV420",
                 },
                 raw=None,
-                controls={"FrameRate": self._profile.camera_fps},
+                controls=camera_controls,
                 buffer_count=3,
                 queue=False,
             )
             camera.options["quality"] = 90
             camera.configure(config)
             camera.start()
+            LOGGER.info(
+                "Camera %s started: %sx%s, autofocus=%s",
+                model, self._profile.capture_width, self._profile.capture_height,
+                "continuous" if self._profile.camera_autofocus else "off",
+            )
         except Exception:
             self.close()
             raise
@@ -203,15 +230,30 @@ class Picamera2Camera:
 
     def capture(self, output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
-        request = self._request()
+        request = None
+        deadline = time.monotonic() + FOCUS_SETTLE_SECONDS
         try:
+            while True:
+                request = self._request()
+                if self._af_scanning is None:
+                    break
+                state = request.get_metadata().get("AfState")
+                if state != self._af_scanning or time.monotonic() >= deadline:
+                    if state == self._af_scanning:
+                        LOGGER.info("Autofocus is still scanning; saving the latest frame")
+                    break
+                # Let continuous AF settle without switching sensor modes or holding a buffer.
+                request.release()
+                request = None
             request.save("main", str(output))
         finally:
-            request.release()
+            if request is not None:
+                request.release()
         return output
 
     def close(self) -> None:
         camera, self._camera = self._camera, None
+        self._af_scanning = None
         if camera is not None:
             try:
                 camera.cancel_all_and_flush()

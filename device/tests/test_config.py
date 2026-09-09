@@ -53,6 +53,8 @@ def test_load_config_requires_credentials(tmp_path: Path, monkeypatch: pytest.Mo
     (
         ("pi3bplus-imx415-tft35", 480, 320, "evdev-touch", 21),
         ("pi3bplus-imx415-dsi43", 800, 480, "browser-touch", None),
+        ("pi3bplus-imx519-dsi43", 800, 480, "browser-touch", None),
+        ("pi3bplus-cam3-dsi43", 800, 480, "browser-touch", None),
         ("zero2-cam3-displayhat", 320, 240, "displayhat-buttons", 21),
     ),
 )
@@ -64,6 +66,10 @@ def test_hardware_profiles_load(
     assert profile.input_backend == input_backend
     assert profile.shutter_gpio == 20
     assert profile.power_gpio == power_gpio
+    assert profile.camera_autofocus == ("imx519" in profile_id or "cam3" in profile_id)
+    assert profile.camera_model == (
+        "imx708" if "cam3" in profile_id else "imx519" if "imx519" in profile_id else "imx415"
+    )
 
 
 def test_pi3_touch_orientation_matches_landscape_display() -> None:
