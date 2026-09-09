@@ -25,9 +25,11 @@ def wait_until(predicate, timeout: float = 6):
     raise AssertionError("Timed out waiting for camera state")
 
 
-def make_controller(tmp_path: Path) -> CameraWebController:
+def make_controller(
+    tmp_path: Path, profile_id: str = "pi3bplus-imx415-dsi43"
+) -> CameraWebController:
     profiles = Path(__file__).parents[1] / "profiles"
-    profile = load_profile("pi3bplus-imx415-dsi43", profiles)
+    profile = load_profile(profile_id, profiles)
     config = DeviceConfig(
         server_url="http://127.0.0.1:3000",
         device_token="do-not-expose",
@@ -36,6 +38,75 @@ def make_controller(tmp_path: Path) -> CameraWebController:
         profiles_dir=profiles,
     )
     return CameraWebController(config, profile, simulate=True, offline=True)
+
+
+def test_focus_actions_are_serialized_and_survive_capture(tmp_path):
+    controller = make_controller(tmp_path, "pi3bplus-imx519-dsi43")
+    controller.start()
+    try:
+        wait_until(lambda: controller.state()["status"] == "live")
+        assert controller.state()["focus"]["supported"]
+        controller.dispatch("focus", {"x": 0.25, "y": 0.6})
+        wait_until(lambda: controller.state()["focus"]["status"] == "scanning")
+        # Even with no MJPEG consumer, a pending focus request must finish.
+        wait_until(lambda: controller.state()["focus"]["status"] == "focused")
+        revision = controller.state()["revision"]
+        controller._refresh_focus()
+        assert controller.state()["revision"] == revision
+        controller.dispatch("capture")
+        wait_until(lambda: controller.state()["galleryCount"] == 1)
+        assert controller.state()["focus"]["point"] == {"x": 0.25, "y": 0.6}
+        controller.dispatch("focus_auto")
+        wait_until(lambda: controller.state()["focus"]["point"] is None)
+        assert controller.state()["focus"]["mode"] == "auto"
+    finally:
+        controller.close()
+
+
+def test_http_focus_validation_and_unavailable_camera(tmp_path):
+    controller = make_controller(tmp_path, "pi3bplus-imx519-dsi43")
+
+    async def exercise():
+        async with TestClient(TestServer(create_web_app(controller))) as client:
+            controller._start_camera()
+            headers = {"X-MuseCam-Request": "1"}
+            for values in [{}, {"x": 0.5}, {"x": -1, "y": 1}, {"x": 1.1, "y": 0},
+                           {"x": True, "y": 0.5}, {"x": "0.5", "y": 0.5},
+                           {"x": None, "y": 0}, {"x": 0, "y": 0, "extra": 1}, []]:
+                response = await client.post("/api/actions/focus", json=values, headers=headers)
+                assert response.status == 400
+            for values in [{"x": 0, "y": 0}, {"x": 1, "y": 1}]:
+                response = await client.post("/api/actions/focus", json=values, headers=headers)
+                assert response.status == 202
+                controller._poll_actions()
+            response = await client.post("/api/actions/focus_auto", json={}, headers=headers)
+            assert response.status == 202
+            controller._poll_actions()
+            assert controller.state()["focus"]["point"] is None
+            controller._camera_available = False
+            response = await client.post(
+                "/api/actions/focus", json={"x": 0.5, "y": 0.5}, headers=headers
+            )
+            assert response.status == 400
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        controller.close()
+
+
+def test_fixed_focus_profile_does_not_offer_focus_actions(tmp_path):
+    controller = make_controller(tmp_path)
+    controller._start_camera()
+    try:
+        assert not controller.state()["focus"]["supported"]
+        for x in (float("nan"), float("inf"), 10**1000):
+            with pytest.raises(ValueError, match="inside the preview"):
+                controller.dispatch("focus", {"x": x, "y": 0.5})
+        with pytest.raises(ValueError, match="unavailable"):
+            controller.dispatch("focus", {"x": 0.5, "y": 0.5})
+    finally:
+        controller.close()
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ import { useCamera } from "./use-camera";
 import { Icon } from "./icons";
 import { Gallery, PhotoDetail } from "./gallery";
 import { Settings } from "./settings";
+import { FocusTarget } from "./focus";
 
 export function App() {
   const { state, connected, act } = useCamera();
@@ -88,6 +89,10 @@ export function App() {
         return;
       }
       if (screen !== "camera") return;
+      if (
+        (event.key === " " || event.key === "Enter") &&
+        (event.target as HTMLElement).closest("button, a, [role='button']")
+      ) return;
       const action =
         event.key === "ArrowLeft" || event.key === "ArrowUp"
           ? "previous"
@@ -105,6 +110,7 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [screen, act, report]);
   const working = state.queued + (state.processingId ? 1 : 0);
+  const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
     <main
       className="camera-shell"
@@ -120,6 +126,15 @@ export function App() {
             draggable={false}
           />
           <div className="viewfinder-shade" />
+          {state.focus?.supported && (
+            <FocusTarget
+              focus={state.focus}
+              previewSize={state.previewSize}
+              enabled={canFocus}
+              act={act}
+              report={report}
+            />
+          )}
           <header className="camera-header">
             <div className="brand">
               <Icon name="camera" size={24} />
@@ -173,12 +188,6 @@ export function App() {
               </button>
             </div>
           </header>
-          <div className="focus-brackets" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
           {stylesOpen && (
             <aside className="style-rail" aria-label="Choose a style">
               <div className="rail-heading">
@@ -230,12 +239,23 @@ export function App() {
               <strong>{state.preset.name}</strong>
               <span className="shutter-hint">
                 {state.status === "live"
-                  ? "Press the shutter to capture"
+                  ? state.focus?.supported
+                    ? "Tap to focus · Press the shutter to capture"
+                    : "Press the shutter to capture"
                   : state.status === "capturing"
                     ? "Hold steady"
                     : "Waiting for the camera"}
               </span>
             </div>
+            {state.focus?.point && (
+              <button
+                className="glass-button auto-area"
+                disabled={!canFocus}
+                onClick={() => void act("focus_auto").catch((error) => report(error.message))}
+              >
+                Auto area
+              </button>
+            )}
             {working > 0 && (
               <button
                 className="queue-pill"

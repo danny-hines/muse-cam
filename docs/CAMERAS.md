@@ -36,6 +36,40 @@ autofocus is working. Even advertised `AfMode` controls are insufficient: the
 sensor tuning file must load the focus algorithm, and frame metadata should show
 the lens scanning and reaching focus.
 
+## Tap to focus on the DSI touchscreen
+
+Autofocus runs continuously by default. With an IMX519 or Camera Module 3,
+tap a subject in the live preview to select that area. The brackets are amber
+while focusing, green when frame metadata reports focus achieved, and coral
+if the scan fails. Gray means focus could not be confirmed; try another area.
+The selected area continues to autofocus after captures and gallery visits.
+Tap **Auto area** to return to the camera's default metering, or restart the
+camera. This selects an area in the frame; it does not track a moving person.
+Fixed-focus modules do not show these controls.
+
+The browser converts taps through the live image's centered `object-fit: cover`
+crop. Python maps those normalized coordinates into the latest `ScalerCrop`
+sensor rectangle and meters a 15% window around the point, clamped at its edges.
+`AfMetering=Windows` and `AfWindows` select the area. Continuous AF is briefly
+paused and resumed to start a fresh scan, acknowledging `AfPauseState` and
+draining the three configured frame buffers after each control change. No
+sensor reconfiguration or extra camera instance is involved. If acknowledgement
+does not arrive within five seconds, AF is resumed and the target remains
+unconfirmed until another tap or **Auto area**.
+
+The local API accepts `POST /api/actions/focus` with normalized `{"x": 0.5,
+"y": 0.5}`, or `POST /api/actions/focus_auto` with `{}`, using the same local
+request protections as other actions. `/api/state` and SSE expose `focus`
+(`supported`, `mode`, `point`, `status`) and `previewSize`. Commands are queued
+onto the camera thread; focus state changes are published without streaming
+every lens adjustment to the UI.
+
+Physical IMX519 validation on September 9, 2026 confirmed pause/resume
+acknowledgement, lens movement, and reported focus at three different target
+areas followed by automatic-area reset. The sensor crop was
+`(708, 674, 3240, 2160)`. Camera Module 3 uses the same tested control path;
+physical testing of that module is still pending.
+
 ## First installation
 
 Use the Bookworm-based Raspberry Pi OS setup described in [DEVICE.md](DEVICE.md).

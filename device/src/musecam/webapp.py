@@ -30,7 +30,7 @@ from .app import (
 )
 from .audio import SoundPlayer
 from .battery import create_battery
-from .camera import Camera, create_camera, prepare_capture
+from .camera import Camera, FocusState, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
 from .models import CaptureJob, Generation, Preset, ScreenState
@@ -50,6 +50,8 @@ API_ACTIONS = {
     "retry",
     "power",
     "restart_camera",
+    "focus",
+    "focus_auto",
 }
 MIN_FREE_BYTES = 150 * 1024 * 1024
 MAX_PENDING = 30
@@ -138,6 +140,7 @@ class CameraWebController:
         self._message = "Starting camera"
         self._network_online = not offline
         self._camera_available = False
+        self._focus = FocusState()
         self._camera_restart_at: float | None = 0.0
         self._camera_start_attempts = 0
         self._future: Future[CaptureOutcome] | None = None
@@ -198,6 +201,18 @@ class CameraWebController:
         if action not in API_ACTIONS:
             raise ValueError("Unsupported camera action")
         values = values or {}
+        if action == "focus" and (
+            set(values) != {"x", "y"}
+            or any(
+                isinstance(values[key], bool)
+                or not isinstance(values[key], (int, float))
+                or not 0 <= values[key] <= 1
+                for key in ("x", "y")
+            )
+        ):
+            raise ValueError("Choose a focus point inside the preview")
+        if action == "focus_auto" and values:
+            raise ValueError("Auto area does not take a focus point")
         if action == "select" and values.get("presetId") not in {p.id for p in self._presets}:
             raise ValueError("Choose an available style")
         if action in {"remix", "retry", "share"}:
@@ -206,6 +221,10 @@ class CameraWebController:
         with self._state_changed:
             if self._maintenance:
                 raise ValueError("An update is in progress")
+            if action in {"focus", "focus_auto"} and (
+                not self._camera_available or not self._focus.supported
+            ):
+                raise ValueError("Tap to focus is unavailable on this camera")
             try:
                 self._actions.put_nowait((action, values))
             except Full as error:
@@ -232,7 +251,11 @@ class CameraWebController:
                 if self._future is not None and now - self._last_processing_sound > 7:
                     self._sound.play("processing")
                     self._last_processing_sound = now
-                if self._camera_available and self._preview_consumers and now >= next_frame:
+                if (
+                    self._camera_available
+                    and (self._preview_consumers or self._focus.status == "scanning")
+                    and now >= next_frame
+                ):
                     self._refresh_preview()
                     fps = (
                         min(5, self._profile.preview_fps)
@@ -245,6 +268,7 @@ class CameraWebController:
             LOGGER.exception("Camera runtime failed")
             with self._state_changed:
                 self._camera_available = False
+                self._focus = FocusState()
                 self._status, self._message = ScreenState.ERROR, CAMERA_UNAVAILABLE_MESSAGE
                 self._publish_locked()
         finally:
@@ -267,6 +291,7 @@ class CameraWebController:
         self._camera_restart_at = None
         with self._state_changed:
             self._camera_available = True
+            self._focus = self._camera.focus
             self._status, self._message = ScreenState.LIVE, ""
             self._publish_locked()
 
@@ -274,6 +299,7 @@ class CameraWebController:
         retry = self._camera_start_attempts < MAX_CAMERA_START_ATTEMPTS
         with self._state_changed:
             self._camera_available = False
+            self._focus = FocusState()
             self._status = ScreenState.ERROR
             self._message = (
                 "Camera interrupted. Reconnecting shortly."
@@ -323,6 +349,12 @@ class CameraWebController:
             if not self._camera_available:
                 self._camera_start_attempts = 0
                 self._camera_restart_at = 0.0
+        elif action in {"focus", "focus_auto"}:
+            if not self._camera_available:
+                raise ValueError("Wait for the camera before focusing")
+            point = (float(values["x"]), float(values["y"])) if action == "focus" else None
+            self._camera.focus_at(point)
+            self._refresh_focus()
         elif action in {"previous", "next", "select"}:
             with self._state_changed:
                 if action == "select":
@@ -366,6 +398,7 @@ class CameraWebController:
         try:
             try:
                 self._camera.capture(source_path)
+                self._refresh_focus()
             except Exception:
                 self._camera_failed()
                 raise
@@ -574,6 +607,7 @@ class CameraWebController:
         try:
             output = BytesIO()
             self._camera.preview().save(output, "JPEG", quality=72)
+            self._refresh_focus()
             with self._frame_changed:
                 self._preview_jpeg = output.getvalue()
                 self._frame_revision += 1
@@ -581,6 +615,12 @@ class CameraWebController:
         except Exception:
             LOGGER.warning("Preview frame unavailable", exc_info=True)
             self._camera_failed()
+
+    def _refresh_focus(self) -> None:
+        with self._state_changed:
+            if self._focus != self._camera.focus:
+                self._focus = self._camera.focus
+                self._publish_locked()
 
     def _refresh_battery(self) -> None:
         now = time.monotonic()
@@ -650,6 +690,11 @@ class CameraWebController:
                 "processingId": self._processing_id,
                 "sharingId": self._sharing_id,
                 "battery": self._battery_percentage,
+                "focus": self._focus.to_dict(),
+                "previewSize": {
+                    "width": self._profile.display_width,
+                    "height": self._profile.display_height,
+                },
                 "galleryRevision": self._gallery_revision,
                 "galleryCount": sum(counts.values()),
                 "notifications": list(self._notifications),
