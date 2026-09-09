@@ -100,6 +100,14 @@ for the main/lores stream and camera-buffer model.
 
 **Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the public roll only when explicitly tapped.
 
+Pinch a gallery photo to zoom from 1× to 4×, then drag with one finger to pan.
+Double-tap to switch between 2× and the full photo, or tap **Fit** to reset.
+A stationary hold (or the **Hold** button) compares the original at the same zoom;
+moving or adding a second finger cancels comparison. Original-only photos also
+support zoom, and opening a different photo resets the view. With the viewer
+focused, `+`/`-` adjust zoom and `0` fits the photo. Zoom affects only the viewer,
+not saved or shared images.
+
 **Settings** includes:
 
 - Sounds: persistent master volume, mute, optional quiet processing chirps, and previews of the shutter click, processing, success, and failure cues. The default is a conservative 35%; zero silences every cue. Original synthesized sounds require no downloaded audio assets.
