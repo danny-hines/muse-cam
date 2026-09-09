@@ -1,12 +1,35 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { getPreset, presets } from "./presets";
+import { getPreset, presets, retiredPresets } from "./presets";
 import { GET } from "@/app/api/device/presets/route";
 
 describe("preset catalog", () => {
   it("contains unique ids", () => {
-    expect(new Set(presets.map(({ id }) => id)).size).toBe(presets.length);
+    const all = [...presets, ...retiredPresets];
+    expect(new Set(all.map(({ id }) => id)).size).toBe(all.length);
+  });
+
+  it("keeps retired photo styles resolvable without advertising them", () => {
+    const bundled = JSON.parse(
+      readFileSync(new URL("../../../device/src/musecam/retired-presets.json", import.meta.url), "utf8"),
+    );
+    expect(bundled).toEqual(retiredPresets.map(({ id, version, name, description, accent }) => ({
+      id, version, name, description, accent,
+    })));
+    for (const retired of retiredPresets) {
+      expect(presets.some(({ id }) => id === retired.id)).toBe(false);
+      expect(getPreset(retired.id)).toEqual(retired);
+    }
+  });
+
+  it("keeps renamed style IDs stable and versions changed prompts", () => {
+    expect(getPreset("after-school")).toMatchObject({ name: "Anime Cel", version: 1 });
+    expect(getPreset("big-screen")).toMatchObject({ name: "3D Toon", version: 1 });
+    expect(getPreset("pocket-arcade")).toMatchObject({ name: "Title Screen", version: 1 });
+    expect(getPreset("memory-card")).toMatchObject({ name: "Insert Disc 2", version: 2 });
+    expect(getPreset("age-of-legends")?.version).toBe(2);
+    expect(presets.some(({ id }) => id === "player-one")).toBe(true);
   });
 
   it("resolves a known preset", () => {

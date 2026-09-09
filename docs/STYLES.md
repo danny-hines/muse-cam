@@ -1,70 +1,99 @@
 # MuseCam styles
 
-The camera has 23 styles. The original six retain their IDs and prompt versions;
-the 17 additions below begin at version 1. Every style works for new captures and
+The camera has 18 active styles. Every active style works for new captures and
 for **Gallery → Restyle**, which creates a separate entry from a saved original.
 
 | Style | Treatment |
 | --- | --- |
+| After the End | Peaceful, weathered surroundings reclaimed by nature |
+| Fridge Masterpiece | Wobbly crayons and joyful childlike drawings |
+| First Contact | A friendly visitor and everyday science-fiction wonder |
+| Tiny Clay World | Hand-shaped characters and miniature stop-motion sets |
+| Found in 1997 | Flash, soft focus, grain, and a nostalgic timestamp |
+| Bedtime Legend | Warm, richly painted storybook illustration |
 | Panel One | Comic brush inks, halftone dots, and printed color |
-| After School | Nostalgic cel anime with expressive faces and painted scenery |
+| Anime Cel | Nostalgic cel anime with expressive faces and painted scenery |
 | Prime Time | Simple, flat-color animated sitcom characters |
-| Once Upon a Cel | Hand-drawn animated feature with lush painted backgrounds |
-| Big Screen | Sculpted characters in a cinematic 3D animated feature |
-| Pocket Arcade | Detailed 16-bit pixel art throughout the scene |
-| Memory Card | Deliberately crude early 3D, angular faces, and tiny muddy textures |
-| Cartridge World | Cheerful, chunky early-3D platformer models and soft textures |
-| Age of Legends | Grounded high fantasy, practical costumes, and great halls |
-| Elven Dawn | Luminous woodland fantasy, silver ornaments, and flowing fabrics |
-| Frost & Crown | Weathered northern castles, heavy wool, and cold daylight |
+| 3D Toon | Sculpted characters in a cinematic 3D animated feature |
+| Title Screen | Detailed pixel illustration with retro title-screen atmosphere |
+| Player One | Small playable sprites inside a full 16-bit game scene |
+| Insert Disc 2 | Chunky console-era models with low-resolution photographic textures |
+| Age of Legends | One coherent fantasy mood chosen to suit each photo |
 | Paper Universe | Folded and layered paper dioramas |
 | Soft Spot | Stuffed felt puppets and embroidered textile scenery |
 | Neon Rain | Cinematic futuristic night lighting and reflected neon |
-| Riso Club | Three-ink risograph art on textured paper |
 | Stained in Light | Jewel-colored stained glass with slender lead contours |
-| Blueprint Universe | Fine white technical linework on deep cyan paper |
 
-The existing styles are After the End, Fridge Masterpiece, First Contact,
-Tiny Clay World, Found in 1997, and Bedtime Legend.
+## September 8 curation
+
+After School is now **Anime Cel**, Big Screen is **3D Toon**, and Pocket Arcade is
+**Title Screen**. These are metadata changes: their IDs and version-1 prompts are
+unchanged. **Player One** is a separate version-1 preset that pulls back from
+close-up portraits to show small full-body gameplay sprites in tiled scenery.
+
+Memory Card keeps its ID and becomes **Insert Disc 2**, with a version-2 prompt.
+It specifies chunky limbs and silhouettes, blurry photographic face and clothing
+textures, baked lighting, and coarse early-console rendering. Empty spaces remain
+unoccupied rather than gaining invented game characters.
+
+**Age of Legends v2** absorbs Elven Dawn and Frost & Crown. Its prompt asks the
+model to choose one consistent mood: an elven woodland court, a royal castle,
+a dragon-themed palace, or a northern great hall. Costumes, hair, architecture,
+and lighting follow that choice. Mood selection is model-driven; repeated
+generations can still choose the same mood.
+
+Once Upon a Cel, Cartridge World, Elven Dawn, Frost & Crown, Riso Club, and
+Blueprint Universe leave the capture and restyle pickers. Their definitions remain
+available for existing gallery labels, shared links, queued requests, and retries
+of existing failed photos. Retiring a style does not delete any photos. Restyling
+an old photo defaults to an active style; a saved Elven Dawn or Frost & Crown
+capture selection moves to Age of Legends.
 
 ## Prompt behavior
 
-The animation styles describe visual techniques and original character designs.
-Fantasy styles explicitly replace modern clothing and accessories, reinterpret
-the surroundings, and adapt hair while preserving facial identity, age,
-expression, pose, and scene layout. They depict peaceful everyday scenes with
-original costume and heraldry designs. Memory Card intentionally preserves
-recognizability at a coarse level rather than retaining detailed photographic
-faces. Output fidelity still varies by input and generation.
+Animation styles describe visual techniques and original character designs.
+Fantasy replaces modern clothing and accessories, adapts hair, and reinterprets
+the setting while preserving facial identity, age, expression, and pose. Scenes
+use peaceful everyday activity, original costumes, architecture, and heraldry.
+Output fidelity varies by input and generation.
 
-All prompts are defined in `web/src/config/presets.ts`. Provider safeguards and
-error handling remain in place. A single successful sample does not establish a
-style's success rate; compare future outcomes by both style ID and prompt version
-as described in `PRESET_RELIABILITY.md`.
+Prompts live in `web/src/config/presets.ts`. Provider safeguards and single-attempt
+error handling remain in place. Compare future outcomes by both style ID and
+prompt version as described in `PRESET_RELIABILITY.md`.
 
-## Initial validation — September 8, 2026
+## Validation — September 8, 2026
 
-All 17 new styles produced a readable image from the same clothed portrait using
-the production Meta provider and input normalization. Six styles were rendered
-again after visual refinement (Prime Time, Memory Card, Soft Spot, and the three
-fantasy styles). All 23 requests completed; the final 17 samples were visually
-reviewed. These direct provider checks did not create gallery entries or publish
-images, and cover only one input rather than a representative reliability study.
+The original 17-style expansion completed 23 direct Meta requests, including six
+refinement renders, using one clothed portrait. That is historical validation of
+the earlier catalog, not a reliability measurement for the revised prompts.
 
-The 800×480 simulator verified selection of all 23 styles, wraparound navigation,
-capture with Memory Card, and restyling to Blueprint Universe as a new gallery
-entry while preserving the original. The installed Python wheel was also checked
-to ensure it contains and can load the complete offline catalog.
+For this curation, the final prompts produced eight successful direct Meta samples:
+Insert Disc 2 on a portrait and empty room; Player One on a portrait and dog; and
+Age of Legends on the portrait twice, room, and dog. All eight were visually
+reviewed. The two fantasy portraits chose a northern setting, while the room and
+dog chose woodland styling. The first fantasy draft had two portrait rejections
+and one successful room result; simplifying its costume and setting instructions
+preceded the four successful final samples. This small check does not establish
+a filtering cause or guarantee future acceptance. An earlier console draft also
+added people to an empty room; the final prompt explicitly preserves occupancy,
+and its room sample did so.
+
+Direct provider checks used production input normalization and created no camera
+or server gallery entries or public images. Local synthetic fixtures exercise the
+800×480 capture and restyle flows, including photos made with retired styles.
+Regression tests cover shared links for all six retired presets, offline picker
+filtering, gallery labels, and retrying a failed retired style while preserving its
+original. The Python wheel contains and loads both catalogs.
 
 ## Keeping the device catalog synchronized
 
-`device/src/musecam/presets.json` bundles the public catalog (ID, version, name,
-description, accent) for offline startup and the simulator. It is included in the
-installed Python package. Update this file when changing preset metadata; the
-web catalog test verifies exact equality with the device API response and checks
-that prompts are not exposed in the public catalog.
+`device/src/musecam/presets.json` bundles active public metadata (ID, version,
+name, description, accent). `device/src/musecam/retired-presets.json` preserves
+metadata for retired styles. Both are included in the installed Python package.
+Update these files when changing metadata; web tests verify parity and ensure
+prompts are absent from the public API response.
 
-Connected cameras fetch the server catalog at startup and cache it for later
-offline use. Publish the server update before restarting or updating a camera
-to pick up new styles. Preset selection is stored by ID, so extending the catalog
-does not change the user's selected style or alter existing gallery entries.
+Connected cameras fetch the active server catalog at startup and cache it for
+offline use. Local filtering also removes retired styles from older cached lists.
+Publish the server update before updating the camera. Stable IDs preserve saved
+photos and selections across renames, while changed prompts receive new versions.

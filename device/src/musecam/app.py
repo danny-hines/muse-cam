@@ -31,6 +31,10 @@ FALLBACK_PRESETS = [
     Preset.from_api(value)
     for value in json.loads(files("musecam").joinpath("presets.json").read_text())
 ]
+RETIRED_PRESETS = {
+    value["id"]: Preset.from_api(value)
+    for value in json.loads(files("musecam").joinpath("retired-presets.json").read_text())
+}
 
 
 def api_error_code(error: httpx.HTTPStatusError) -> str | None:
@@ -173,7 +177,8 @@ class MuseCamApp:
             except (httpx.HTTPError, ValueError, KeyError):
                 LOGGER.warning("Unable to refresh presets; using cache", exc_info=True)
                 self._network_online = False
-        self._presets = presets or self._store.load_presets() or FALLBACK_PRESETS
+        loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
+        self._presets = [p for p in loaded if p.id not in RETIRED_PRESETS] or FALLBACK_PRESETS
 
     def _render(self) -> None:
         preset = self._presets[self._preset_index]

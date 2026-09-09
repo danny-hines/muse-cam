@@ -335,7 +335,12 @@ export function PhotoDetail({
             <button
               className="primary-button"
               disabled={pending}
-              onClick={() => setRemixing(true)}
+              onClick={() => {
+                if (!state.presets.some((preset) => preset.id === presetId)) {
+                  setPresetId(state.preset.id);
+                }
+                setRemixing(true);
+              }}
             >
               <Icon name="spark" />
               Restyle

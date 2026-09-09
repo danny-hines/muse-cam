@@ -20,7 +20,7 @@ musecam = "musecam.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-musecam = ["static/**/*", "presets.json"]
+musecam = ["static/**/*", "presets.json", "retired-presets.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
