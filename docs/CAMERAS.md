@@ -9,7 +9,7 @@ shutter, sounds, and photo queue use the same application code.
 | Camera | Installer profile | Focus | Validation status |
 | --- | --- | --- | --- |
 | Arducam IMX415, B0569 | `pi3bplus-imx415-dsi43` | Fixed lens | Existing enclosed build; autofocus is not requested |
-| Arducam 16 MP IMX519 autofocus, B0371 | `pi3bplus-imx519-dsi43` | Continuous AF through Arducam's libcamera stack | Software prepared; physical bring-up pending |
+| Arducam 16 MP IMX519 autofocus, B0371 | `pi3bplus-imx519-dsi43` | Continuous AF through Arducam's libcamera stack | Initial physical focus/preview/capture checks passed; see results below |
 | Raspberry Pi Camera Module 3, IMX708 | `pi3bplus-cam3-dsi43` | Continuous AF through Raspberry Pi's camera stack | Software prepared; physical bring-up pending |
 
 All three DSI profiles use 1920×1280 stills, a 15 FPS camera stream, up to 10 FPS
@@ -32,7 +32,9 @@ autofocus. Follow its OS-specific
 [IMX519 installation guide](https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/16MP-IMX519/)
 before enabling this profile. Muse Cam does not download or execute the vendor's
 installer automatically. Having an `imx519.dtbo` file alone does not prove that
-the autofocus driver and Python bindings are working.
+autofocus is working. Even advertised `AfMode` controls are insufficient: the
+sensor tuning file must load the focus algorithm, and frame metadata should show
+the lens scanning and reaching focus.
 
 ## First installation
 
@@ -112,7 +114,7 @@ With the selected camera installed and the Pi rebooted:
 sudo systemctl stop musecam
 sudo -u musecam /opt/muse-cam/.venv/bin/musecam \
   --config /etc/musecam/device.env doctor
-sudo systemctl start musecam
+sudo systemctl start musecam musecam-kiosk
 journalctl -u musecam -b -n 80 --no-pager
 ```
 
@@ -122,7 +124,29 @@ camera overlays. Camera Module 3's `imx708`, `imx708_wide`, `imx708_noir`, and
 registered separately in Raspberry Pi's
 [libcamera implementation](https://github.com/raspberrypi/libcamera/blob/main/src/ipa/rpi/cam_helper/cam_helper_imx708.cpp).
 Application startup verifies that autofocus controls exist and logs the sensor,
-capture size, and `autofocus=continuous` (or `off` for IMX415).
+capture size, and requested `autofocus=continuous` (or `off` for IMX415). Also check
+for driver warnings: `Could not set AF_MODE - no AF algorithm` means that preview
+can work while autofocus does not. Install the matching Arducam camera libraries
+and verify focus metadata before declaring autofocus operational.
+
+### IMX519 initial hardware results — 2026-09-09
+
+The enclosed Pi 3B+ detected the replacement after changing both the boot overlay
+and Muse Cam profile from IMX415 to IMX519 and rebooting. The original Raspberry Pi
+camera libraries produced live video but lacked `rpi.af` in the IMX519 tuning file.
+Installing Arducam's `libcamera0.5` and `libcamera-ipa`, both version
+`0.5.2+rpt20250909-1` for arm64, enabled autofocus. The existing
+`python3-libcamera` (`0.5.2+rpt20250903-1~bpo12+1`) and Picamera2 (`0.3.31-1`)
+worked with those runtime libraries; no application or kernel replacement was
+needed. This was Bookworm 64-bit with kernel `6.12.93+rpt-rpi-v8`.
+
+Frame metadata reported scanning followed by focus lock (`AfState` 1 → 2), with
+changing lens positions. Ten consecutive 1920×1280 JPEG captures each returned
+an 800×480 preview without allocation errors. The app then served changing live
+frames with the gallery, style selection, and volume preserved; audio remained
+available. The test originals were kept in a separate local diagnostics folder,
+without submitting generation requests or adding gallery entries. Near/far
+handheld use and the complete enclosure fit still need user testing.
 
 Before marking a module physically validated, check:
 
