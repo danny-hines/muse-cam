@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { api } from "./use-camera";
 import { Icon } from "./icons";
+import { PhotoViewer } from "./photo-viewer";
 
 type Act = (action: CameraAction, values?: object) => Promise<unknown>;
 export const photoStatus = (status: string) =>
@@ -262,22 +263,13 @@ export function PhotoDetail({
   return (
     <section className="page detail-page" aria-label="Photo detail">
       {photo && (
-        <img
-          className="detail-image"
-          inert={remixing}
-          src={original || !photo.resultUrl ? photo.sourceUrl : photo.resultUrl}
-          alt={original ? "Original photograph" : "Imagined photograph"}
-          draggable={false}
-          onPointerDown={(event) => {
-            if (photo.resultUrl) {
-              event.currentTarget.setPointerCapture(event.pointerId);
-              setOriginal(true);
-            }
-          }}
-          onPointerUp={() => setOriginal(false)}
-          onPointerCancel={() => setOriginal(false)}
-          onLostPointerCapture={() => setOriginal(false)}
-          onContextMenu={(event) => event.preventDefault()}
+        <PhotoViewer
+          key={id}
+          sourceUrl={photo.sourceUrl}
+          resultUrl={photo.resultUrl}
+          original={original}
+          disabled={remixing || confirmDelete}
+          onCompare={setOriginal}
         />
       )}
       <header className="detail-header" inert={remixing}>
@@ -305,8 +297,8 @@ export function PhotoDetail({
               {photo.status === "failed"
                 ? photo.error
                 : photo.resultUrl
-                  ? "Hold the photo to see the original"
-                  : "You can keep shooting while this photo waits"}
+                  ? "Pinch to zoom · Hold to see original"
+                  : "Pinch to zoom · Your original is saved"}
             </p>
           </div>
           <div className="detail-actions">

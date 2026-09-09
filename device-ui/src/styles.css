@@ -553,10 +553,32 @@ svg {
 .detail-page {
   background: #070b0a;
 }
-.detail-image {
+.photo-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   touch-action: none;
+  outline-offset: -3px;
+}
+.photo-viewport.zoomed {
+  cursor: grab;
+}
+.photo-viewport.zoomed:active {
+  cursor: grabbing;
+}
+.detail-image {
   object-fit: contain;
   inset: 0;
+  pointer-events: none;
+  transform-origin: center;
+}
+.photo-fit {
+  position: absolute;
+  top: 72px;
+  right: 16px;
+  min-height: 44px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .detail-header {
   position: absolute;
