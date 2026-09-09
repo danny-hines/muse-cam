@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 import subprocess
@@ -7,6 +8,7 @@ import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 
 import httpx
@@ -26,12 +28,8 @@ LOGGER = logging.getLogger(__name__)
 CAMERA_UNAVAILABLE_MESSAGE = "Camera unavailable — check ribbon cable"
 
 FALLBACK_PRESETS = [
-    Preset("post-apocalypse", 2, "After the End", "Cinematic ruins and survival gear.", "#ff6c51"),
-    Preset("kid-drawing", 1, "Fridge Masterpiece", "Wobbly crayons and joyful color.", "#ffd84a"),
-    Preset("alien-visitor", 1, "First Contact", "An uncanny close encounter.", "#d7ff42"),
-    Preset("claymation", 1, "Tiny Clay World", "Hand-shaped stop-motion charm.", "#f39b69"),
-    Preset("disposable-90s", 1, "Found in 1997", "Flash, grain, and candid energy.", "#5ac6c8"),
-    Preset("storybook", 1, "Bedtime Legend", "A warm painted storybook page.", "#6657de"),
+    Preset.from_api(value)
+    for value in json.loads(files("musecam").joinpath("presets.json").read_text())
 ]
 
 
