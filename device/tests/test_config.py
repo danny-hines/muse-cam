@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ def test_load_config_reads_device_settings(tmp_path: Path, monkeypatch: pytest.M
         "MUSECAM_DATA_DIR",
         "MUSECAM_LOG_LEVEL",
         "MUSECAM_PROFILES_DIR",
+        "MUSECAM_POWER_BACKEND",
     ):
         monkeypatch.delenv(key, raising=False)
     config_path = tmp_path / "device.env"
@@ -26,6 +28,7 @@ def test_load_config_reads_device_settings(tmp_path: Path, monkeypatch: pytest.M
                 "MUSECAM_PROFILE=zero2-cam3-displayhat",
                 f"MUSECAM_DATA_DIR={tmp_path / 'data'}",
                 "MUSECAM_LOG_LEVEL=debug",
+                "MUSECAM_POWER_BACKEND=pisugar3",
                 f"MUSECAM_PROFILES_DIR={Path(__file__).parents[1] / 'profiles'}",
             )
         ),
@@ -39,6 +42,31 @@ def test_load_config_reads_device_settings(tmp_path: Path, monkeypatch: pytest.M
     assert config.profile_id == "zero2-cam3-displayhat"
     assert config.log_level == "DEBUG"
     assert config.data_dir == tmp_path / "data"
+    assert config.power_backend == "pisugar3"
+
+
+@pytest.mark.parametrize("camera", ("imx415", "imx519", "cam3"))
+def test_battery_swap_preserves_camera_profile(camera: str) -> None:
+    profiles = Path(__file__).parents[1] / "profiles"
+    profile_id = f"pi3bplus-{camera}-dsi43"
+    original = load_profile(profile_id, profiles)
+    upgraded = load_profile(profile_id, profiles, power_backend="pisugar3")
+    assert upgraded == replace(original, power_backend="pisugar3", battery_telemetry=True)
+    assert not original.battery_telemetry
+
+
+@pytest.mark.parametrize("backend", ("none", "pisugar-s-plus"))
+def test_non_communicating_power_override_disables_telemetry(backend: str) -> None:
+    profile = load_profile(
+        "zero2-cam3-displayhat", Path(__file__).parents[1] / "profiles", power_backend=backend
+    )
+    assert profile.power_backend == backend
+    assert not profile.battery_telemetry
+
+
+def test_unknown_power_backend_is_rejected() -> None:
+    with pytest.raises(ValueError, match="Unknown power backend"):
+        load_profile("pi3bplus-cam3-dsi43", power_backend="pisguar3")
 
 
 def test_load_config_requires_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

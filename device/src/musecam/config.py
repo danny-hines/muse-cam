@@ -59,6 +59,7 @@ class DeviceConfig:
     sdl_video_driver: str | None = None
     framebuffer_device: str | None = None
     profiles_dir: Path = BUILTIN_PROFILES_DIR
+    power_backend: str | None = None
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
@@ -92,6 +93,7 @@ def load_config(
         sdl_video_driver=values.get("MUSECAM_SDL_VIDEODRIVER") or None,
         framebuffer_device=values.get("MUSECAM_FRAMEBUFFER") or None,
         profiles_dir=Path(values.get("MUSECAM_PROFILES_DIR", str(default_profiles_dir()))),
+        power_backend=values.get("MUSECAM_POWER_BACKEND") or None,
     )
 
 
@@ -100,7 +102,13 @@ def _optional_int(values: dict[str, Any], key: str) -> int | None:
     return int(value) if value is not None else None
 
 
-def load_profile(profile_id: str, profiles_dir: Path | None = None) -> HardwareProfile:
+def load_profile(
+    profile_id: str, profiles_dir: Path | None = None, *, power_backend: str | None = None
+) -> HardwareProfile:
+    if power_backend is not None and power_backend not in {
+        "none", "pisugar-s-plus", "pisugar2", "pisugar3"
+    }:
+        raise ValueError(f"Unknown power backend {power_backend!r}")
     profiles_dir = profiles_dir or default_profiles_dir()
     path = profiles_dir / f"{profile_id}.toml"
     if not path.is_file():
@@ -131,8 +139,12 @@ def load_profile(profile_id: str, profiles_dir: Path | None = None) -> HardwareP
         preview_fps=preview_fps,
         shutter_gpio=_optional_int(values, "shutter_gpio"),
         power_gpio=_optional_int(values, "power_gpio"),
-        power_backend=str(values.get("power_backend", "none")),
-        battery_telemetry=bool(values.get("battery_telemetry", False)),
+        power_backend=power_backend or str(values.get("power_backend", "none")),
+        battery_telemetry=(
+            power_backend in {"pisugar2", "pisugar3"}
+            if power_backend is not None
+            else bool(values.get("battery_telemetry", False))
+        ),
         camera_model=str(values["camera_model"]).lower() if values.get("camera_model") else None,
         camera_autofocus=bool(values.get("camera_autofocus", False)),
     )
