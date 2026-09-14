@@ -214,7 +214,8 @@ apt-get install -y \
   sudo
 
 if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
-  apt-get install -y chromium xserver-xorg xinit x11-xserver-utils \
+  apt-get install -y chromium xserver-xorg xinit x11-xserver-utils x11-utils \
+    matchbox-window-manager \
     alsa-utils device-tree-compiler network-manager python3-dbus
 fi
 
