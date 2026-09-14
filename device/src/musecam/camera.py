@@ -82,6 +82,8 @@ class Camera(Protocol):
 
     def preview(self) -> Image.Image: ...
 
+    def preview_jpeg(self, quality: int = 72) -> bytes: ...
+
     def capture(self, output: Path) -> Path: ...
 
     def close(self) -> None: ...
@@ -175,6 +177,11 @@ class SimulatorCamera:
 
         self._last_frame = image
         return image
+
+    def preview_jpeg(self, quality: int = 72) -> bytes:
+        output = BytesIO()
+        self.preview().save(output, "JPEG", quality=quality)
+        return output.getvalue()
 
     def capture(self, output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -328,17 +335,25 @@ class Picamera2Camera:
         return self._camera.capture_request(wait=3.0)
 
     def preview(self) -> Image.Image:
+        with Image.open(BytesIO(self.preview_jpeg(quality=90))) as image:
+            return image.copy()
+
+    def preview_jpeg(self, quality: int = 72) -> bytes:
         request = self._request()
         output = BytesIO()
+        previous_quality = self._camera.options.get("quality", 90)
         try:
             self._read_focus(request.get_metadata())
             # Picamera2's JPEG encoder handles YUV plane padding and colour order.
             # The Pi 3's low-resolution stream cannot output RGB directly.
+            # Camera operations are serialized; restore still quality before the
+            # next capture, including when encoding fails.
+            self._camera.options["quality"] = quality
             request.save("lores", output, format="jpeg")
         finally:
+            self._camera.options["quality"] = previous_quality
             request.release()
-        with Image.open(output) as image:
-            return image.copy()
+        return output.getvalue()
 
     def capture(self, output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)

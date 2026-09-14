@@ -11,8 +11,8 @@ camera_model = "imx708"
 camera_autofocus = true
 capture_width = 1920
 capture_height = 1280
-camera_fps = 15
-preview_fps = 10
+camera_fps = 30
+preview_fps = 15
 shutter_gpio = 20
 # GPIO21 carries I2S audio data on the enclosed build; no shutdown button is wired.
 # Omit power_gpio so the application does not claim the amplifier's data pin.

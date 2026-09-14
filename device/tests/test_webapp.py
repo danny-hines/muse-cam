@@ -238,7 +238,12 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         next_style = controller.state()["presets"][1]["id"]
         controller.dispatch("select", {"presetId": next_style})
         controller.dispatch("capture")
-        wait_until(lambda: controller.state()["galleryCount"] == 2)
+        # Enqueue publishes the gallery entry just before capture returns to live.
+        # Wait for that completed transition while generation is still blocked.
+        wait_until(lambda: (
+            controller.state()["galleryCount"] == 2
+            and controller.state()["status"] == "live"
+        ))
         state = controller.state()
         assert state["status"] == "live"
         assert state["processingId"] == first

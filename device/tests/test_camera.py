@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import replace
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -48,6 +49,7 @@ def fake_picamera(monkeypatch):
             self.metadata = camera.metadata.pop(0) if camera.metadata else {"AfState": self.state}
 
         def save(self, stream, output, format=None):
+            self.camera.saved_qualities.append((stream, self.camera.options.get("quality")))
             if self.camera.save_error:
                 raise self.camera.save_error
             Image.new("RGB", self.camera.config[stream]["size"], "red").save(output, "JPEG")
@@ -74,6 +76,7 @@ def fake_picamera(monkeypatch):
             self.focus_states = []
             self.metadata = []
             self.control_changes = []
+            self.saved_qualities = []
 
         def set_controls(self, values):
             self.control_changes.append(values)
@@ -136,7 +139,22 @@ def test_picamera_keeps_preview_and_still_buffers_across_captures(fake_picamera,
         camera.close()
 
 
-@pytest.mark.parametrize("operation", ["preview", "capture"])
+def test_preview_jpeg_preserves_still_quality_and_releases_buffer(fake_picamera, tmp_path):
+    profile = load_profile("pi3bplus-imx415-dsi43", Path(__file__).parents[1] / "profiles")
+    camera = Picamera2Camera(profile)
+    camera.start()
+    try:
+        jpeg = camera.preview_jpeg()
+        with Image.open(BytesIO(jpeg)) as image:
+            assert image.size == (800, 480)
+        camera.capture(tmp_path / "still.jpg")
+        assert fake_picamera.saved_qualities == [("lores", 72), ("main", 90)]
+        assert all(request.released for request in fake_picamera.requests)
+    finally:
+        camera.close()
+
+
+@pytest.mark.parametrize("operation", ["preview", "preview_jpeg", "capture"])
 def test_picamera_releases_request_when_image_save_fails(fake_picamera, tmp_path, operation):
     profile = load_profile("pi3bplus-imx415-dsi43", Path(__file__).parents[1] / "profiles")
     camera = Picamera2Camera(profile)
@@ -144,11 +162,12 @@ def test_picamera_releases_request_when_image_save_fails(fake_picamera, tmp_path
     fake_picamera.save_error = OSError("Disk or encoder error")
     try:
         with pytest.raises(OSError):
-            if operation == "preview":
-                camera.preview()
+            if operation in {"preview", "preview_jpeg"}:
+                getattr(camera, operation)()
             else:
                 camera.capture(tmp_path / "failed.jpg")
         assert fake_picamera.requests[-1].released
+        assert fake_picamera.options["quality"] == 90
     finally:
         camera.close()
 

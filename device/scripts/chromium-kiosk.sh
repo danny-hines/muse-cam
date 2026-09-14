@@ -34,6 +34,7 @@ exec "${browser}" \
   --disable-background-networking \
   --disable-pinch \
   --disable-sync \
+  --force-gpu-mem-available-mb=64 \
   --overscroll-history-navigation=0 \
   --password-store=basic \
   http://127.0.0.1:8080

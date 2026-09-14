@@ -262,8 +262,15 @@ class CameraWebController:
                         if self._preview_throttled
                         else self._profile.preview_fps
                     )
-                    next_frame = time.monotonic() + 1 / fps
-                self._stop.wait(0.015)
+                    # Include capture/encode time in the frame budget. Sleeping a
+                    # whole interval afterwards halved the Pi's delivered FPS.
+                    next_frame = now + 1 / fps
+                wait = 0.015
+                if self._camera_available and (
+                    self._preview_consumers or self._focus.status == "scanning"
+                ):
+                    wait = min(wait, max(0.0, next_frame - time.monotonic()))
+                self._stop.wait(wait)
         except Exception:
             LOGGER.exception("Camera runtime failed")
             with self._state_changed:
@@ -605,11 +612,12 @@ class CameraWebController:
 
     def _refresh_preview(self) -> None:
         try:
-            output = BytesIO()
-            self._camera.preview().save(output, "JPEG", quality=72)
+            # The camera already has a JPEG encoder for its YUV stream. Keep
+            # those bytes instead of decoding and encoding the entire frame again.
+            jpeg = self._camera.preview_jpeg()
             self._refresh_focus()
             with self._frame_changed:
-                self._preview_jpeg = output.getvalue()
+                self._preview_jpeg = jpeg
                 self._frame_revision += 1
                 self._frame_changed.notify_all()
         except Exception:
