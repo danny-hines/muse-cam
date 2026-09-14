@@ -146,7 +146,9 @@ def _run_claim(args: argparse.Namespace) -> int:
 
 def _run_app(args: argparse.Namespace) -> int:
     config = load_config(args.config, require_credentials=not args.offline)
-    profile = load_profile(args.profile or config.profile_id, config.profiles_dir)
+    profile = load_profile(
+        args.profile or config.profile_id, config.profiles_dir, power_backend=config.power_backend
+    )
     logging.basicConfig(
         level=getattr(logging, config.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -168,7 +170,9 @@ def _run_app(args: argparse.Namespace) -> int:
 
 def _run_doctor(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    profile = load_profile(args.profile or config.profile_id, config.profiles_dir)
+    profile = load_profile(
+        args.profile or config.profile_id, config.profiles_dir, power_backend=config.power_backend
+    )
     checks = run_diagnostics(config, profile)
     if args.json:
         _print_json({"profile": profile.id, "checks": [check.to_dict() for check in checks]})
@@ -184,7 +188,9 @@ def _run_web_app(args: argparse.Namespace) -> int:
     from .webapp import run_web_app
 
     config = load_config(args.config, require_credentials=not args.offline)
-    profile = load_profile(args.profile or config.profile_id, config.profiles_dir)
+    profile = load_profile(
+        args.profile or config.profile_id, config.profiles_dir, power_backend=config.power_backend
+    )
     logging.basicConfig(
         level=getattr(logging, config.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

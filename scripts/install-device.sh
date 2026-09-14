@@ -330,6 +330,10 @@ fi
 
 TEMP_CONFIG=$(mktemp)
 trap 'rm -f "${TEMP_CONFIG}"' EXIT
+POWER_BACKEND=""
+if [[ -f ${CONFIG_FILE} ]]; then
+  POWER_BACKEND=$(sed -n 's/^MUSECAM_POWER_BACKEND=//p' "${CONFIG_FILE}" | tail -1)
+fi
 {
   printf 'MUSECAM_SERVER_URL=%s\n' "${SERVER_URL%/}"
   printf 'MUSECAM_DEVICE_TOKEN=%s\n' "${DEVICE_TOKEN}"
@@ -337,6 +341,9 @@ trap 'rm -f "${TEMP_CONFIG}"' EXIT
     printf 'MUSECAM_DEVICE_ID=%s\n' "${DEVICE_ID}"
   fi
   printf 'MUSECAM_PROFILE=%s\n' "${PROFILE}"
+  if [[ -n ${POWER_BACKEND} ]]; then
+    printf 'MUSECAM_POWER_BACKEND=%s\n' "${POWER_BACKEND}"
+  fi
   printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
   printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
   printf 'MUSECAM_LOG_LEVEL=INFO\n'
