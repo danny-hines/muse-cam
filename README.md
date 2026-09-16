@@ -7,6 +7,7 @@ This repository contains both sides of the project:
 - `web/` — Next.js site and device API deployed to Vercel.
 - `device-ui/` — touch-first React interface compiled into the Raspberry Pi package.
 - `device/` — portable Python client and hardware profiles for Raspberry Pi.
+- `hardware/` — physical build plan, working parts list, source CAD, and printable exports.
 - `scripts/` — repeatable device installation tooling.
 - `docs/` — API and deployment documentation.
 
@@ -80,14 +81,16 @@ See [docs/API.md](docs/API.md) for the complete flow.
 
 ## Raspberry Pi installation
 
-The same public installer supports both planned builds:
+The public installer supports the current Camera Module 3 / Pi 3B+ / DSI build and the alternate hardware profiles:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim YOUR-SETUP-CODE
+  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --claim YOUR-SETUP-CODE
 ```
 
-Use `pi3bplus-imx415-tft35` for the current SPI screen or `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and hardware bring-up. See [docs/ADMIN.md](docs/ADMIN.md) for registration and moderation.
+For the PiSugar 3 Plus, also complete [battery setup](docs/POWER.md) and set `MUSECAM_POWER_BACKEND=pisugar3`. Use `pi3bplus-imx415-tft35` for the SPI screen or `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and hardware bring-up. See [docs/ADMIN.md](docs/ADMIN.md) for registration and moderation.
+
+The [parts list](hardware/BOM.md), [illustrated build guide](hardware/BUILD.md), [GPIO wiring](hardware/WIRING.md), and [six enclosure STL files](hardware/stl/README.md) cover the Camera Module 3 / PiSugar 3 Plus build. The guide follows the September 16, 2026 assembly notes and includes ten [assembly photos](hardware/photos/README.md) plus four [completed-camera views](hardware/BUILD.md#completed-camera); print settings and a few measurements remain pending. The enclosed prototype processes photos over Wi-Fi and has working audio and battery reporting; Camera Module 3 autofocus remains unresolved in the [recorded hardware checks](docs/CAMERAS.md).
 
 ## Privacy defaults
 

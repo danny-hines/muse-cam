@@ -2,7 +2,7 @@
 
 Muse Cam supports two display paths. The current SPI/HAT builds use the native Python/Pygame interface. The Waveshare DSI build uses a local Chromium interface backed by a Python camera service. In both cases, camera capture, buttons, credentials, persistence, and API calls remain in Python; the DSI browser only connects to `127.0.0.1`.
 
-For the physical parts list, enclosure plan, and printable assets, see [`../hardware/README.md`](../hardware/README.md). This document remains the source of truth for software installation and device bring-up.
+For the physical parts list, enclosure plan, printable assets, and exact amplifier/shutter pin table, see [the hardware guide](../hardware/README.md) and [wiring reference](../hardware/WIRING.md). This document remains the source of truth for software installation and device bring-up.
 
 ## Supported profiles
 
@@ -14,8 +14,13 @@ For the physical parts list, enclosure plan, and printable assets, see [`../hard
 | `pi3bplus-cam3-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | Camera Module 3 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
 | `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Camera Module 3 continuous autofocus, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
 
-The IMX519 DSI profile has passed initial physical focus and capture checks;
-Camera Module 3 still awaits physical validation. All cameras use Picamera2.
+The battery column shows profile defaults. For the current PiSugar 3 Plus build,
+follow [POWER.md](POWER.md) and set `MUSECAM_POWER_BACKEND=pisugar3`; this
+overrides the Camera Module 3 profile's PiSugar S Plus default.
+
+The IMX519 DSI profile has passed initial physical focus and capture checks.
+Camera Module 3 Standard preview and capture have been checked, but lens movement
+and autofocus remain unresolved on the current unit. All cameras use Picamera2.
 See [Camera options and swaps](CAMERAS.md)
 for driver requirements, Standard/Wide variants, enclosure status, and the procedure
 for changing cameras without losing the local gallery.
@@ -195,7 +200,9 @@ Keyboard controls are shown in the table above. Remove `--offline` and pass `--c
 The enclosed prototype's I²S amp and speaker passed an initial test on 2026-09-07:
 two 48 kHz stereo test tones at 2.5% digital amplitude played as the `musecam` user,
 and Danny confirmed clean sound. The module works with the `max98357a,no-sdmode`
-overlay; its exact chip and speaker rating remain to be recorded. Application
+overlay. The September 16 parts list identifies the selected module as a
+MAX98357A amplifier and 3 W speaker kit; speaker impedance and connector details
+are still pending in the [BOM](../hardware/BOM.md). Application
 sound cues are now implemented in `device/src/musecam/audio.py` and controlled from Settings → Sounds. After a reboot, the amp was detected,
 playback as `musecam` succeeded again, both camera services were active, and GPIO20
 remained configured as the shutter input.
@@ -278,4 +285,4 @@ requires an SSH tunnel; discovering its LAN address does not expose the UI there
 
 ## PiSugar 2 telemetry
 
-The Zero profile reads `get battery` from `/tmp/pisugar-server.sock`. Install PiSugar Power Manager using PiSugar's official instructions if an on-screen percentage is desired. The camera works without it. PiSugar S Plus does not provide equivalent telemetry, so the Pi 3 profile deliberately omits the percentage.
+The Zero profile reads `get battery` from `/tmp/pisugar-server.sock`. Install PiSugar Power Manager if an on-screen percentage is desired. PiSugar S Plus does not provide equivalent telemetry, so the Pi 3 profiles omit it by default. For PiSugar 3 Plus, follow [POWER.md](POWER.md) and select `MUSECAM_POWER_BACKEND=pisugar3` to enable battery reporting.
