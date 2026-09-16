@@ -10,7 +10,7 @@ shutter, sounds, and photo queue use the same application code.
 | --- | --- | --- | --- |
 | Arducam IMX415, B0569 | `pi3bplus-imx415-dsi43` | Fixed lens | Existing enclosed build; autofocus is not requested |
 | Arducam 16 MP IMX519 autofocus, B0371 | `pi3bplus-imx519-dsi43` | Continuous AF through Arducam's libcamera stack | Initial physical focus/preview/capture checks passed; see results below |
-| Raspberry Pi Camera Module 3, IMX708 | `pi3bplus-cam3-dsi43` | Continuous AF through Raspberry Pi's camera stack | Software prepared; physical bring-up pending |
+| Raspberry Pi Camera Module 3, IMX708 | `pi3bplus-cam3-dsi43` | Continuous AF through Raspberry Pi's camera stack | Standard module preview/capture checked; focus movement remains unresolved on this unit |
 
 All three DSI profiles use 1920×1280 stills, a 15 FPS camera stream, up to 10 FPS
 preview delivery, and the same GPIO20 shutter / GPIO21 amplifier wiring. The
@@ -67,8 +67,8 @@ every lens adjustment to the UI.
 Physical IMX519 validation on September 9, 2026 confirmed pause/resume
 acknowledgement, lens movement, and reported focus at three different target
 areas followed by automatic-area reset. The sensor crop was
-`(708, 674, 3240, 2160)`. Camera Module 3 uses the same tested control path;
-physical testing of that module is still pending.
+`(708, 674, 3240, 2160)`. Camera Module 3 uses the same control path; see its
+partial bring-up results below before treating autofocus as physically verified.
 
 ## First installation
 
@@ -182,6 +182,33 @@ available. The test originals were kept in a separate local diagnostics folder,
 without submitting generation requests or adding gallery entries. Near/far
 handheld use and the complete enclosure fit still need user testing.
 
+### Camera Module 3 initial hardware results — 2026-09-12
+
+The Standard module reports `imx708`, a 4608×2592 pixel array, and the expected
+180° sensor mounting rotation. Selecting `dtoverlay=imx708` and
+`pi3bplus-cam3-dsi43`, then rebooting, restored preview and capture. The chosen
+sensor mode is 2304×1296, with a `(360, 0, 3888, 2592)` scaler crop. Ten successive
+1920×1280 JPEG captures returned to 800×480 preview without capture errors.
+
+Autofocus is **not yet verified on this physical unit**. It reports `Failed`
+and produces a blurred image. Replacing the Arducam `libcamera0.5` and
+`libcamera-ipa` packages with Raspberry Pi's matching Bookworm packages
+(`0.5.2+rpt20250903-1~bpo12+1`, runtime `v0.5.2+99-bfd68f78`) did not resolve it.
+The sensor and `dw9817-vcm` lens controller are both bound to kernel drivers.
+Six further captures at manually commanded 0, 1, 2, 4, 8, and 12 dioptres all
+showed essentially unchanged sharpness despite changing reported lens positions.
+This suggests a blocked or non-moving lens mechanism, but does not establish
+the physical cause. Check lens/enclosure clearance and any protective cover
+before assuming a software autofocus problem or defective module.
+
+The device now uses the Raspberry Pi camera libraries. Both library sets and
+the prior configuration are saved under
+`/var/backups/musecam-cam3-swap-20260912T082403Z/`; the IMX519 still requires its
+Arducam autofocus stack when switching back. Diagnostic photos are separate
+from the gallery in `/var/lib/musecam/diagnostics/cam3-20260912/`. The 69 gallery
+entries, selected style, volume, device credential, and display/audio setup
+were preserved. Camera, kiosk, and control services remain running.
+
 Before marking a module physically validated, check:
 
 - Live preview and saved originals have the intended orientation and framing.
@@ -218,9 +245,12 @@ the earlier fixed-focus backend behavior for custom profiles. The installer
 accepts the five profiles listed in [DEVICE.md](DEVICE.md); new board/display
 combinations need their own profile, installer handling, and hardware validation.
 
-The IMX519 enclosure STL revision has been reported complete by the builder but
-has not yet been supplied to this checkout. A Camera Module 3 enclosure revision
-is planned. Neither is included as a validated print in this release. Keep
-camera-specific front mounts separately labeled, with the board/lens variant and
-revision recorded; use the manufacturer's dimensional drawings and the physical
-module to confirm lens clearance and ribbon routing before publishing prints.
+The six enclosure STLs supplied on September 16, 2026 are now in
+[`hardware/stl/`](../hardware/stl/README.md), with a [parts list](../hardware/BOM.md),
+[build guide](../hardware/BUILD.md), and [wiring reference](../hardware/WIRING.md)
+for Camera Module 3 / Pi 3B+ / DSI / PiSugar 3 Plus. The guide includes ten
+[assembly photos](../hardware/photos/README.md), including camera placement and
+the lens mount. Print settings are pending; the photos do not resolve the
+autofocus issue recorded above. Check the lens actuator clearance in `lens_back`/`lens_front`
+and near/far focus before closing the housing. The separate IMX519 enclosure
+revision has not been supplied; do not assume these mounts fit it.
