@@ -34,7 +34,6 @@ Use software profile `pi3bplus-cam3-dsi43` with
 | [Wiring reference](WIRING.md) | Physical pin numbers, BCM GPIO numbers, and audio setup |
 | [STL files](stl/README.md) | Six original exports, dimensions, and SHA-256 checksums |
 | [Source CAD](cad/README.md) | Location for editable models; source files are still pending |
-| [Earlier concepts](concepts/README.md) | Illustrative concepts; use the supplied STLs for this build |
 | [Device setup](../docs/DEVICE.md) | OS installation, diagnostics, and operation |
 | [Battery setup](../docs/POWER.md) | PiSugar 3 Plus telemetry and power-manager configuration |
 
