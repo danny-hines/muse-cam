@@ -35,6 +35,17 @@ function hashMatches(actual: string, expected: string): boolean {
   return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(actual, "hex"));
 }
 
+// Bring the original environment-configured camera into the same registry as
+// claimed cameras, without replacing its credential or operator settings.
+export async function syncConfiguredDevice(): Promise<void> {
+  const tokenHash = expectedTokenHash();
+  if (!tokenHash || !/^[a-f0-9]{64}$/.test(tokenHash) || !fleetAuthIsAvailable()) return;
+  await getFleetRepository().syncConfiguredDevice({
+    id: process.env.DEVICE_ID ?? "muse-cam-01",
+    tokenHash,
+  });
+}
+
 export async function authenticateDevice(request: Request): Promise<AuthenticatedDevice> {
   const expected = expectedTokenHash();
   if (!expected && !fleetAuthIsAvailable()) {
@@ -46,17 +57,18 @@ export async function authenticateDevice(request: Request): Promise<Authenticate
   if (!token) throw new DeviceAuthError("Invalid device credential", 401);
   const actual = sha256(token);
 
-  if (expected && hashMatches(actual, expected)) {
-    return { deviceId: process.env.DEVICE_ID ?? "muse-cam-01", eventId: null };
-  }
-
   if (fleetAuthIsAvailable()) {
+    // Sync before looking up any credential so an old environment token cannot
+    // keep authenticating from the registry after it has been rotated.
+    await syncConfiguredDevice();
     const repository = getFleetRepository();
     const device = await repository.findDeviceByTokenHash(actual);
     if (device?.status === "active") {
       await repository.touchDevice(device.id);
       return { deviceId: device.id, eventId: device.eventId };
     }
+  } else if (expected && hashMatches(actual, expected)) {
+    return { deviceId: process.env.DEVICE_ID ?? "muse-cam-01", eventId: null };
   }
 
   throw new DeviceAuthError("Invalid device credential", 401);

@@ -19,6 +19,8 @@ export type ClaimDeviceInput = {
   tokenHash: string;
 };
 
+export type ConfiguredDeviceInput = Pick<DeviceRecord, "id" | "tokenHash">;
+
 export interface FleetRepository {
   createEvent(input: CreateEventInput): Promise<EventRecord>;
   listEvents(): Promise<EventRecord[]>;
@@ -27,6 +29,7 @@ export interface FleetRepository {
   createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord>;
   listClaims(limit?: number): Promise<DeviceClaimRecord[]>;
   claimDevice(input: ClaimDeviceInput): Promise<DeviceRecord | null>;
+  syncConfiguredDevice(input: ConfiguredDeviceInput): Promise<DeviceRecord>;
   findDeviceByTokenHash(tokenHash: string): Promise<DeviceRecord | null>;
   findDeviceById(id: string): Promise<DeviceRecord | null>;
   listDevices(): Promise<DeviceRecord[]>;

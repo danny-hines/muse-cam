@@ -30,6 +30,8 @@ Deployment requires applying the database migration with `pnpm --dir web db:migr
 
 ## Register a camera
 
+An existing camera configured with `DEVICE_API_TOKEN` or `DEVICE_API_TOKEN_SHA256` appears automatically when an operator opens the dashboard or the camera makes a request. It keeps its `DEVICE_ID` and credential, starts with **No event**, and supports the same event assignment and revoke controls as cameras registered with a setup code. No reinstall is needed. Syncing or rotating the configured token preserves its event and revoked status.
+
 1. Create or choose an event.
 2. Enter a suggested camera name and select **Create setup code**.
 3. Within 30 minutes, run the displayed command on the camera.

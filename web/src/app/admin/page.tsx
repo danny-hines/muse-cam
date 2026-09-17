@@ -15,6 +15,7 @@ import { DeviceEventForm } from "@/components/device-event-form";
 import { EventSettingsForm } from "@/components/event-settings-form";
 import { getPreset } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { syncConfiguredDevice } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
 import { fullTimestamp } from "@/lib/time";
@@ -25,6 +26,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
+  await syncConfiguredDevice();
   const [{ notice }, photos, devices, events, claims] = await Promise.all([
     searchParams,
     getPhotoRepository().listAll(100),
