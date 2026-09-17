@@ -4,6 +4,7 @@ import mimetypes
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -59,3 +60,9 @@ class MuseCamClient:
         response = self._client.post(f"/api/device/generations/{generation_id}/share")
         response.raise_for_status()
         return Generation.from_api(response.json())
+
+    def retract_capture(self, capture_id: str) -> None:
+        response = self._client.delete(
+            f"/api/device/captures/{quote(capture_id, safe='')}/share", timeout=20.0
+        )
+        response.raise_for_status()

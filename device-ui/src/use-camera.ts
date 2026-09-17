@@ -18,6 +18,7 @@ const FALLBACK: CameraState = {
   message: "Starting camera",
   networkOnline: true,
   queued: 0,
+  pendingRetractions: 0,
   processingId: null,
   sharingId: null,
   battery: null,

@@ -608,3 +608,100 @@ def test_shutdown_ends_open_event_and_preview_streams(tmp_path: Path) -> None:
         asyncio.run(exercise())
     finally:
         controller.close()
+
+
+def test_deleted_photo_retraction_retries_after_restart(tmp_path, monkeypatch):
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "sync.jpg"
+    source.write_bytes(b"local photo")
+    controller._store.enqueue("capture-sync", "kid-drawing", source)
+    controller._store.mark_complete(
+        "capture-sync", "generation-sync", tmp_path / "results" / "sync.jpg",
+        "https://camera.example/p/shared",
+    )
+
+    class SyncClient:
+        def __init__(self, fail=False):
+            self.fail = fail
+            self.calls = []
+
+        def retract_capture(self, capture_id):
+            self.calls.append(capture_id)
+            if self.fail:
+                raise httpx.ConnectError("offline")
+
+        def close(self):
+            pass
+
+    failing = SyncClient(fail=True)
+    controller._client = failing
+    try:
+        controller.delete_photo("capture-sync")
+        assert not source.exists()
+        assert controller._store.get("capture-sync") is None
+        assert controller.state()["pendingRetractions"] == 1
+        controller._sync_retractions()
+        wait_until(lambda: controller._retraction_future.done())
+        controller._sync_retractions()
+        assert failing.calls == ["capture-sync"]
+        assert controller.state()["pendingRetractions"] == 1
+    finally:
+        controller.close()
+
+    reopened = make_controller(tmp_path)
+    succeeding = SyncClient()
+    reopened._client = succeeding
+    try:
+        monkeypatch.setattr("musecam.store.time.time", lambda: 99999999999)
+        reopened._sync_retractions()
+        wait_until(lambda: reopened._retraction_future.done())
+        reopened._sync_retractions()
+        assert succeeding.calls == ["capture-sync"]
+        assert reopened.state()["pendingRetractions"] == 0
+    finally:
+        reopened.close()
+
+
+def test_deleting_an_interrupted_upload_retracts_without_a_generation_id(tmp_path):
+    controller = make_controller(tmp_path)
+    controller._offline = False
+    source = tmp_path / "captures" / "interrupted.jpg"
+    source.write_bytes(b"photo")
+    try:
+        controller._store.enqueue("capture-interrupted", "kid-drawing", source)
+        controller._store.mark_uploading("capture-interrupted")
+        controller._store.mark_queued("capture-interrupted", "Upload response was lost")
+        controller.delete_photo("capture-interrupted")
+        assert controller._store.pending_retraction() == "capture-interrupted"
+    finally:
+        controller.close()
+
+
+def test_auto_shared_generation_is_recorded_in_camera_gallery(tmp_path):
+    from musecam.models import Generation
+
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "auto.jpg"
+    Image.new("RGB", (80, 60), "blue").save(source)
+    controller._store.enqueue("capture-auto", "kid-drawing", source)
+
+    class AutoShareClient:
+        def generate(self, image, capture_id, preset_id):
+            return Generation(
+                "generation-auto", capture_id, "complete", preset_id,
+                "https://camera.example/image", "https://camera.example/p/auto", None,
+            )
+
+        def download_result(self, url, output):
+            Image.new("RGB", (80, 60), "red").save(output, "JPEG")
+
+        def close(self):
+            pass
+
+    controller._client = AutoShareClient()
+    try:
+        outcome = controller._process_job(controller._store.get("capture-auto"))
+        assert outcome.job.share_url == "https://camera.example/p/auto"
+        assert controller.gallery()["items"][0]["shareUrl"] == outcome.job.share_url
+    finally:
+        controller.close()

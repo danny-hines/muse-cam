@@ -9,7 +9,7 @@ export type CreatePhotoInput = Pick<
   | "presetId"
   | "presetVersion"
   | "capturedAtDevice"
->;
+> & { autoSharePending?: boolean };
 
 export type CompletePhotoInput = {
   originalPrivateRef: string;
@@ -37,4 +37,6 @@ export interface PhotoRepository {
   markUnshared(id: string): Promise<PhotoRecord>;
   markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord>;
   delete(id: string): Promise<void>;
+  retractCapture(deviceId: string, captureId: string): Promise<void>;
+  isCaptureRetracted(deviceId: string, captureId: string): Promise<boolean>;
 }

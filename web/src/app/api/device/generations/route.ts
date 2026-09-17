@@ -4,12 +4,15 @@ import { z } from "zod";
 import { getPreset } from "@/config/presets";
 import { apiError, photoApiResponse } from "@/lib/api";
 import { authenticateDevice, DeviceAuthError } from "@/lib/device-auth";
+import { getFleetRepository } from "@/lib/fleet";
 import { getMediaStore } from "@/lib/media";
 import { getImageModelProvider } from "@/lib/model";
 import { classifyGenerationError } from "@/lib/model/errors";
 import { InvalidImageError, MAX_IMAGE_BYTES, normalizeInputImage } from "@/lib/model/image";
 import { getPhotoRepository } from "@/lib/repository";
 import { deviceApiIsAvailable } from "@/lib/runtime-config";
+import { CaptureRetractedError, publishPhoto } from "@/lib/sharing";
+import type { PhotoRecord } from "@/lib/types";
 
 export const maxDuration = 300;
 
@@ -18,6 +21,19 @@ const generationFields = z.object({
   presetId: z.string().min(1).max(80),
   capturedAt: z.iso.datetime({ offset: true }).optional(),
 });
+
+async function generationResponse(photo: PhotoRecord, request: Request, status: number) {
+  if (photo.status === "complete" && photo.autoSharePending) {
+    try {
+      photo = await publishPhoto(photo);
+    } catch (error) {
+      if (error instanceof CaptureRetractedError) return apiError(error.message, 410);
+      console.error("Auto-share failed; the completed photo is saved for retry", { photoId: photo.id, error });
+      return apiError("Photo is ready, but sharing is temporarily unavailable. Retry this upload.", 503);
+    }
+  }
+  return Response.json(photoApiResponse(photo, request), { status });
+}
 
 export async function POST(request: Request) {
   let deviceId: string;
@@ -65,11 +81,14 @@ export async function POST(request: Request) {
   }
 
   const repository = getPhotoRepository();
+  if (await repository.isCaptureRetracted(deviceId, parsed.data.captureId)) {
+    return apiError("Photo was deleted on the camera", 410);
+  }
   const existing = await repository.findByCaptureId(parsed.data.captureId);
   if (existing) {
     if (existing.deviceId !== deviceId) return apiError("Capture ID is already in use", 409);
     const status = existing.status === "processing" ? 202 : 200;
-    return Response.json(photoApiResponse(existing, request), { status });
+    return generationResponse(existing, request, status);
   }
 
   let normalizedImage: Buffer;
@@ -80,11 +99,13 @@ export async function POST(request: Request) {
     return apiError("Unable to prepare image", 400);
   }
 
+  const event = eventId ? await getFleetRepository().findEventById(eventId) : null;
   const photo = await repository.create({
     id: randomUUID(),
     captureId: parsed.data.captureId,
     deviceId,
     eventId,
+    autoSharePending: event?.autoShare ?? false,
     presetId: preset.id,
     presetVersion: preset.version,
     capturedAtDevice: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null,
@@ -116,7 +137,7 @@ export async function POST(request: Request) {
       width: result.width,
       height: result.height,
     });
-    return Response.json(photoApiResponse(completed, request), { status: 201 });
+    return generationResponse(completed, request, 201);
   } catch (error) {
     const { code, message, status } = classifyGenerationError(error);
     await repository.markFailed(photo.id, code);

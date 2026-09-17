@@ -3,6 +3,7 @@ import type { CompletePhotoInput, CreatePhotoInput, PhotoRepository } from "./ty
 
 type MemoryState = {
   photos: Map<string, PhotoRecord>;
+  retractions: Set<string>;
 };
 
 const globalMemory = globalThis as typeof globalThis & {
@@ -11,7 +12,7 @@ const globalMemory = globalThis as typeof globalThis & {
 
 function getState(): MemoryState {
   if (!globalMemory.__museCamMemoryState) {
-    globalMemory.__museCamMemoryState = { photos: new Map() };
+    globalMemory.__museCamMemoryState = { photos: new Map(), retractions: new Set() };
   }
 
   return globalMemory.__museCamMemoryState;
@@ -42,6 +43,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
     const now = new Date();
     return save({
       ...input,
+      autoSharePending: input.autoSharePending ?? false,
       status: "processing",
       createdAt: now,
       updatedAt: now,
@@ -118,6 +120,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
       resultPublicUrl: publicUrl,
       originalPublicUrl,
       sharedAt: now,
+      autoSharePending: false,
       updatedAt: now,
     });
   }
@@ -129,6 +132,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
       resultPublicUrl: null,
       originalPublicUrl: null,
       sharedAt: null,
+      autoSharePending: false,
       updatedAt: new Date(),
     });
   }
@@ -139,5 +143,13 @@ export class MemoryPhotoRepository implements PhotoRepository {
 
   async delete(id: string): Promise<void> {
     getState().photos.delete(id);
+  }
+
+  async retractCapture(deviceId: string, captureId: string): Promise<void> {
+    getState().retractions.add(JSON.stringify([deviceId, captureId]));
+  }
+
+  async isCaptureRetracted(deviceId: string, captureId: string): Promise<boolean> {
+    return getState().retractions.has(JSON.stringify([deviceId, captureId]));
   }
 }

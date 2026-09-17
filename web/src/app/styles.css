@@ -650,6 +650,54 @@ select {
   font-size: 0.72rem;
 }
 
+.admin-device-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  padding: 16px 0;
+}
+
+.admin-event-row {
+  display: grid;
+  padding: 16px 0;
+}
+
+.event-settings-form {
+  margin-top: 0;
+}
+
+.event-settings-form button {
+  justify-self: start;
+}
+
+.admin-device-row strong {
+  overflow-wrap: anywhere;
+}
+
+.device-event-form {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.device-event-form select {
+  min-width: 0;
+}
+
+.device-event-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.device-event-help {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
 .text-button,
 .admin-photo-actions button,
 .admin-photo-actions a {

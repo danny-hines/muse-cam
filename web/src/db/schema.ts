@@ -4,6 +4,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -19,6 +20,7 @@ export const events = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     publishOriginals: boolean("publish_originals").notNull().default(false),
+    autoShare: boolean("auto_share").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
   },
@@ -67,6 +69,7 @@ export const photos = pgTable(
     presetId: text("preset_id").notNull(),
     presetVersion: integer("preset_version").notNull(),
     status: photoStatus("status").notNull().default("processing"),
+    autoSharePending: boolean("auto_share_pending").notNull().default(false),
     capturedAtDevice: timestamp("captured_at_device", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
@@ -89,4 +92,15 @@ export const photos = pgTable(
     index("photos_device_created_idx").on(table.deviceId, table.createdAt),
     index("photos_event_shared_idx").on(table.eventId, table.sharedAt),
   ],
+);
+
+// Persist camera deletions even when the upload response was lost or is still in flight.
+export const captureRetractions = pgTable(
+  "capture_retractions",
+  {
+    deviceId: text("device_id").notNull(),
+    captureId: text("capture_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.deviceId, table.captureId] })],
 );

@@ -292,6 +292,9 @@ class MuseCamApp:
             self._store.mark_queued(job.capture_id, str(error))
             return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
         except httpx.HTTPStatusError as error:
+            if error.response.status_code in {408, 429, 502, 503, 504}:
+                self._store.mark_queued(job.capture_id, "Service busy. Saved for automatic retry.")
+                return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
             message = friendly_generation_error(api_error_code(error))
             self._store.mark_failed(job.capture_id, message)
             return CaptureOutcome(self._store.get(job.capture_id) or job, None)

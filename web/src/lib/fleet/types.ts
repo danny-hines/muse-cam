@@ -3,7 +3,9 @@ import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 export type CreateEventInput = Pick<
   EventRecord,
   "id" | "slug" | "name" | "publishOriginals"
->;
+> & { autoShare?: boolean };
+
+export type EventSettings = Pick<EventRecord, "autoShare" | "publishOriginals">;
 
 export type CreateClaimInput = Pick<
   DeviceClaimRecord,
@@ -21,6 +23,7 @@ export interface FleetRepository {
   createEvent(input: CreateEventInput): Promise<EventRecord>;
   listEvents(): Promise<EventRecord[]>;
   findEventById(id: string): Promise<EventRecord | null>;
+  updateEventSettings(id: string, settings: EventSettings): Promise<EventRecord>;
   createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord>;
   listClaims(limit?: number): Promise<DeviceClaimRecord[]>;
   claimDevice(input: ClaimDeviceInput): Promise<DeviceRecord | null>;
@@ -28,5 +31,6 @@ export interface FleetRepository {
   findDeviceById(id: string): Promise<DeviceRecord | null>;
   listDevices(): Promise<DeviceRecord[]>;
   touchDevice(id: string): Promise<void>;
+  updateDeviceEvent(id: string, eventId: string | null): Promise<DeviceRecord>;
   updateDeviceStatus(id: string, status: DeviceRecord["status"]): Promise<DeviceRecord>;
 }

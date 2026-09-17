@@ -3,6 +3,7 @@ import type {
   ClaimDeviceInput,
   CreateClaimInput,
   CreateEventInput,
+  EventSettings,
   FleetRepository,
 } from "./types";
 
@@ -32,7 +33,7 @@ function requireDevice(id: string): DeviceRecord {
 export class MemoryFleetRepository implements FleetRepository {
   async createEvent(input: CreateEventInput): Promise<EventRecord> {
     const now = new Date();
-    const event = { ...input, createdAt: now, updatedAt: now };
+    const event = { ...input, autoShare: input.autoShare ?? false, createdAt: now, updatedAt: now };
     state().events.set(event.id, event);
     return event;
   }
@@ -49,6 +50,14 @@ export class MemoryFleetRepository implements FleetRepository {
     const claim = { ...input, claimedAt: null, createdAt: new Date() };
     state().claims.set(claim.id, claim);
     return claim;
+  }
+
+  async updateEventSettings(id: string, settings: EventSettings): Promise<EventRecord> {
+    const event = await this.findEventById(id);
+    if (!event) throw new Error(`Event ${id} was not found`);
+    const updated = { ...event, ...settings, updatedAt: new Date() };
+    state().events.set(id, updated);
+    return updated;
   }
 
   async listClaims(limit = 30): Promise<DeviceClaimRecord[]> {
@@ -96,6 +105,12 @@ export class MemoryFleetRepository implements FleetRepository {
   async touchDevice(id: string): Promise<void> {
     const existing = requireDevice(id);
     state().devices.set(id, { ...existing, lastSeenAt: new Date(), updatedAt: new Date() });
+  }
+
+  async updateDeviceEvent(id: string, eventId: string | null): Promise<DeviceRecord> {
+    const updated = { ...requireDevice(id), eventId, updatedAt: new Date() };
+    state().devices.set(id, updated);
+    return updated;
   }
 
   async updateDeviceStatus(

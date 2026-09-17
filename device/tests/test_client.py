@@ -66,3 +66,29 @@ def test_client_parses_presets_and_generation(tmp_path: Path) -> None:
     assert requests[1].headers["authorization"] == "Bearer device-secret"
     assert "multipart/form-data" in requests[1].headers["content-type"]
     assert b"capture_0001" in requests[1].content
+
+
+def test_client_retracts_by_capture_id_and_keeps_failures_retryable():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200 if len(requests) > 1 else 503, json={"retracted": True})
+
+    client = MuseCamClient(DeviceConfig(server_url="https://camera.example", device_token="secret"))
+    client._client.close()
+    client._client = httpx.Client(
+        base_url="https://camera.example", headers={"Authorization": "Bearer secret"},
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        import pytest
+
+        with pytest.raises(httpx.HTTPStatusError):
+            client.retract_capture("capture_0001")
+        client.retract_capture("capture_0001")
+        assert all(request.method == "DELETE" for request in requests)
+        assert requests[0].url.path == "/api/device/captures/capture_0001/share"
+        assert requests[0].headers["authorization"] == "Bearer secret"
+    finally:
+        client.close()

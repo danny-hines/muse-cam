@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -26,6 +27,11 @@ CREATE INDEX IF NOT EXISTS captures_status_created_idx ON captures(status, creat
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS share_retractions (
+    capture_id TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    retry_at REAL NOT NULL DEFAULT 0
 );
 """
 
@@ -103,9 +109,40 @@ class CaptureStore:
             ).fetchone()
         return self._to_job(row) if row else None
 
-    def delete(self, capture_id: str) -> None:
+    def delete(self, capture_id: str, *, retract_share: bool = False) -> None:
         with self._lock, self._connection:
+            if retract_share:
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO share_retractions (capture_id) VALUES (?)",
+                    (capture_id,),
+                )
             self._connection.execute("DELETE FROM captures WHERE capture_id = ?", (capture_id,))
+
+    def pending_retraction(self) -> str | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT capture_id FROM share_retractions WHERE retry_at <= ? "
+                "ORDER BY retry_at, rowid LIMIT 1", (time.time(),)
+            ).fetchone()
+        return row["capture_id"] if row else None
+
+    def retraction_count(self) -> int:
+        with self._lock:
+            return self._connection.execute("SELECT COUNT(*) FROM share_retractions").fetchone()[0]
+
+    def complete_retraction(self, capture_id: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "DELETE FROM share_retractions WHERE capture_id = ?", (capture_id,)
+            )
+
+    def defer_retraction(self, capture_id: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "UPDATE share_retractions SET attempts = attempts + 1, "
+                "retry_at = ? + MIN(300, 5 * (1 << MIN(attempts, 6))) WHERE capture_id = ?",
+                (time.time(), capture_id),
+            )
 
     def referenced_elsewhere(self, path: Path, capture_id: str) -> bool:
         with self._lock:
