@@ -1,6 +1,7 @@
 import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 import type {
   ClaimDeviceInput,
+  ConfiguredDeviceInput,
   CreateClaimInput,
   CreateEventInput,
   EventSettings,
@@ -92,6 +93,29 @@ export class MemoryFleetRepository implements FleetRepository {
 
   async findDeviceByTokenHash(tokenHash: string): Promise<DeviceRecord | null> {
     return [...state().devices.values()].find((device) => device.tokenHash === tokenHash) ?? null;
+  }
+
+  async syncConfiguredDevice(input: ConfiguredDeviceInput): Promise<DeviceRecord> {
+    const tokenOwner = await this.findDeviceByTokenHash(input.tokenHash);
+    if (tokenOwner && tokenOwner.id !== input.id) {
+      throw new Error("Device credential is already registered to another camera");
+    }
+    const existing = state().devices.get(input.id);
+    if (existing?.tokenHash === input.tokenHash) return existing;
+    const now = new Date();
+    const device: DeviceRecord = existing
+      ? { ...existing, tokenHash: input.tokenHash, updatedAt: now }
+      : {
+          ...input,
+          name: input.id,
+          eventId: null,
+          status: "active",
+          lastSeenAt: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+    state().devices.set(device.id, device);
+    return device;
   }
 
   async findDeviceById(id: string): Promise<DeviceRecord | null> {

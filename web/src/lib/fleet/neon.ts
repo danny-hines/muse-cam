@@ -1,10 +1,11 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
 import { deviceClaims, devices, events } from "@/db/schema";
 import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 import type {
   ClaimDeviceInput,
+  ConfiguredDeviceInput,
   CreateClaimInput,
   CreateEventInput,
   EventSettings,
@@ -95,6 +96,23 @@ export class NeonFleetRepository implements FleetRepository {
       .where(eq(devices.tokenHash, tokenHash))
       .limit(1);
     return rows[0] ?? null;
+  }
+
+  async syncConfiguredDevice(input: ConfiguredDeviceInput): Promise<DeviceRecord> {
+    const now = new Date();
+    const rows = await getDb().insert(devices).values({
+      ...input,
+      name: input.id,
+      createdAt: now,
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: devices.id,
+      set: { tokenHash: input.tokenHash, updatedAt: now },
+      setWhere: ne(devices.tokenHash, input.tokenHash),
+    }).returning();
+    // Repeated requests preserve the operator's event, name, and revoked status.
+    if (rows[0]) return rows[0];
+    return firstOrThrow(await getDb().select().from(devices).where(eq(devices.id, input.id)), "Device", input.id);
   }
 
   async findDeviceById(id: string): Promise<DeviceRecord | null> {
