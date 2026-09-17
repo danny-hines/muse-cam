@@ -11,6 +11,8 @@ import {
 } from "@/app/admin/actions";
 import { CreateClaimForm } from "@/components/create-claim-form";
 import { DeletePhotoForm } from "@/components/delete-photo-form";
+import { DeviceEventForm } from "@/components/device-event-form";
+import { EventSettingsForm } from "@/components/event-settings-form";
 import { getPreset } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getFleetRepository } from "@/lib/fleet";
@@ -30,7 +32,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     getFleetRepository().listEvents(),
     getFleetRepository().listClaims(),
   ]);
-  const eventNames = new Map(events.map((event) => [event.id, event.name]));
+  const eventOptions = events.map(({ id, name }) => ({ id, name }));
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
 
   return (
@@ -86,19 +88,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <input name="slug" placeholder="seattle-launch" />
             </label>
             <label className="check-label">
+              <input name="autoShare" type="checkbox" />
+              Automatically share new photos to the public roll
+            </label>
+            <label className="check-label">
               <input name="publishOriginals" type="checkbox" />
               Allow before-and-after originals for this event
             </label>
             <button type="submit">Create event</button>
           </form>
+          <p className="device-event-help">
+            Auto-sharing is off by default. Changes apply to new uploads; existing photos keep their sharing status.
+          </p>
           <div className="admin-list">
             {events.map((event) => (
-              <div className="admin-list-row" key={event.id}>
+              <div className="admin-list-row admin-event-row" key={event.id}>
                 <div>
                   <strong>{event.name}</strong>
                   <span>/{event.slug}</span>
                 </div>
-                <span>{event.publishOriginals ? "Originals on" : "Originals private"}</span>
+                <EventSettingsForm
+                  key={`${event.id}:${event.autoShare}:${event.publishOriginals}`}
+                  event={{ id: event.id, name: event.name, autoShare: event.autoShare, publishOriginals: event.publishOriginals }}
+                />
               </div>
             ))}
           </div>
@@ -111,13 +123,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <h2>Cameras</h2>
             </div>
           </div>
-          <CreateClaimForm events={events.map(({ id, name }) => ({ id, name }))} />
+          <CreateClaimForm events={eventOptions} />
+          {devices.length > 0 ? (
+            <p className="device-event-help">
+              Event changes apply to new uploads. Existing photos keep their event.
+            </p>
+          ) : null}
           <div className="admin-list">
             {devices.map((device) => (
-              <div className="admin-list-row" key={device.id}>
+              <div className="admin-list-row admin-device-row" key={device.id}>
                 <div>
                   <strong>{device.name}</strong>
-                  <span>{eventNames.get(device.eventId ?? "") ?? "Unassigned"}</span>
                 </div>
                 <form action={toggleDevice}>
                   <input type="hidden" name="id" value={device.id} />
@@ -130,6 +146,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     {device.status === "active" ? "Revoke" : "Restore"}
                   </button>
                 </form>
+                <DeviceEventForm
+                  key={`${device.id}:${device.eventId ?? ""}`}
+                  device={{ id: device.id, name: device.name, eventId: device.eventId }}
+                  events={eventOptions}
+                />
               </div>
             ))}
             {devices.length === 0 ? <p className="admin-empty">No registered cameras yet.</p> : null}

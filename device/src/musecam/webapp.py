@@ -147,6 +147,9 @@ class CameraWebController:
         self._processing_id: str | None = None
         self._share_future: Future[Generation] | None = None
         self._sharing_id: str | None = None
+        self._retraction_future: Future[None] | None = None
+        self._retracting_id: str | None = None
+        self._retraction_check_at = 0.0
         self._retry_after: dict[str, float] = {}
         self._last_capture_id: str | None = None
         self._last_result_id: str | None = None
@@ -245,6 +248,7 @@ class CameraWebController:
                     self._poll_actions()
                     self._poll_future()
                     self._poll_share()
+                    self._sync_retractions()
                     self._start_pending()
                 self._refresh_battery()
                 now = time.monotonic()
@@ -624,6 +628,40 @@ class CameraWebController:
             LOGGER.warning("Preview frame unavailable", exc_info=True)
             self._camera_failed()
 
+    def _sync_retractions(self) -> None:
+        if self._retraction_future is not None:
+            if not self._retraction_future.done():
+                return
+            future, capture_id = self._retraction_future, self._retracting_id
+            self._retraction_future, self._retracting_id = None, None
+            if capture_id is not None:
+                try:
+                    future.result()
+                except Exception:
+                    LOGGER.warning("Share removal will retry for %s", capture_id, exc_info=True)
+                    self._store.defer_retraction(capture_id)
+                else:
+                    self._store.complete_retraction(capture_id)
+                    self._notify(
+                        "success", "Shared photo removed", "The public link is no longer available"
+                    )
+                with self._state_changed:
+                    self._publish_locked()
+        now = time.monotonic()
+        if (
+            self._client is None
+            or self._share_future is not None
+            or now < self._retraction_check_at
+        ):
+            return
+        self._retraction_check_at = now + 1
+        capture_id = self._store.pending_retraction()
+        if capture_id is not None:
+            self._retracting_id = capture_id
+            self._retraction_future = self._share_executor.submit(
+                self._client.retract_capture, capture_id
+            )
+
     def _refresh_focus(self) -> None:
         with self._state_changed:
             if self._focus != self._camera.focus:
@@ -695,6 +733,7 @@ class CameraWebController:
                 "message": self._message,
                 "networkOnline": self._network_online,
                 "queued": counts.get("queued", 0),
+                "pendingRetractions": self._store.retraction_count(),
                 "processingId": self._processing_id,
                 "sharingId": self._sharing_id,
                 "battery": self._battery_percentage,
@@ -779,7 +818,12 @@ class CameraWebController:
                         path.unlink(missing_ok=True)
             except OSError as error:
                 raise ValueError("Could not remove the photo files. Please try again.") from error
-            self._store.delete(capture_id)
+            retract_share = bool(
+                (job.generation_id and not job.generation_id.startswith("offline-"))
+                or (job.attempts > 0 and not self._offline)
+            )
+            self._store.delete(capture_id, retract_share=retract_share)
+            self._retraction_check_at = 0
             self._retry_after.pop(capture_id, None)
             self._notifications = deque(
                 (notice for notice in self._notifications if notice["captureId"] != capture_id),
@@ -790,7 +834,11 @@ class CameraWebController:
             if self._last_result_id == capture_id:
                 self._last_result_id = None
             self._gallery_revision += 1
-            self._notify("deleted", "Photo deleted", "Removed from this camera")
+            self._notify(
+                "deleted", "Photo deleted",
+                "Public share removal is queued until connected" if retract_share
+                else "Removed from this camera",
+            )
 
     def media_path(self, capture_id: str, kind: str) -> Path:
         job = self._store.get(capture_id)

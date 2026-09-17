@@ -10,6 +10,7 @@ export type PhotoRecord = {
   presetId: string;
   presetVersion: number;
   status: PhotoStatus;
+  autoSharePending: boolean;
   capturedAtDevice: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -47,6 +48,7 @@ export type EventRecord = {
   slug: string;
   name: string;
   publishOriginals: boolean;
+  autoShare: boolean;
   createdAt: Date;
   updatedAt: Date;
 };

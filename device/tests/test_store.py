@@ -65,3 +65,25 @@ def test_interrupted_upload_is_recovered_on_startup(tmp_path: Path) -> None:
         assert pending[0].error == "Interrupted while uploading; queued for retry"
     finally:
         recovered.close()
+
+
+def test_share_retraction_survives_deletion_retry_and_restart(tmp_path, monkeypatch):
+    database = tmp_path / "musecam.sqlite3"
+    store = CaptureStore(database)
+    store.enqueue("capture-delete", "storybook", tmp_path / "source.jpg")
+    store.delete("capture-delete", retract_share=True)
+    assert store.get("capture-delete") is None
+    assert store.pending_retraction() == "capture-delete"
+    store.defer_retraction("capture-delete")
+    assert store.pending_retraction() is None
+    store.close()
+
+    recovered = CaptureStore(database)
+    try:
+        assert recovered.retraction_count() == 1
+        monkeypatch.setattr("musecam.store.time.time", lambda: 99999999999)
+        assert recovered.pending_retraction() == "capture-delete"
+        recovered.complete_retraction("capture-delete")
+        assert recovered.retraction_count() == 0
+    finally:
+        recovered.close()

@@ -49,12 +49,27 @@ export async function createEvent(formData: FormData): Promise<void> {
     name,
     slug: requestedSlug,
     publishOriginals: formData.get("publishOriginals") === "on",
+    autoShare: formData.get("autoShare") === "on",
   });
   revalidatePath("/admin");
   redirect(destination(`Created ${name}`));
 }
 
 const CLAIM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export async function updateEventSettings(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const repository = getFleetRepository();
+  const event = await repository.findEventById(id);
+  if (!event) redirect(destination("Event not found"));
+  await repository.updateEventSettings(id, {
+    autoShare: formData.get("autoShare") === "on",
+    publishOriginals: formData.get("publishOriginals") === "on",
+  });
+  revalidatePath("/admin");
+  redirect(destination(`Settings saved for ${event.name}`));
+}
 
 function claimCode(): string {
   const bytes = randomBytes(16);
@@ -82,6 +97,28 @@ export async function createClaim(
   });
   revalidatePath("/admin");
   return { code, error: null };
+}
+
+export async function updateDeviceEvent(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = formData.get("id");
+  const requestedEventId = formData.get("eventId");
+  if (typeof id !== "string" || !id || typeof requestedEventId !== "string") {
+    redirect(destination("Camera and event selection are required"));
+  }
+
+  const repository = getFleetRepository();
+  const device = await repository.findDeviceById(id);
+  if (!device) redirect(destination("Camera not found"));
+  const eventId = requestedEventId || null;
+  const event = eventId ? await repository.findEventById(eventId) : null;
+  if (eventId && !event) redirect(destination("Event not found"));
+
+  await repository.updateDeviceEvent(id, eventId);
+  revalidatePath("/admin");
+  redirect(destination(event
+    ? `${device.name} assigned to ${event.name}`
+    : `${device.name} is now unassigned`));
 }
 
 export async function toggleDevice(formData: FormData): Promise<void> {

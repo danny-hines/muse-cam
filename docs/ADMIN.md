@@ -20,6 +20,14 @@ Events currently group cameras, label public detail pages, and define the privac
 
 For a photo shared without its original, an operator can later choose **Enable original**. The public detail page then displays explicit Transformed and Original controls. Originals are not revealed on feed hover.
 
+Each event also has an **Automatically share new photos to the public roll** setting, off by default. Set it when creating an event, or edit it under that event and select **Save settings**. You can also change whether future shares include originals there. Enabling auto-sharing does not publish older photos, and disabling it does not retract existing shares.
+
+The server applies the event's auto-share setting when an upload first arrives. Successful auto-shares return their link with the generated photo, so the camera shows it as shared without a restart. Sharing failures retry the saved result without another model generation.
+
+Deleting a photo in the camera gallery also retracts its public share, including a public original. Private server copies remain available for admin moderation. Offline deletions remove the local photo immediately and persist a share-removal request across camera restarts; the public link remains available until the camera reconnects and that request succeeds. The gallery shows pending share removals. Automatic local-history pruning does not retract public shares.
+
+Deployment requires applying the database migration with `pnpm --dir web db:migrate`, deploying the updated web app, and updating the camera service and bundled device UI for deletion syncing. Deploy the server before updating cameras. Existing events retain manual sharing after migration.
+
 ## Register a camera
 
 1. Create or choose an event.
@@ -35,6 +43,12 @@ For a fresh public-repository install, pass the code directly to the installer:
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
   | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim XXXX-XXXX-XXXX-XXXX
 ```
+
+## Change a camera's event
+
+In **Cameras**, choose an event from the registered camera's **Event** dropdown and select **Save**. Choose **No event** to remove its assignment. The camera keeps its registration and token; no restart is needed.
+
+The change applies to new uploads, including captures waiting to be uploaded. Photos already uploaded keep their original event and follow that event's original-photo privacy setting.
 
 ## Moderation
 

@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
-import { photos } from "@/db/schema";
+import { captureRetractions, photos } from "@/db/schema";
 import type { PhotoRecord } from "@/lib/types";
 import type { CompletePhotoInput, CreatePhotoInput, PhotoRepository } from "./types";
 
@@ -97,6 +97,7 @@ export class NeonPhotoRepository implements PhotoRepository {
         resultPublicUrl: publicUrl,
         originalPublicUrl,
         sharedAt: now,
+        autoSharePending: false,
         updatedAt: now,
       })
       .where(eq(photos.id, id))
@@ -112,6 +113,7 @@ export class NeonPhotoRepository implements PhotoRepository {
         resultPublicUrl: null,
         originalPublicUrl: null,
         sharedAt: null,
+        autoSharePending: false,
         updatedAt: new Date(),
       })
       .where(eq(photos.id, id))
@@ -130,5 +132,18 @@ export class NeonPhotoRepository implements PhotoRepository {
 
   async delete(id: string): Promise<void> {
     await getDb().delete(photos).where(eq(photos.id, id));
+  }
+
+  async retractCapture(deviceId: string, captureId: string): Promise<void> {
+    await getDb().insert(captureRetractions)
+      .values({ deviceId, captureId, createdAt: new Date() }).onConflictDoNothing();
+  }
+
+  async isCaptureRetracted(deviceId: string, captureId: string): Promise<boolean> {
+    const rows = await getDb().select({ captureId: captureRetractions.captureId })
+      .from(captureRetractions)
+      .where(and(eq(captureRetractions.deviceId, deviceId), eq(captureRetractions.captureId, captureId)))
+      .limit(1);
+    return rows.length > 0;
   }
 }

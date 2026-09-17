@@ -7,6 +7,7 @@ import type {
   ClaimDeviceInput,
   CreateClaimInput,
   CreateEventInput,
+  EventSettings,
   FleetRepository,
 } from "./types";
 
@@ -41,6 +42,13 @@ export class NeonFleetRepository implements FleetRepository {
       .values({ ...input, createdAt: new Date() })
       .returning();
     return firstOrThrow(rows, "Claim", input.id);
+  }
+
+  async updateEventSettings(id: string, settings: EventSettings): Promise<EventRecord> {
+    const rows = await getDb().update(events)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(events.id, id)).returning();
+    return firstOrThrow(rows, "Event", id);
   }
 
   async listClaims(limit = 30): Promise<DeviceClaimRecord[]> {
@@ -101,6 +109,15 @@ export class NeonFleetRepository implements FleetRepository {
   async touchDevice(id: string): Promise<void> {
     const now = new Date();
     await getDb().update(devices).set({ lastSeenAt: now, updatedAt: now }).where(eq(devices.id, id));
+  }
+
+  async updateDeviceEvent(id: string, eventId: string | null): Promise<DeviceRecord> {
+    const rows = await getDb()
+      .update(devices)
+      .set({ eventId, updatedAt: new Date() })
+      .where(eq(devices.id, id))
+      .returning();
+    return firstOrThrow(rows, "Device", id);
   }
 
   async updateDeviceStatus(

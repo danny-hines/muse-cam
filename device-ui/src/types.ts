@@ -22,6 +22,7 @@ export type CameraState = {
   message: string;
   networkOnline: boolean;
   queued: number;
+  pendingRetractions: number;
   processingId: string | null;
   sharingId: string | null;
   battery: number | null;

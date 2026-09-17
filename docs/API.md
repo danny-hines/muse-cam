@@ -67,6 +67,8 @@ Example response:
 
 Submitting the same `capture_id` again returns the existing job and does not call the model twice.
 
+If the camera's event has auto-sharing enabled when the upload first arrives, the completed response includes `shareUrl` and `sharedAt`. The event's originals setting still controls whether the source is public. A temporary auto-share failure returns `503`; retry with the same capture ID to publish the saved result without regenerating. Retried older manual or hidden photos are not automatically published when event settings change.
+
 ## Read status
 
 ```http
@@ -98,6 +100,16 @@ DELETE /api/device/generations/:id/share
 ```
 
 Deletes all public copies and removes the frame from the feed. Private media is retained until an operator permanently deletes the capture.
+
+## Retract a camera-deleted capture
+
+```http
+DELETE /api/device/captures/:captureId/share
+```
+
+Returns `{ "retracted": true }` once public copies have been removed. Private copies remain. This operation is idempotent and records the retraction even if the upload has not arrived yet, preventing late uploads or sharing retries from publishing a deleted capture. Subsequent generation or share requests for a retracted capture return `410`. A different camera cannot retract an existing capture it does not own.
+
+The camera durably queues this request before removing the local database entry, including when an interrupted upload never returned a generation ID. Network and server failures keep the request queued with retry backoff.
 
 ## Health
 

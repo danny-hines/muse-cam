@@ -95,6 +95,11 @@ export function Gallery({
         <div>
           <h1>Your roll</h1>
           <p>{state.galleryCount} photos · saved on this camera</p>
+          {state.pendingRetractions > 0 && (
+            <p role="status">
+              {state.pendingRetractions} public share {state.pendingRetractions === 1 ? "removal" : "removals"} waiting to sync
+            </p>
+          )}
         </div>
         <Icon name="gallery" />
       </header>
@@ -488,7 +493,10 @@ function DeletePhotoDialog({
             : ""}
         </p>
         <p>Other style versions are kept. This can’t be undone.</p>
-        {photo.shareUrl && <p>Its shared link will remain online.</p>}
+        <p>
+          Any public share will also be removed. If offline, the link stays online until
+          this camera reconnects and syncs the deletion.
+        </p>
       </div>
       {busy && <p role="status">Wait for processing or sharing to finish.</p>}
       {error && <p role="alert">{error}</p>}
