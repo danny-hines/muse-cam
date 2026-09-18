@@ -42,7 +42,7 @@ export default async function HomePage() {
           {photos.length > 0 ? (
             <div className="photo-grid">
               {photos.map((photo, index) => (
-                <PhotoCard key={photo.id} photo={photo} index={index} />
+                <PhotoCard key={photo.id} photo={photo} index={index} gallery="roll" />
               ))}
             </div>
           ) : (
