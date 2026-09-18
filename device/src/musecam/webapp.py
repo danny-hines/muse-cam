@@ -49,6 +49,7 @@ API_ACTIONS = {
     "timer",
     "cancel_capture",
     "back",
+    "view",
     "share",
     "remix",
     "retry",
@@ -151,6 +152,7 @@ class CameraWebController:
         self._countdown_remaining = 0
         self._countdown_preset: Preset | None = None
         self._status = ScreenState.STARTING
+        self._view = {"screen": "camera", "photoId": None}
         self._message = "Starting camera"
         self._network_online = not offline
         self._camera_available = False
@@ -219,6 +221,11 @@ class CameraWebController:
         if action not in API_ACTIONS:
             raise ValueError("Unsupported camera action")
         values = values or {}
+        if action == "view":
+            if values.get("screen") not in ("camera", "gallery", "photo", "settings"):
+                raise ValueError("Choose an available screen")
+            if values["screen"] == "photo" and self._store.get(str(values.get("photoId"))) is None:
+                raise ValueError("Photo was not found")
         if action == "focus" and (
             set(values) != {"x", "y"}
             or any(
@@ -237,7 +244,7 @@ class CameraWebController:
             if self._store.get(str(values.get("captureId", self._last_result_id))) is None:
                 raise ValueError("Photo was not found")
         with self._state_changed:
-            if self._maintenance:
+            if self._maintenance and action not in {"view", "back"}:
                 raise ValueError("An update is in progress")
             if action in {"focus", "focus_auto"} and (
                 not self._camera_available or not self._focus.supported
@@ -377,7 +384,11 @@ class CameraWebController:
         if action == "power":
             self._power_off()
         elif action == "back":
-            pass  # The browser owns navigation; background work keeps running.
+            self._set_view("camera")
+        elif action == "view":
+            if self._countdown_deadline is not None and values["screen"] != "camera":
+                return
+            self._set_view(values["screen"], values.get("photoId"))
         elif action == "restart_camera":
             if not self._camera_available:
                 self._camera_start_attempts = 0
@@ -401,6 +412,11 @@ class CameraWebController:
                 self._store.set_setting("presetId", self._presets[self._preset_index].id)
                 self._publish_locked()
         elif action == "capture":
+            # GPIO and keyboard shutter presses share this path. Consume the
+            # first press as navigation, before starting a timer or capture.
+            if self._view["screen"] != "camera":
+                self._set_view("camera")
+                return
             self._request_capture()
         elif action == "timer":
             if self._countdown_deadline is None:
@@ -419,6 +435,11 @@ class CameraWebController:
             self._remix(values, retry=action == "retry")
         elif action == "share":
             self._share(str(values.get("captureId", self._last_result_id)))
+
+    def _set_view(self, screen: str, photo_id: str | None = None) -> None:
+        with self._state_changed:
+            self._view = {"screen": screen, "photoId": photo_id if screen == "photo" else None}
+            self._publish_locked()
 
     def _can_save(self) -> None:
         counts = self._store.counts()
@@ -810,6 +831,7 @@ class CameraWebController:
             counts = self._store.counts()
             return {
                 "status": self._status.value.replace("-", "_"),
+                "view": self._view,
                 "preset": self._preset_json(preset),
                 "presets": [self._preset_json(p) for p in self._presets],
                 "presetIndex": self._preset_index,

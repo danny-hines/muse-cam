@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import httpx
 import pytest
 from PIL import Image
@@ -55,6 +57,23 @@ def test_error_cannot_hide_an_unavailable_camera() -> None:
 
     assert app._state == ScreenState.ERROR
     assert app._message == CAMERA_UNAVAILABLE_MESSAGE
+
+
+def test_shutter_leaves_native_photo_review_before_capturing() -> None:
+    app = object.__new__(MuseCamApp)
+    app._camera_available = True
+    app._state = ScreenState.RESULT
+    app._message = ""
+    app._result = Image.new("RGB", (2, 2))
+    app._capture = Mock()
+
+    app._handle_action(Action.SHUTTER)
+    assert app._state == ScreenState.LIVE
+    assert app._result is None
+    app._capture.assert_not_called()
+
+    app._handle_action(Action.SHUTTER)
+    app._capture.assert_called_once_with()
 
 
 def test_native_camera_retries_temporary_auto_share_failure(tmp_path):

@@ -12,6 +12,7 @@ export type Notice = {
   captureId: string | null;
 };
 export type CameraState = {
+  view: { screen: "camera" | "gallery" | "photo" | "settings"; photoId: string | null };
   focus: FocusState;
   previewSize: { width: number; height: number };
   status: string;
@@ -55,6 +56,7 @@ export type CameraAction =
   | "timer"
   | "cancel_capture"
   | "back"
+  | "view"
   | "share"
   | "remix"
   | "retry"

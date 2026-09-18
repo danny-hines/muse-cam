@@ -8,6 +8,7 @@ const preset = {
   accent: "#ffac71",
 };
 const FALLBACK: CameraState = {
+  view: { screen: "camera", photoId: null },
   focus: { supported: false, point: null, mode: "auto", status: "unavailable" },
   previewSize: { width: 800, height: 480 },
   status: "starting",
