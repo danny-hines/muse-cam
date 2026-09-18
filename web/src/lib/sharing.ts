@@ -17,6 +17,7 @@ export async function unpublishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
   const updated = await getPhotoRepository().markUnshared(photo.id);
   revalidatePath("/");
   revalidatePath("/admin");
+  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
   return updated;
 }
@@ -57,6 +58,7 @@ export async function publishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
   }
   revalidatePath("/");
   revalidatePath("/admin");
+  if (shared.eventId) revalidatePath("/[eventSlug]", "page");
   revalidatePath(`/p/${shared.publicSlug}`);
   return shared;
 }

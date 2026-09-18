@@ -156,6 +156,12 @@ select {
   color: var(--violet);
 }
 
+.event-hero .hero-title {
+  font-size: clamp(3rem, 7vw, 7rem);
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+}
+
 .hero-copy {
   max-width: 430px;
   margin: 0 0 8px;

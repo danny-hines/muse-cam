@@ -37,6 +37,7 @@ export type PublishedPhoto = {
   originalImageUrl: string | null;
   deviceName: string;
   eventName: string | null;
+  eventSlug: string | null;
   width: number;
   height: number;
   capturedAt: Date;

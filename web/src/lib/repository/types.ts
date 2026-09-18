@@ -24,7 +24,7 @@ export interface PhotoRepository {
   findById(id: string): Promise<PhotoRecord | null>;
   findByCaptureId(captureId: string): Promise<PhotoRecord | null>;
   findByPublicSlug(slug: string): Promise<PhotoRecord | null>;
-  listShared(limit?: number): Promise<PhotoRecord[]>;
+  listShared(limit?: number, eventId?: string | null): Promise<PhotoRecord[]>;
   listAll(limit?: number): Promise<PhotoRecord[]>;
   markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord>;
   markFailed(id: string, errorCode: string): Promise<PhotoRecord>;

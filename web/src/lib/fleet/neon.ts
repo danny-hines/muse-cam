@@ -37,6 +37,11 @@ export class NeonFleetRepository implements FleetRepository {
     return rows[0] ?? null;
   }
 
+  async findEventBySlug(slug: string): Promise<EventRecord | null> {
+    const rows = await getDb().select().from(events).where(eq(events.slug, slug)).limit(1);
+    return rows[0] ?? null;
+  }
+
   async createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord> {
     const rows = await getDb()
       .insert(deviceClaims)

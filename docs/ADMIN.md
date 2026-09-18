@@ -16,7 +16,9 @@ This lightweight operator-key flow is appropriate for the showcase build and a s
 
 ## Events and original photos
 
-Events currently group cameras, label public detail pages, and define the privacy default for original photos. “Allow before-and-after originals” means that photos shared by a camera assigned to that event publish both the transformed image and the normalized source image. It is off by default.
+Each event has a public gallery at `/<event-slug>` (for example, `/sei-nyc`). Open it with **View gallery** in the dashboard. The gallery shows only that event's shared photos; private photos stay private. Shared event photos also appear on the combined home feed, and their detail pages link back to the event. Camera assignments apply to new uploads; older photos keep their saved event.
+
+Events also define the privacy default for original photos. “Allow before-and-after originals” means that photos shared by a camera assigned to that event publish both the transformed image and the normalized source image. It is off by default.
 
 For a photo shared without its original, an operator can later choose **Enable original**. The public detail page then displays explicit Transformed and Original controls. Originals are not revealed on feed hover.
 
