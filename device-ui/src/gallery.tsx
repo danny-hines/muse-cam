@@ -4,6 +4,7 @@ import type {
   CameraState,
   GalleryData,
   Photo,
+  PhotoDetailData,
   Preset,
 } from "./types";
 import { api } from "./use-camera";
@@ -21,11 +22,15 @@ export const photoStatus = (status: string) =>
 
 export function Gallery({
   state,
+  filter,
+  onFilter,
   onOpen,
   onCamera,
   report,
 }: {
   state: CameraState;
+  filter: string;
+  onFilter: (filter: string) => void;
   onOpen: (id: string) => void;
   onCamera: () => void;
   report: (message: string) => void;
@@ -36,7 +41,6 @@ export function Gallery({
     nextOffset: null,
   });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -114,7 +118,7 @@ export function Gallery({
             key={key}
             disabled={loading}
             className={filter === key ? "chip selected" : "chip"}
-            onClick={() => setFilter(key)}
+            onClick={() => onFilter(key)}
           >
             {label}
             {key === "failed" && (data.counts.failed || 0) > 0
@@ -189,6 +193,8 @@ export function Gallery({
 export function PhotoDetail({
   id,
   state,
+  filter,
+  onOpen,
   act,
   onBack,
   onCamera,
@@ -196,12 +202,14 @@ export function PhotoDetail({
 }: {
   id: string;
   state: CameraState;
+  filter: string;
+  onOpen: (id: string) => void;
   act: Act;
   onBack: () => void;
   onCamera: () => void;
   report: (message: string) => void;
 }) {
-  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [photo, setPhoto] = useState<PhotoDetailData | null>(null);
   const [original, setOriginal] = useState(false);
   const [remixing, setRemixing] = useState(false);
   const [presetId, setPresetId] = useState("");
@@ -212,7 +220,7 @@ export function PhotoDetail({
   useEffect(() => {
     if (deleting) return;
     let active = true;
-    api<Photo>(`/api/gallery/${id}`)
+    api<PhotoDetailData>(`/api/gallery/${id}?filter=${encodeURIComponent(filter)}`)
       .then((next) => {
         if (active) {
           setPhoto(next);
@@ -225,7 +233,7 @@ export function PhotoDetail({
     return () => {
       active = false;
     };
-  }, [id, state.galleryRevision, report, deleting]);
+  }, [id, state.galleryRevision, report, deleting, filter]);
   useEffect(() => {
     setOriginal(false);
     const reset = () => setOriginal(false);
@@ -275,6 +283,8 @@ export function PhotoDetail({
           original={original}
           disabled={remixing || confirmDelete}
           onCompare={setOriginal}
+          onPrevious={photo.previousId ? () => onOpen(photo.previousId!) : undefined}
+          onNext={photo.nextId ? () => onOpen(photo.nextId!) : undefined}
         />
       )}
       <header className="detail-header" inert={remixing}>
@@ -302,8 +312,8 @@ export function PhotoDetail({
               {photo.status === "failed"
                 ? photo.error
                 : photo.resultUrl
-                  ? "Pinch to zoom · Hold to see original"
-                  : "Pinch to zoom · Your original is saved"}
+                  ? "Swipe to browse · Pinch to zoom · Hold for original"
+                  : "Swipe to browse · Pinch to zoom · Original saved"}
             </p>
           </div>
           <div className="detail-actions">

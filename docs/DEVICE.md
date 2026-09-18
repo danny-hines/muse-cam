@@ -101,7 +101,11 @@ The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. I
 
 ## DSI touchscreen controls (0.3)
 
-The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. The two top-right icons open the local gallery and settings. Keyboard testing supports arrows to change style, Space/Enter to capture, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
+The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. **Random**, the first option, chooses an available style separately for each shot. The actual style is saved with the photo, so retries keep that choice. Random is also available when restyling an existing original.
+
+Tap the top-right **Timer** control to cycle **Off → 5s → 10s → Off**. With the timer enabled, the physical shutter starts a visible countdown and a short speaker beep each second before taking one photo. Preview and background processing continue. **Cancel** or Escape stops the countdown; extra shutter presses during it do not queue more shots. The setting persists across restarts, but an unfinished countdown does not. Beeps follow the master volume and mute settings.
+
+The adjacent icons open the local gallery and settings. Keyboard testing supports arrows to change style, Space/Enter to capture, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
 
 On autofocus camera profiles, tap the preview to focus on a subject. Amber
 brackets indicate focusing; green means the camera reports focus achieved.
@@ -129,12 +133,17 @@ for the main/lores stream and camera-buffer model.
 
 **Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the public roll only when explicitly tapped.
 
-Pinch a gallery photo to zoom from 1× to 4×, then drag with one finger to pan.
+Swipe left for the next (older) gallery photo and right for the previous (newer)
+photo. Navigation follows the selected gallery filter, continues across loaded
+pages, and stops at either end. The arrow buttons provide the same navigation.
+Pinch a gallery photo to zoom from 1× to 4×, then drag with one finger to pan;
+swipes only change photos when zoomed out.
 Double-tap to switch between 2× and the full photo, or tap **Fit** to reset.
 A stationary hold (or the **Hold** button) compares the original at the same zoom;
 moving or adding a second finger cancels comparison. Original-only photos also
 support zoom, and opening a different photo resets the view. With the viewer
-focused, `+`/`-` adjust zoom and `0` fits the photo. Zoom affects only the viewer,
+focused, left/right arrows browse while zoomed out, `+`/`-` adjust zoom, and `0` fits the photo.
+Zoom affects only the viewer,
 not saved or shared images.
 
 **Settings** includes:

@@ -188,6 +188,32 @@ class CaptureStore:
             ).fetchall()
         return {row["status"]: row["count"] for row in rows}
 
+    def gallery_neighbors(self, capture_id: str, status: str = "all") -> dict[str, str | None]:
+        filters = {
+            "all": "1 = 1",
+            "complete": "status = 'complete'",
+            "failed": "status = 'failed'",
+            "waiting": "status IN ('queued', 'uploading')",
+        }
+        if status not in filters:
+            raise ValueError("Unknown gallery filter")
+        with self._lock:
+            current = self._connection.execute(
+                "SELECT created_at, rowid FROM captures WHERE capture_id = ?", (capture_id,)
+            ).fetchone()
+            if current is None:
+                return {"previousId": None, "nextId": None}
+            result = {}
+            for key, comparison, order in (("previousId", ">", "ASC"), ("nextId", "<", "DESC")):
+                row = self._connection.execute(
+                    f"SELECT capture_id FROM captures WHERE {filters[status]} "
+                    f"AND (created_at, rowid) {comparison} (?, ?) "
+                    f"ORDER BY created_at {order}, rowid {order} LIMIT 1",
+                    (current["created_at"], current["rowid"]),
+                ).fetchone()
+                result[key] = row["capture_id"] if row else None
+            return result
+
     def setting(self, key: str, default: object = None) -> object:
         with self._lock:
             row = self._connection.execute(

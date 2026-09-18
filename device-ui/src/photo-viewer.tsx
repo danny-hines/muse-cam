@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { Icon } from "./icons";
+import { swipeDirection } from "./swipe";
 
 type Point = { x: number; y: number };
 type View = Point & { scale: number };
@@ -17,12 +19,16 @@ export function PhotoViewer({
   original,
   disabled,
   onCompare,
+  onPrevious,
+  onNext,
 }: {
   sourceUrl: string;
   resultUrl: string | null;
   original: boolean;
   disabled: boolean;
   onCompare: (original: boolean) => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const imageSize = useRef({ width: 0, height: 0 });
@@ -37,6 +43,7 @@ export function PhotoViewer({
     time: number;
     moved: boolean;
     held: boolean;
+    scale: number;
   } | null>(null);
   const lastTap = useRef<{ point: Point; time: number } | null>(null);
 
@@ -129,6 +136,7 @@ export function PhotoViewer({
     if (pointers.current.size === 1) {
       tap.current = {
         id: event.pointerId, start, time: performance.now(), moved: false, held: false,
+        scale: current.current.scale,
       };
       if (resultUrl) {
         holdTimer.current = setTimeout(() => {
@@ -185,6 +193,13 @@ export function PhotoViewer({
     if (event.type !== "pointerup") lastTap.current = null;
     const candidate = tap.current;
     const now = performance.now();
+    const end = point(event);
+    const swipe = event.type === "pointerup" && candidate && !candidate.held
+      ? swipeDirection({
+          dx: end.x - candidate.start.x, dy: end.y - candidate.start.y,
+          elapsedMs: now - candidate.time, startScale: candidate.scale, endScale: current.current.scale,
+        })
+      : null;
     if (event.type === "pointerup" && candidate?.id === event.pointerId &&
       !candidate.moved && !candidate.held && now - candidate.time < 300 &&
       distance(candidate.start, point(event)) <= 8) {
@@ -203,6 +218,8 @@ export function PhotoViewer({
     pointers.current.delete(event.pointerId);
     // The remaining finger starts panning from here, without a position jump.
     rebase();
+    if (swipe === "next") onNext?.();
+    else if (swipe === "previous") onPrevious?.();
   }
 
   return (
@@ -212,7 +229,7 @@ export function PhotoViewer({
         className={`photo-viewport${view.scale > 1.01 ? " zoomed" : ""}`}
         inert={disabled}
         role="region"
-        aria-label="Photo viewer. Pinch or double-tap to zoom, drag to pan. Use plus, minus or zero on a keyboard."
+        aria-label="Photo viewer. Swipe left or right to browse. Pinch or double-tap to zoom, drag to pan. Use arrow keys to browse, plus, minus or zero to zoom."
         tabIndex={0}
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
@@ -221,6 +238,13 @@ export function PhotoViewer({
         onLostPointerCapture={pointerEnd}
         onContextMenu={(event) => event.preventDefault()}
         onKeyDown={(event) => {
+          if (["ArrowLeft", "ArrowRight"].includes(event.key) && current.current.scale <= 1.01) {
+            event.preventDefault();
+            resetGesture();
+            if (event.key === "ArrowLeft") onPrevious?.();
+            else onNext?.();
+            return;
+          }
           if (!["+", "=", "-", "0"].includes(event.key)) return;
           event.preventDefault();
           resetGesture();
@@ -247,6 +271,22 @@ export function PhotoViewer({
           }}
         />
       </div>
+      <button
+        className="glass-button square photo-nav previous"
+        aria-label="Previous photo"
+        disabled={disabled || !onPrevious}
+        onClick={onPrevious}
+      >
+        <Icon name="back" />
+      </button>
+      <button
+        className="glass-button square photo-nav next"
+        aria-label="Next photo"
+        disabled={disabled || !onNext}
+        onClick={onNext}
+      >
+        <Icon name="next" />
+      </button>
       {view.scale > 1.01 && (
         <button
           className="glass-button photo-fit"

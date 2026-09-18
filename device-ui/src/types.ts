@@ -19,6 +19,8 @@ export type CameraState = {
   presets: Preset[];
   presetIndex: number;
   presetCount: number;
+  timerSeconds: 0 | 5 | 10;
+  countdownRemaining: number;
   message: string;
   networkOnline: boolean;
   queued: number;
@@ -50,6 +52,8 @@ export type CameraAction =
   | "next"
   | "select"
   | "capture"
+  | "timer"
+  | "cancel_capture"
   | "back"
   | "share"
   | "remix"
@@ -73,6 +77,10 @@ export type GalleryData = {
   items: Photo[];
   counts: Record<string, number>;
   nextOffset: number | null;
+};
+export type PhotoDetailData = Photo & {
+  previousId: string | null;
+  nextId: string | null;
 };
 export type Network = {
   ssid: string;

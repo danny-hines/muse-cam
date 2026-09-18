@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
+import random
 import shutil
 import subprocess
 import threading
@@ -44,6 +46,8 @@ API_ACTIONS = {
     "next",
     "select",
     "capture",
+    "timer",
+    "cancel_capture",
     "back",
     "share",
     "remix",
@@ -57,6 +61,11 @@ MIN_FREE_BYTES = 150 * 1024 * 1024
 MAX_PENDING = 30
 CAMERA_RETRY_DELAY = 3.0
 MAX_CAMERA_START_ATTEMPTS = 3
+TIMER_OPTIONS = (0, 5, 10)
+RANDOM_PRESET = Preset(
+    id="random", version=1, name="Random",
+    description="A surprise style for every photo", accent="#d6b8ff",
+)
 
 
 def gallery_error(message: str | None) -> str | None:
@@ -134,8 +143,13 @@ class CameraWebController:
         self._frame_changed = threading.Condition(threading.RLock())
         self._thread: threading.Thread | None = None
         self._buttons: HardwareButtons | None = None
-        self._presets: list[Preset] = FALLBACK_PRESETS
+        self._presets: list[Preset] = [RANDOM_PRESET, *FALLBACK_PRESETS]
         self._preset_index = 0
+        timer = self._store.setting("timerSeconds", 0)
+        self._timer_seconds = timer if type(timer) is int and timer in TIMER_OPTIONS else 0
+        self._countdown_deadline: float | None = None
+        self._countdown_remaining = 0
+        self._countdown_preset: Preset | None = None
         self._status = ScreenState.STARTING
         self._message = "Starting camera"
         self._network_online = not offline
@@ -186,7 +200,8 @@ class CameraWebController:
                 LOGGER.warning("Unable to refresh presets; using cache")
                 self._network_online = False
         loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
-        self._presets = [p for p in loaded if p.id not in RETIRED_PRESETS] or FALLBACK_PRESETS
+        styles = [p for p in loaded if p.id not in RETIRED_PRESETS and p.id != "random"]
+        self._presets = [RANDOM_PRESET, *(styles or FALLBACK_PRESETS)]
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
             selected = "age-of-legends"
@@ -246,13 +261,15 @@ class CameraWebController:
                 # Serialize deletion with capture, restyling, and worker handoffs.
                 with self._photo_operations:
                     self._poll_actions()
+                    self._poll_countdown()
                     self._poll_future()
                     self._poll_share()
                     self._sync_retractions()
                     self._start_pending()
                 self._refresh_battery()
                 now = time.monotonic()
-                if self._future is not None and now - self._last_processing_sound > 7:
+                if (self._future is not None and self._countdown_deadline is None
+                        and now - self._last_processing_sound > 7):
                     self._sound.play("processing")
                     self._last_processing_sound = now
                 if (
@@ -309,6 +326,7 @@ class CameraWebController:
     def _camera_failed(self) -> None:
         retry = self._camera_start_attempts < MAX_CAMERA_START_ATTEMPTS
         with self._state_changed:
+            self._clear_countdown_locked()
             self._camera_available = False
             self._focus = FocusState()
             self._status = ScreenState.ERROR
@@ -337,19 +355,23 @@ class CameraWebController:
         try:
             self._handle_action(action, values)
         except Exception as error:
-            LOGGER.warning("Camera action failed: %s", action, exc_info=True)
-            message = (
-                "Camera interrupted. Please try again when it is ready."
-                if action == "capture" and not self._camera_available
-                else str(error)[:160]
-            )
-            self._notify("error", "Couldn’t do that", message)
-            self._sound.play("error")
-            with self._state_changed:
-                self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
-                if self._camera_available:
-                    self._message = ""
-                self._publish_locked()
+            self._action_failed(action, error)
+
+    def _action_failed(self, action: str, error: Exception) -> None:
+        LOGGER.warning("Camera action failed: %s", action, exc_info=True)
+        message = (
+            "Camera interrupted. Please try again when it is ready."
+            if action == "capture" and not self._camera_available
+            else str(error)[:160]
+        )
+        self._notify("error", "Couldn’t do that", message)
+        self._sound.play("error")
+        with self._state_changed:
+            self._clear_countdown_locked()
+            self._status = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
+            if self._camera_available:
+                self._message = ""
+            self._publish_locked()
 
     def _handle_action(self, action: str, values: dict) -> None:
         if action == "power":
@@ -379,7 +401,20 @@ class CameraWebController:
                 self._store.set_setting("presetId", self._presets[self._preset_index].id)
                 self._publish_locked()
         elif action == "capture":
-            self._capture()
+            self._request_capture()
+        elif action == "timer":
+            if self._countdown_deadline is None:
+                with self._state_changed:
+                    index = TIMER_OPTIONS.index(self._timer_seconds)
+                    self._timer_seconds = TIMER_OPTIONS[(index + 1) % len(TIMER_OPTIONS)]
+                    self._store.set_setting("timerSeconds", self._timer_seconds)
+                    self._publish_locked()
+        elif action == "cancel_capture":
+            with self._state_changed:
+                if self._countdown_deadline is not None:
+                    self._clear_countdown_locked()
+                    self._status, self._message = ScreenState.LIVE, ""
+                    self._publish_locked()
         elif action in {"retry", "remix"}:
             self._remix(values, retry=action == "retry")
         elif action == "share":
@@ -396,11 +431,57 @@ class CameraWebController:
         capture_id = f"pi_{int(time.time())}_{uuid.uuid4().hex[:12]}"
         return capture_id, self._captures_dir / f"{capture_id}.jpg"
 
-    def _capture(self) -> None:
+    def _resolve_preset(self, preset: Preset) -> Preset:
+        if preset.id == "random":
+            return random.choice([p for p in self._presets if p.id != "random"])
+        return preset
+
+    def _clear_countdown_locked(self) -> None:
+        self._countdown_deadline = None
+        self._countdown_remaining = 0
+        self._countdown_preset = None
+
+    def _request_capture(self) -> None:
+        # Extra shutter presses must not queue another delayed shot.
+        if self._countdown_deadline is not None:
+            return
+        if not self._camera_available or self._status != ScreenState.LIVE:
+            raise ValueError("Wait for the camera before taking a photo")
+        self._can_save()
+        preset = self._resolve_preset(self._presets[self._preset_index])
+        if not self._timer_seconds:
+            self._capture(preset)
+            return
+        with self._state_changed:
+            self._countdown_preset = preset
+            self._countdown_deadline = time.monotonic() + self._timer_seconds
+            self._status, self._message = ScreenState.COUNTDOWN, "Get ready"
+        self._poll_countdown()
+
+    def _poll_countdown(self) -> None:
+        if self._countdown_deadline is None or self._stop.is_set():
+            return
+        remaining = max(0, math.ceil(self._countdown_deadline - time.monotonic()))
+        if remaining:
+            if remaining != self._countdown_remaining:
+                with self._state_changed:
+                    self._countdown_remaining = remaining
+                    self._publish_locked()
+                self._sound.play("countdown")
+            return
+        with self._state_changed:
+            preset = self._countdown_preset
+            self._clear_countdown_locked()
+        try:
+            self._capture(preset)
+        except Exception as error:
+            self._action_failed("capture", error)
+
+    def _capture(self, preset: Preset | None = None) -> None:
         if not self._camera_available:
             raise ValueError(CAMERA_UNAVAILABLE_MESSAGE)
         self._can_save()
-        preset = self._presets[self._preset_index]
+        preset = preset or self._resolve_preset(self._presets[self._preset_index])
         capture_id, source_path = self._new_source()
         with self._state_changed:
             self._status, self._message = ScreenState.CAPTURING, "Hold steady"
@@ -437,6 +518,8 @@ class CameraWebController:
             retry and preset_id in RETIRED_PRESETS
         ):
             raise ValueError("Choose an available style")
+        if preset_id == "random":
+            preset_id = self._resolve_preset(RANDOM_PRESET).id
         capture_id, source_path = self._new_source()
         # Each treatment owns its original, so future cleanup cannot break siblings.
         shutil.copyfile(original.source_path, source_path)
@@ -689,6 +772,7 @@ class CameraWebController:
         if self._store.counts().get("uploading", 0) or self._future or self._share_future:
             raise ValueError("Wait for processing to finish before shutting down")
         with self._state_changed:
+            self._clear_countdown_locked()
             self._status = ScreenState.SHUTTING_DOWN
             self._message = "Safe to unplug when the screen turns off"
             self._publish_locked()
@@ -730,6 +814,8 @@ class CameraWebController:
                 "presets": [self._preset_json(p) for p in self._presets],
                 "presetIndex": self._preset_index,
                 "presetCount": len(self._presets),
+                "timerSeconds": self._timer_seconds,
+                "countdownRemaining": self._countdown_remaining,
                 "message": self._message,
                 "networkOnline": self._network_online,
                 "queued": counts.get("queued", 0),
@@ -914,7 +1000,7 @@ class CameraWebController:
                 or not self._actions.empty()
                 or counts.get("queued", 0)
                 or counts.get("uploading", 0)
-                or self._status == ScreenState.CAPTURING
+                or self._status in {ScreenState.CAPTURING, ScreenState.COUNTDOWN}
             ):
                 raise ValueError("Let all queued photos finish before updating")
             self._maintenance = True
@@ -1052,7 +1138,15 @@ async def _gallery_detail(request: web.Request) -> web.Response:
     job = controller._store.get(request.match_info["capture_id"])
     if job is None:
         raise web.HTTPNotFound()
-    return web.json_response(controller.gallery_item(job), headers={"Cache-Control": "no-store"})
+    return web.json_response(
+        {
+            **controller.gallery_item(job),
+            **controller._store.gallery_neighbors(
+                job.capture_id, request.query.get("filter", "all")
+            ),
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 async def _gallery_delete(request: web.Request) -> web.Response:

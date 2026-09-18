@@ -268,7 +268,7 @@ def test_gallery_retry_and_restyle_preserve_originals(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     source = tmp_path / "captures" / "old.jpg"
     Image.new("RGB", (100, 80), "orange").save(source)
-    style = controller._presets[0].id
+    style = FALLBACK_PRESETS[0].id
     controller._store.enqueue("old", style, source)
     controller._store.mark_failed("old", "Generation failed")
     controller.start()
@@ -703,5 +703,166 @@ def test_auto_shared_generation_is_recorded_in_camera_gallery(tmp_path):
         outcome = controller._process_job(controller._store.get("capture-auto"))
         assert outcome.job.share_url == "https://camera.example/p/auto"
         assert controller.gallery()["items"][0]["shareUrl"] == outcome.job.share_url
+    finally:
+        controller.close()
+
+
+def test_random_style_resolves_each_shot_and_retry_keeps_the_choice(tmp_path, monkeypatch):
+    controller = make_controller(tmp_path)
+    controller._load_presets()
+    controller._start_camera()
+    styles = iter(FALLBACK_PRESETS[:3])
+    choices = []
+
+    def choose(options):
+        assert all(p.id != "random" and p.id not in RETIRED_PRESETS for p in options)
+        selected = next(styles)
+        choices.append(selected.id)
+        return selected
+
+    monkeypatch.setattr("musecam.webapp.random.choice", choose)
+    try:
+        assert controller.state()["presets"][0]["id"] == "random"
+        controller._handle_action("select", {"presetId": "random"})
+        controller._handle_action("capture", {})
+        first = controller._store.get(controller.state()["lastCaptureId"])
+        controller._handle_action("capture", {})
+        second = controller._store.get(controller.state()["lastCaptureId"])
+        assert first.preset_id == FALLBACK_PRESETS[0].id
+        assert second.preset_id == FALLBACK_PRESETS[1].id
+        assert controller.state()["preset"]["id"] == "random"
+        controller._store.mark_failed(first.capture_id, "Try again")
+        controller._remix({"captureId": first.capture_id}, retry=True)
+        retry = controller.gallery()["items"][0]
+        assert retry["presetId"] == first.preset_id
+        assert len(choices) == 2
+        controller._remix({"captureId": first.capture_id, "presetId": "random"}, retry=False)
+        assert controller.gallery()["items"][0]["presetId"] == FALLBACK_PRESETS[2].id
+        controller._load_presets()
+        assert controller.state()["preset"]["id"] == "random"
+    finally:
+        controller.close()
+
+
+@pytest.mark.parametrize("seconds", [5, 10])
+def test_shutter_counts_down_beeps_once_per_second_and_captures_once(
+    tmp_path, monkeypatch, seconds
+):
+    controller = make_controller(tmp_path)
+    controller._start_camera()
+    clock = [100.0]
+    monkeypatch.setattr("musecam.webapp.time.monotonic", lambda: clock[0])
+    cues = []
+    monkeypatch.setattr(controller._sound, "play", cues.append)
+    try:
+        controller._handle_action("select", {"presetId": FALLBACK_PRESETS[0].id})
+        controller._handle_action("timer", {})
+        if seconds == 10:
+            controller._handle_action("timer", {})
+        assert controller.state()["timerSeconds"] == seconds
+        controller.dispatch("capture")  # The same action used by the GPIO shutter.
+        controller._poll_actions()
+        deadline = controller._countdown_deadline
+        assert controller.state()["countdownRemaining"] == seconds
+        assert controller.state()["status"] == "countdown"
+        controller.dispatch("capture")
+        controller._poll_actions()
+        assert controller._countdown_deadline == deadline
+        # A style change cannot alter the shot already counting down.
+        controller._handle_action("select", {"presetId": FALLBACK_PRESETS[1].id})
+        for elapsed in range(1, seconds):
+            clock[0] = 100.0 + elapsed
+            controller._poll_countdown()
+            controller._poll_countdown()  # Repeated frames must not beep twice.
+            assert controller.state()["countdownRemaining"] == seconds - elapsed
+            assert controller.state()["galleryCount"] == 0
+        clock[0] = deadline - 0.001
+        controller._poll_countdown()
+        assert controller.state()["galleryCount"] == 0
+        clock[0] = deadline
+        controller._poll_countdown()
+        controller._poll_countdown()
+        assert cues == ["countdown"] * seconds + ["shutter"]
+        assert controller.state()["galleryCount"] == 1
+        assert controller.state()["countdownRemaining"] == 0
+        assert controller.state()["status"] == "live"
+        assert controller.gallery()["items"][0]["presetId"] == FALLBACK_PRESETS[0].id
+    finally:
+        controller.close()
+
+
+@pytest.mark.parametrize("cancel", ["cancel_capture", "camera_failure", "power", "close"])
+def test_countdown_cancellation_never_takes_a_late_photo(tmp_path, monkeypatch, cancel):
+    controller = make_controller(tmp_path)
+    controller._start_camera()
+    clock = [100.0]
+    monkeypatch.setattr("musecam.webapp.time.monotonic", lambda: clock[0])
+    try:
+        controller._handle_action("timer", {})
+        controller._handle_action("capture", {})
+        with pytest.raises(ValueError, match="queued photos"):
+            controller.update()
+        if cancel == "camera_failure":
+            controller._camera_failed()
+        elif cancel == "close":
+            controller._stop.set()
+        else:
+            controller._handle_action(cancel, {})
+        clock[0] = 120.0
+        controller._poll_countdown()
+        assert controller.state()["galleryCount"] == 0
+        if cancel != "close":
+            assert controller.state()["countdownRemaining"] == 0
+    finally:
+        controller.close()
+
+
+def test_timer_cycles_and_off_takes_an_immediate_photo(tmp_path):
+    controller = make_controller(tmp_path)
+    controller._start_camera()
+    try:
+        assert controller.state()["timerSeconds"] == 0
+        for value in (5, 10, 0):
+            controller._handle_action("timer", {})
+            assert controller.state()["timerSeconds"] == value
+        controller._handle_action("capture", {})
+        assert controller.state()["galleryCount"] == 1
+        controller._handle_action("timer", {})
+    finally:
+        controller.close()
+    reopened = make_controller(tmp_path)
+    try:
+        assert reopened.state()["timerSeconds"] == 5
+        assert reopened.state()["countdownRemaining"] == 0
+    finally:
+        reopened.close()
+
+
+def test_detail_neighbors_cross_pages_and_respect_gallery_filters(tmp_path):
+    controller = make_controller(tmp_path)
+    for index in range(45):
+        capture_id = f"photo-{index:02d}"
+        controller._store.enqueue(capture_id, FALLBACK_PRESETS[0].id, tmp_path / capture_id)
+        if index % 2 == 0:
+            controller._store.mark_failed(capture_id, "test")
+
+    async def exercise():
+        async with TestClient(TestServer(create_web_app(controller))) as client:
+            detail = await (await client.get("/api/gallery/photo-05")).json()
+            assert detail["previousId"] == "photo-06"
+            assert detail["nextId"] == "photo-04"
+            oldest = await (await client.get("/api/gallery/photo-00")).json()
+            assert oldest["nextId"] is None
+            newest = await (await client.get("/api/gallery/photo-44")).json()
+            assert newest["previousId"] is None
+            filtered = await (await client.get("/api/gallery/photo-06?filter=failed")).json()
+            assert filtered["previousId"] == "photo-08"
+            assert filtered["nextId"] == "photo-04"
+            controller._store.delete("photo-04")
+            after_delete = await (await client.get("/api/gallery/photo-06?filter=failed")).json()
+            assert after_delete["nextId"] == "photo-02"
+
+    try:
+        asyncio.run(exercise())
     finally:
         controller.close()

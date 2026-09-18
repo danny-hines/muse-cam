@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
-CUES = {"shutter", "processing", "success", "error"}
+CUES = {"shutter", "countdown", "processing", "success", "error"}
 SAMPLE_RATE = 48000
 CHUNK_FRAMES = 1024
 SILENCE = bytes(CHUNK_FRAMES * 4)
@@ -29,7 +29,9 @@ def sound_wave(cue: str, volume: int) -> bytes:
     if cue not in CUES:
         raise ValueError("Unknown sound")
     rate = SAMPLE_RATE
-    duration = {"shutter": 0.19, "processing": 0.38, "success": 0.55, "error": 0.42}[cue]
+    duration = {
+        "shutter": 0.19, "countdown": 0.12, "processing": 0.38, "success": 0.55, "error": 0.42
+    }[cue]
     gain = 0.20 * (max(0, min(100, volume)) / 100) ** 2
     # The success melody carries much more strongly on the enclosure's speaker.
     if cue == "success":
@@ -50,6 +52,8 @@ def sound_wave(cue: str, volume: int) -> bytes:
                         * math.exp(-x * 95)
                         * (0.65 * rng.uniform(-1, 1) + 0.35 * math.sin(2 * math.pi * 1750 * x))
                     )
+        elif cue == "countdown":
+            value = 0.6 * math.sin(math.pi * t / duration) ** 2 * math.sin(2 * math.pi * 880 * t)
         elif cue == "processing":
             step = int(t / 0.062)
             x = t % 0.062
@@ -84,7 +88,7 @@ def sound_wave(cue: str, volume: int) -> bytes:
     return output.getvalue()
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=5)
 def _samples(cue: str) -> tuple[int, ...]:
     with wave.open(io.BytesIO(sound_wave(cue, 100)), "rb") as wav:
         payload = wav.readframes(wav.getnframes())

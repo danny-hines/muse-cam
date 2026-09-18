@@ -65,6 +65,7 @@ class CaptureJob:
 class ScreenState(StrEnum):
     STARTING = "starting"
     LIVE = "live"
+    COUNTDOWN = "countdown"
     CAPTURING = "capturing"
     PROCESSING = "processing"
     RESULT = "result"

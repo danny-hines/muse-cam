@@ -166,6 +166,35 @@ svg {
   margin-left: auto;
   gap: 8px;
 }
+.timer-button {
+  min-width: 76px;
+  font-variant-numeric: tabular-nums;
+}
+.timer-button.enabled {
+  color: #ffd197;
+  border-color: #ffd19788;
+}
+.countdown-overlay {
+  position: absolute;
+  inset: 64px 0 80px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  text-shadow: 0 3px 24px #0009;
+}
+.countdown-overlay .eyebrow {
+  color: #fff;
+}
+.countdown-number {
+  display: block;
+  font-size: clamp(72px, 18vh, 140px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 .glass-button,
 .primary-button,
 .secondary-button,
@@ -603,6 +632,20 @@ svg {
 }
 .photo-viewport.zoomed:active {
   cursor: grabbing;
+}
+.photo-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.photo-nav.previous {
+  left: 12px;
+}
+.photo-nav.next {
+  right: 12px;
+}
+.photo-nav:disabled {
+  opacity: 0.25;
 }
 .detail-image {
   object-fit: contain;
