@@ -18,6 +18,7 @@ export function App() {
     "camera" | "gallery" | "photo" | "settings"
   >("camera");
   const [photoId, setPhotoId] = useState<string | null>(null);
+  const [galleryFilter, setGalleryFilter] = useState("all");
   const [stylesOpen, setStylesOpen] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
@@ -85,6 +86,9 @@ export function App() {
       )
         return;
       if (event.key === "Escape") {
+        if (state.status === "countdown") {
+          void act("cancel_capture").catch((error) => report(error.message));
+        }
         setScreen("camera");
         return;
       }
@@ -108,7 +112,10 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [screen, act, report]);
+  }, [screen, act, report, state.status]);
+  useEffect(() => {
+    if (state.status === "countdown") setScreen("camera");
+  }, [state.status]);
   const working = state.queued + (state.processingId ? 1 : 0);
   const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
@@ -154,6 +161,8 @@ export function App() {
                 ? "Reconnecting"
                 : state.status === "capturing"
                   ? "Capturing"
+                  : state.status === "countdown"
+                    ? "Get ready"
                   : state.maintenance
                     ? "Updating"
                     : state.status === "starting"
@@ -173,8 +182,18 @@ export function App() {
             </div>
             <div className="header-actions">
               <button
+                className={`glass-button timer-button${state.timerSeconds ? " enabled" : ""}`}
+                aria-label={`Timer: ${state.timerSeconds ? `${state.timerSeconds} seconds` : "off"}. Tap to change.`}
+                disabled={!connected || state.status !== "live" || state.maintenance}
+                onClick={() => void act("timer").catch((error) => report(error.message))}
+              >
+                <Icon name="clock" />
+                <span>{state.timerSeconds ? `${state.timerSeconds}s` : "Off"}</span>
+              </button>
+              <button
                 className="glass-button square"
                 aria-label="Open gallery"
+                disabled={state.status === "countdown"}
                 onClick={() => setScreen("gallery")}
               >
                 <Icon name="gallery" />
@@ -182,6 +201,7 @@ export function App() {
               <button
                 className="glass-button square"
                 aria-label="Open settings"
+                disabled={state.status === "countdown"}
                 onClick={() => setScreen("settings")}
               >
                 <Icon name="settings" />
@@ -212,6 +232,7 @@ export function App() {
                         : "rail-style"
                     }
                     aria-pressed={preset.id === state.preset.id}
+                    disabled={state.status === "countdown" || state.status === "capturing"}
                     onClick={() =>
                       void act("select", { presetId: preset.id }).catch(
                         (error) => report(error.message),
@@ -222,7 +243,7 @@ export function App() {
                       className="style-number"
                       style={{ color: preset.accent }}
                     >
-                      {String(index + 1).padStart(2, "0")}
+                      {preset.id === "random" ? <Icon name="shuffle" size={17} /> : String(index).padStart(2, "0")}
                     </span>
                     <strong>{preset.name}</strong>
                     {preset.id === state.preset.id && (
@@ -238,7 +259,9 @@ export function App() {
               <span className="eyebrow">Your next imagination</span>
               <strong>{state.preset.name}</strong>
               <span className="shutter-hint">
-                {state.status === "live"
+                {state.status === "countdown"
+                  ? "Get in the frame"
+                  : state.status === "live"
                   ? state.focus?.supported
                     ? "Tap to focus · Press the shutter to capture"
                     : "Press the shutter to capture"
@@ -276,6 +299,20 @@ export function App() {
               </button>
             )}
           </footer>
+          {state.status === "countdown" && (
+            <div className="countdown-overlay">
+              <div role="status" aria-live="polite" aria-atomic="true">
+                <span className="eyebrow">Get ready</span>
+                <strong className="countdown-number">{state.countdownRemaining}</strong>
+              </div>
+              <button
+                className="glass-button"
+                onClick={() => void act("cancel_capture").catch((error) => report(error.message))}
+              >
+                <Icon name="close" size={18} /> Cancel
+              </button>
+            </div>
+          )}
           {state.status === "capturing" && (
             <div className="shutter-flash" key={state.revision} />
           )}
@@ -310,6 +347,8 @@ export function App() {
       {screen === "gallery" && (
         <Gallery
           state={state}
+          filter={galleryFilter}
+          onFilter={setGalleryFilter}
           onOpen={openPhoto}
           onCamera={camera}
           report={report}
@@ -320,6 +359,8 @@ export function App() {
           key={photoId}
           id={photoId}
           state={state}
+          filter={galleryFilter}
+          onOpen={openPhoto}
           act={act}
           onBack={() => setScreen("gallery")}
           onCamera={camera}
@@ -329,7 +370,7 @@ export function App() {
       {screen === "settings" && (
         <Settings state={state} onCamera={camera} report={report} />
       )}
-      {notice && screen !== "settings" && (
+      {notice && screen !== "settings" && state.status !== "countdown" && (
         <div className={`notice ${notice.kind}`} role="status">
           <button
             className="notice-content"

@@ -1,4 +1,5 @@
 const paths = {
+  shuffle: "M3 6h3c4 0 8 12 12 12h3 M17 14l4 4-4 4 M3 18h3c4 0 8-12 12-12h3 M17 2l4 4-4 4",
   camera: "M4 7h4l2-3h4l2 3h4v13H4z M16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
   gallery: "M4 4h16v16H4z M4 16l5-5 4 4 3-3 4 4 M15 8h.01",
   settings: "M4 6h16 M4 12h16 M4 18h16 M8 3v6 M16 9v6 M10 15v6",

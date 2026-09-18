@@ -15,6 +15,8 @@ const FALLBACK: CameraState = {
   presets: [],
   presetIndex: 0,
   presetCount: 0,
+  timerSeconds: 0,
+  countdownRemaining: 0,
   message: "Starting camera",
   networkOnline: true,
   queued: 0,
