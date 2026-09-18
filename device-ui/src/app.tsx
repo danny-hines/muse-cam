@@ -5,7 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import type { Notice } from "./types";
+import type { CameraState, Notice } from "./types";
 import { useCamera } from "./use-camera";
 import { Icon } from "./icons";
 import { Gallery, PhotoDetail } from "./gallery";
@@ -14,25 +14,23 @@ import { FocusTarget } from "./focus";
 
 export function App() {
   const { state, connected, act } = useCamera();
-  const [screen, setScreen] = useState<
-    "camera" | "gallery" | "photo" | "settings"
-  >("camera");
-  const [photoId, setPhotoId] = useState<string | null>(null);
+  const { screen, photoId } = state.view;
   const [galleryFilter, setGalleryFilter] = useState("all");
   const [stylesOpen, setStylesOpen] = useState(true);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
   const seenNotice = useRef(0);
-  const lastCapture = useRef<string | null>(null);
   const booted = useRef("");
   const selectedStyle = useRef<HTMLButtonElement | null>(null);
   const report = useCallback((message: string) => setError(message), []);
+  const navigate = useCallback((screen: CameraState["view"]["screen"], photoId?: string) => {
+    void act("view", { screen, photoId }).catch((error) => report(error.message));
+  }, [act, report]);
   const openPhoto = useCallback((id: string) => {
-    setPhotoId(id);
-    setScreen("photo");
+    navigate("photo", id);
     setNotice(null);
-  }, []);
-  const camera = useCallback(() => setScreen("camera"), []);
+  }, [navigate]);
+  const camera = useCallback(() => navigate("camera"), [navigate]);
   useEffect(() => {
     if (!error) return;
     const timer = setTimeout(() => setError(""), 7000);
@@ -41,7 +39,6 @@ export function App() {
   useEffect(() => {
     if (state.sessionId && booted.current !== state.sessionId) {
       booted.current = state.sessionId;
-      lastCapture.current = state.lastCaptureId;
       seenNotice.current = state.notifications.at(-1)?.id || 0;
       return;
     }
@@ -58,10 +55,6 @@ export function App() {
           ) || latest.at(-1)!;
       setNotice(event);
       seenNotice.current = latest.at(-1)!.id;
-    }
-    if (state.lastCaptureId && state.lastCaptureId !== lastCapture.current) {
-      lastCapture.current = state.lastCaptureId;
-      setScreen("camera");
     }
   }, [state.notifications, state.lastCaptureId, state.status, state.sessionId]);
   useEffect(() => {
@@ -89,14 +82,15 @@ export function App() {
         if (state.status === "countdown") {
           void act("cancel_capture").catch((error) => report(error.message));
         }
-        setScreen("camera");
+        camera();
         return;
       }
-      if (screen !== "camera") return;
       if (
         (event.key === " " || event.key === "Enter") &&
         (event.target as HTMLElement).closest("button, a, [role='button']")
       ) return;
+      const shutter = event.key === " " || event.key === "Enter";
+      if (screen !== "camera" && !shutter) return;
       const action =
         event.key === "ArrowLeft" || event.key === "ArrowUp"
           ? "previous"
@@ -112,10 +106,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [screen, act, report, state.status]);
-  useEffect(() => {
-    if (state.status === "countdown") setScreen("camera");
-  }, [state.status]);
+  }, [screen, act, report, state.status, camera]);
   const working = state.queued + (state.processingId ? 1 : 0);
   const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
@@ -194,7 +185,7 @@ export function App() {
                 className="glass-button square"
                 aria-label="Open gallery"
                 disabled={state.status === "countdown"}
-                onClick={() => setScreen("gallery")}
+                onClick={() => navigate("gallery")}
               >
                 <Icon name="gallery" />
               </button>
@@ -202,7 +193,7 @@ export function App() {
                 className="glass-button square"
                 aria-label="Open settings"
                 disabled={state.status === "countdown"}
-                onClick={() => setScreen("settings")}
+                onClick={() => navigate("settings")}
               >
                 <Icon name="settings" />
               </button>
@@ -282,7 +273,7 @@ export function App() {
             {working > 0 && (
               <button
                 className="queue-pill"
-                onClick={() => setScreen("gallery")}
+                onClick={() => navigate("gallery")}
               >
                 <span className="pulse-dot" />
                 {state.processingId ? "Imagining" : "Waiting"} · {working}
@@ -362,7 +353,7 @@ export function App() {
           filter={galleryFilter}
           onOpen={openPhoto}
           act={act}
-          onBack={() => setScreen("gallery")}
+          onBack={() => navigate("gallery")}
           onCamera={camera}
           report={report}
         />

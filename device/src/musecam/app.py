@@ -223,7 +223,9 @@ class MuseCamApp:
             self._state = ScreenState.LIVE if self._camera_available else ScreenState.ERROR
             self._result = None
             self._message = "" if self._camera_available else CAMERA_UNAVAILABLE_MESSAGE
-        elif action == Action.SHUTTER and self._state in {ScreenState.LIVE, ScreenState.RESULT}:
+        elif action == Action.SHUTTER and self._state == ScreenState.RESULT:
+            self._return_to_live()
+        elif action == Action.SHUTTER and self._state == ScreenState.LIVE:
             self._capture()
         elif action == Action.SHARE and self._state == ScreenState.RESULT:
             self._share()

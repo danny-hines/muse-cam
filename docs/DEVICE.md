@@ -105,7 +105,7 @@ The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to t
 
 Tap the top-right **Timer** control to cycle **Off → 5s → 10s → Off**. With the timer enabled, the physical shutter starts a visible countdown and a short speaker beep each second before taking one photo. Preview and background processing continue. **Cancel** or Escape stops the countdown; extra shutter presses during it do not queue more shots. The setting persists across restarts, but an unfinished countdown does not. Beeps follow the master volume and mute settings.
 
-The adjacent icons open the local gallery and settings. Keyboard testing supports arrows to change style, Space/Enter to capture, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
+The adjacent icons open the local gallery and settings. Pressing the shutter while browsing the gallery or a single photo returns to the camera without taking a photo or starting the timer. Press it again from the camera view to capture. Keyboard testing supports arrows to change style, Space/Enter for the same shutter behavior, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
 
 On autofocus camera profiles, tap the preview to focus on a subject. Amber
 brackets indicate focusing; green means the camera reports focus achieved.

@@ -838,6 +838,59 @@ def test_timer_cycles_and_off_takes_an_immediate_photo(tmp_path):
         reopened.close()
 
 
+@pytest.mark.parametrize("screen", ["gallery", "photo"])
+@pytest.mark.parametrize("seconds", [0, 5, 10])
+def test_gallery_shutter_returns_to_camera_before_capturing(tmp_path, monkeypatch, screen, seconds):
+    controller = make_controller(tmp_path)
+    controller._start_camera()
+    controller._store.enqueue("existing", FALLBACK_PRESETS[0].id, tmp_path / "existing.jpg")
+    cues = []
+    monkeypatch.setattr(controller._sound, "play", cues.append)
+    try:
+        for _ in range(seconds // 5):
+            controller._handle_action("timer", {})
+        controller.dispatch("view", {"screen": screen, "photoId": "existing"})
+        controller._poll_actions()
+        assert controller.state()["view"]["screen"] == screen
+
+        # Exercise the GPIO action path, without relying on a browser key handler.
+        controller.dispatch("capture")
+        controller._poll_actions()
+        assert controller.state()["view"] == {"screen": "camera", "photoId": None}
+        assert controller.state()["galleryCount"] == 1
+        assert controller.state()["lastCaptureId"] is None
+        assert controller.state()["status"] == "live"
+        assert controller.state()["countdownRemaining"] == 0
+        assert cues == []
+
+        controller.dispatch("capture")
+        controller._poll_actions()
+        if seconds:
+            assert controller.state()["countdownRemaining"] == seconds
+            assert controller.state()["status"] == "countdown"
+            assert controller.state()["galleryCount"] == 1
+            assert cues == ["countdown"]
+        else:
+            assert controller.state()["galleryCount"] == 2
+            assert controller.state()["lastCaptureId"] is not None
+            assert cues == ["shutter"]
+    finally:
+        controller.close()
+
+
+def test_view_action_validates_screens_and_photos(tmp_path):
+    controller = make_controller(tmp_path)
+    try:
+        for values in ({}, {"screen": "missing"}, {"screen": ["gallery"]}):
+            with pytest.raises(ValueError, match="available screen"):
+                controller.dispatch("view", values)
+        with pytest.raises(ValueError, match="Photo was not found"):
+            controller.dispatch("view", {"screen": "photo", "photoId": "missing"})
+        assert controller.state()["view"] == {"screen": "camera", "photoId": None}
+    finally:
+        controller.close()
+
+
 def test_detail_neighbors_cross_pages_and_respect_gallery_filters(tmp_path):
     controller = make_controller(tmp_path)
     for index in range(45):
