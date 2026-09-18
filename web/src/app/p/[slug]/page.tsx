@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { BeforeAfter } from "@/components/before-after";
+import { PhotoImage } from "@/components/photo-image";
+import { PhotoViewer } from "@/components/photo-viewer";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { getPublishedPhotoBySlug } from "@/lib/photos";
+import { getPublishedPhotoBySlug, getPublishedPhotoNeighbors } from "@/lib/photos";
 import { fullTimestamp } from "@/lib/time";
 
 type PhotoPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ gallery?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: PhotoPageProps): Promise<Meta
   };
 }
 
-export default async function PhotoPage({ params }: PhotoPageProps) {
+export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
   const { slug } = await params;
   const photo = await getPublishedPhotoBySlug(slug);
 
@@ -42,33 +43,28 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
     notFound();
   }
 
+  const inEvent = (await searchParams).gallery !== "roll" && Boolean(photo.eventSlug);
+  const neighbors = await getPublishedPhotoNeighbors(slug, inEvent);
+  const photoHref = (neighborSlug: string | null) => neighborSlug
+    ? `/p/${neighborSlug}${inEvent ? "" : "?gallery=roll"}` : null;
+
   return (
     <>
       <SiteHeader />
       <main className="detail-main">
-        <Link className="back-link" href={photo.eventSlug ? `/${photo.eventSlug}` : "/"}>
-          <span aria-hidden="true">←</span> {photo.eventName ? `Back to ${photo.eventName}` : "Back to the roll"}
+        <Link className="back-link" href={inEvent ? `/${photo.eventSlug}` : "/"}>
+          <span aria-hidden="true">←</span> {inEvent ? `Back to ${photo.eventName}` : "Back to the roll"}
         </Link>
         <div className="detail-layout">
-          <div className="detail-image">
-            {photo.originalImageUrl ? (
-              <BeforeAfter
-                transformedUrl={photo.imageUrl}
-                originalUrl={photo.originalImageUrl}
-                presetName={photo.presetName}
-              />
-            ) : (
-              <Image
-                src={photo.imageUrl}
-                alt={`Muse Cam photo transformed with the ${photo.presetName} preset`}
-                fill
-                sizes="(max-width: 900px) 100vw, 70vw"
-                style={{ objectFit: "cover" }}
-                priority
-                unoptimized={photo.imageUrl.endsWith(".svg")}
-              />
-            )}
-          </div>
+          <PhotoViewer key={photo.id} previousHref={photoHref(neighbors.previousSlug)} nextHref={photoHref(neighbors.nextSlug)}>
+            <PhotoImage
+              transformedUrl={photo.imageUrl}
+              originalUrl={photo.originalImageUrl}
+              presetName={photo.presetName}
+              sizes="(max-width: 900px) 100vw, 70vw"
+              priority
+            />
+          </PhotoViewer>
           <aside className="detail-copy">
             <p className="section-kicker">Preset</p>
             <h1>{photo.presetName}</h1>

@@ -1,9 +1,10 @@
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db/client";
 import { captureRetractions, photos } from "@/db/schema";
 import type { PhotoRecord } from "@/lib/types";
-import type { CompletePhotoInput, CreatePhotoInput, PhotoRepository } from "./types";
+import type { CompletePhotoInput, CreatePhotoInput, PhotoNeighbors, PhotoRepository } from "./types";
 
 function firstOrThrow(rows: PhotoRecord[], id: string): PhotoRecord {
   const photo = rows[0];
@@ -54,12 +55,35 @@ export class NeonPhotoRepository implements PhotoRepository {
           eq(photos.status, "complete"),
           isNotNull(photos.sharedAt),
           isNotNull(photos.resultPublicUrl),
+          isNotNull(photos.publicSlug),
           eventId === undefined ? undefined : eventId === null
             ? isNull(photos.eventId) : eq(photos.eventId, eventId),
         ),
       )
-      .orderBy(desc(photos.sharedAt))
+      .orderBy(desc(photos.sharedAt), desc(photos.id))
       .limit(limit);
+  }
+
+  async findSharedNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
+    const current = alias(photos, "current_photo");
+    const shared = and(
+      eq(photos.status, "complete"), isNotNull(photos.sharedAt),
+      isNotNull(photos.resultPublicUrl), isNotNull(photos.publicSlug),
+      eq(current.status, "complete"), isNotNull(current.sharedAt), isNotNull(current.resultPublicUrl),
+      withinEvent ? or(isNull(current.eventId), eq(photos.eventId, current.eventId)) : undefined,
+    );
+    // Compare in Postgres to retain timestamp precision; the ID also orders simultaneous shares.
+    const [previous, next] = await Promise.all([
+      getDb().select({ slug: photos.publicSlug }).from(photos)
+        .innerJoin(current, eq(current.publicSlug, slug))
+        .where(and(shared, sql`(${photos.sharedAt}, ${photos.id}) > (${current.sharedAt}, ${current.id})`))
+        .orderBy(asc(photos.sharedAt), asc(photos.id)).limit(1),
+      getDb().select({ slug: photos.publicSlug }).from(photos)
+        .innerJoin(current, eq(current.publicSlug, slug))
+        .where(and(shared, sql`(${photos.sharedAt}, ${photos.id}) < (${current.sharedAt}, ${current.id})`))
+        .orderBy(desc(photos.sharedAt), desc(photos.id)).limit(1),
+    ]);
+    return { previousSlug: previous[0]?.slug ?? null, nextSlug: next[0]?.slug ?? null };
   }
 
   async listAll(limit = 100): Promise<PhotoRecord[]> {

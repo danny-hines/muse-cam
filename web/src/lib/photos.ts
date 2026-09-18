@@ -4,6 +4,7 @@ import { getPreset } from "@/config/presets";
 import { demoPhotos } from "@/lib/demo-photos";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository, hasPersistentDatabase } from "@/lib/repository";
+import type { PhotoNeighbors } from "@/lib/repository/types";
 import type { EventRecord, PhotoRecord, PublishedPhoto } from "@/lib/types";
 
 function toPublishedPhoto(
@@ -12,7 +13,7 @@ function toPublishedPhoto(
   event: Pick<EventRecord, "name" | "slug"> | null = null,
 ): PublishedPhoto | null {
   const preset = getPreset(photo.presetId);
-  if (!preset || !photo.publicSlug || !photo.resultPublicUrl || !photo.sharedAt) {
+  if (!preset || photo.status !== "complete" || !photo.publicSlug || !photo.resultPublicUrl || !photo.sharedAt) {
     return null;
   }
 
@@ -63,6 +64,19 @@ export async function listPublishedPhotos(eventId?: string | null): Promise<Publ
 }
 
 export const getEventBySlug = cache((slug: string) => getFleetRepository().findEventBySlug(slug));
+
+export async function getPublishedPhotoNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
+  if (!hasPersistentDatabase() && process.env.DEMO_MODE !== "false") {
+    const demoIndex = demoPhotos.findIndex((photo) => photo.publicSlug === slug);
+    if (demoIndex >= 0) {
+      return {
+        previousSlug: demoPhotos[demoIndex - 1]?.publicSlug ?? null,
+        nextSlug: demoPhotos[demoIndex + 1]?.publicSlug ?? null,
+      };
+    }
+  }
+  return getPhotoRepository().findSharedNeighbors(slug, withinEvent);
+}
 
 export const getPublishedPhotoBySlug = cache(async (slug: string) => {
   const record = await getPhotoRepository().findByPublicSlug(slug);

@@ -1,5 +1,5 @@
 import type { PhotoRecord } from "@/lib/types";
-import type { CompletePhotoInput, CreatePhotoInput, PhotoRepository } from "./types";
+import type { CompletePhotoInput, CreatePhotoInput, PhotoNeighbors, PhotoRepository } from "./types";
 
 type MemoryState = {
   photos: Map<string, PhotoRecord>;
@@ -75,10 +75,19 @@ export class MemoryPhotoRepository implements PhotoRepository {
 
   async listShared(limit = 60, eventId?: string | null): Promise<PhotoRecord[]> {
     return [...getState().photos.values()]
-      .filter((photo) => photo.status === "complete" && photo.sharedAt && photo.resultPublicUrl
+      .filter((photo) => photo.status === "complete" && photo.sharedAt && photo.resultPublicUrl && photo.publicSlug
         && (eventId === undefined || photo.eventId === eventId))
-      .sort((a, b) => b.sharedAt!.getTime() - a.sharedAt!.getTime())
+      .sort((a, b) => b.sharedAt!.getTime() - a.sharedAt!.getTime() || b.id.localeCompare(a.id))
       .slice(0, limit);
+  }
+
+  async findSharedNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
+    const current = await this.findByPublicSlug(slug);
+    if (!current) return { previousSlug: null, nextSlug: null };
+    const shared = await this.listShared(Infinity, withinEvent ? current.eventId ?? undefined : undefined);
+    const index = shared.findIndex((photo) => photo.id === current.id);
+    if (index < 0) return { previousSlug: null, nextSlug: null };
+    return { previousSlug: shared[index - 1]?.publicSlug ?? null, nextSlug: shared[index + 1]?.publicSlug ?? null };
   }
 
   async listAll(limit = 100): Promise<PhotoRecord[]> {
