@@ -47,6 +47,10 @@ export class MemoryFleetRepository implements FleetRepository {
     return state().events.get(id) ?? null;
   }
 
+  async findEventBySlug(slug: string): Promise<EventRecord | null> {
+    return [...state().events.values()].find((event) => event.slug === slug) ?? null;
+  }
+
   async createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord> {
     const claim = { ...input, claimedAt: null, createdAt: new Date() };
     state().claims.set(claim.id, claim);

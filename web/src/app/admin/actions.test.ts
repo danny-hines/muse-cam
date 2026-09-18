@@ -7,7 +7,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
-import { updateDeviceEvent, updateEventSettings } from "./actions";
+import { createEvent, updateDeviceEvent, updateEventSettings } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -123,6 +123,17 @@ describe("camera event reassignment", () => {
 });
 
 describe("event sharing settings", () => {
+  it.each(["admin", "api", "p"])("rejects a gallery slug reserved for /%s", async (slug) => {
+    const form = new FormData();
+    form.set("name", "Offsite");
+    form.set("slug", slug);
+    await expect(createEvent(form)).rejects.toThrow("Redirect:");
+    expect(redirect).toHaveBeenCalledWith(
+      `/admin?notice=${encodeURIComponent("That URL slug is reserved. Choose another event URL.")}`,
+    );
+    expect(await getFleetRepository().findEventBySlug(slug)).toBeNull();
+  });
+
   it("saves and clears both settings without changing the event identity", async () => {
     const { repository, events } = await setup();
     const form = new FormData();

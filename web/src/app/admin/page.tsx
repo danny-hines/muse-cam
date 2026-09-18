@@ -107,7 +107,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <div className="admin-list-row admin-event-row" key={event.id}>
                 <div>
                   <strong>{event.name}</strong>
-                  <span>/{event.slug}</span>
+                  <Link className="text-button" href={`/${event.slug}`}>View gallery /{event.slug} →</Link>
                 </div>
                 <EventSettingsForm
                   key={`${event.id}:${event.autoShare}:${event.publishOriginals}`}

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
 import { captureRetractions, photos } from "@/db/schema";
@@ -45,7 +45,7 @@ export class NeonPhotoRepository implements PhotoRepository {
     return rows[0] ?? null;
   }
 
-  async listShared(limit = 60): Promise<PhotoRecord[]> {
+  async listShared(limit = 60, eventId?: string | null): Promise<PhotoRecord[]> {
     return getDb()
       .select()
       .from(photos)
@@ -54,6 +54,8 @@ export class NeonPhotoRepository implements PhotoRepository {
           eq(photos.status, "complete"),
           isNotNull(photos.sharedAt),
           isNotNull(photos.resultPublicUrl),
+          eventId === undefined ? undefined : eventId === null
+            ? isNull(photos.eventId) : eq(photos.eventId, eventId),
         ),
       )
       .orderBy(desc(photos.sharedAt))

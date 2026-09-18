@@ -25,6 +25,7 @@ export interface FleetRepository {
   createEvent(input: CreateEventInput): Promise<EventRecord>;
   listEvents(): Promise<EventRecord[]>;
   findEventById(id: string): Promise<EventRecord | null>;
+  findEventBySlug(slug: string): Promise<EventRecord | null>;
   updateEventSettings(id: string, settings: EventSettings): Promise<EventRecord>;
   createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord>;
   listClaims(limit?: number): Promise<DeviceClaimRecord[]>;

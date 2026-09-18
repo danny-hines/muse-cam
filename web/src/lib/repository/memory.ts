@@ -73,9 +73,10 @@ export class MemoryPhotoRepository implements PhotoRepository {
     return [...getState().photos.values()].find((photo) => photo.publicSlug === slug) ?? null;
   }
 
-  async listShared(limit = 60): Promise<PhotoRecord[]> {
+  async listShared(limit = 60, eventId?: string | null): Promise<PhotoRecord[]> {
     return [...getState().photos.values()]
-      .filter((photo) => photo.sharedAt && photo.resultPublicUrl)
+      .filter((photo) => photo.status === "complete" && photo.sharedAt && photo.resultPublicUrl
+        && (eventId === undefined || photo.eventId === eventId))
       .sort((a, b) => b.sharedAt!.getTime() - a.sharedAt!.getTime())
       .slice(0, limit);
   }

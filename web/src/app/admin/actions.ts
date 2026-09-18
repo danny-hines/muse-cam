@@ -44,6 +44,9 @@ export async function createEvent(formData: FormData): Promise<void> {
     .replace(/^-|-$/g, "")
     .slice(0, 60);
   if (!name || !requestedSlug) redirect(destination("Event name is required"));
+  if (["admin", "api", "p"].includes(requestedSlug)) {
+    redirect(destination("That URL slug is reserved. Choose another event URL."));
+  }
   await getFleetRepository().createEvent({
     id: randomUUID(),
     name,
@@ -145,6 +148,7 @@ export async function unsharePhoto(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/admin");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
+  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
   redirect(destination("Photo removed from the public roll"));
 }
 
@@ -166,6 +170,7 @@ export async function publishOriginal(formData: FormData): Promise<void> {
   }
   revalidatePath(`/p/${photo.publicSlug}`);
   revalidatePath("/admin");
+  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
   redirect(destination("Original enabled for before-and-after view"));
 }
 
@@ -186,5 +191,6 @@ export async function deletePhoto(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/admin");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
+  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
   redirect(destination("Photo and stored media permanently deleted"));
 }

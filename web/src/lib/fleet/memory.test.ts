@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest";
 import { MemoryFleetRepository } from "./memory";
 
 describe("memory fleet repository", () => {
+  it("looks up an event by its public slug", async () => {
+    const repository = new MemoryFleetRepository();
+    const event = await repository.createEvent({
+      id: randomUUID(), slug: randomUUID(), name: "Offsite", publishOriginals: false,
+    });
+    expect(await repository.findEventBySlug(event.slug)).toEqual(event);
+    expect(await repository.findEventBySlug(randomUUID())).toBeNull();
+  });
   it("claims a setup code exactly once and assigns its event", async () => {
     const repository = new MemoryFleetRepository();
     const event = await repository.createEvent({

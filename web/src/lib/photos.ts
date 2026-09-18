@@ -4,12 +4,12 @@ import { getPreset } from "@/config/presets";
 import { demoPhotos } from "@/lib/demo-photos";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository, hasPersistentDatabase } from "@/lib/repository";
-import type { PhotoRecord, PublishedPhoto } from "@/lib/types";
+import type { EventRecord, PhotoRecord, PublishedPhoto } from "@/lib/types";
 
 function toPublishedPhoto(
   photo: PhotoRecord,
   deviceName = "Muse Cam 01",
-  eventName: string | null = null,
+  event: Pick<EventRecord, "name" | "slug"> | null = null,
 ): PublishedPhoto | null {
   const preset = getPreset(photo.presetId);
   if (!preset || !photo.publicSlug || !photo.resultPublicUrl || !photo.sharedAt) {
@@ -25,7 +25,8 @@ function toPublishedPhoto(
     imageUrl: photo.resultPublicUrl,
     originalImageUrl: photo.originalPublicUrl,
     deviceName,
-    eventName,
+    eventName: event?.name ?? null,
+    eventSlug: event?.slug ?? null,
     width: photo.width ?? 1200,
     height: photo.height ?? 900,
     capturedAt: photo.capturedAtDevice ?? photo.createdAt,
@@ -33,33 +34,35 @@ function toPublishedPhoto(
   };
 }
 
-async function readPublishedPhotos(): Promise<PublishedPhoto[]> {
+async function readPublishedPhotos(eventId?: string | null): Promise<PublishedPhoto[]> {
   const [records, devices, events] = await Promise.all([
-    getPhotoRepository().listShared(),
+    getPhotoRepository().listShared(60, eventId),
     getFleetRepository().listDevices(),
     getFleetRepository().listEvents(),
   ]);
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
-  const eventNames = new Map(events.map((event) => [event.id, event.name]));
+  const eventsById = new Map(events.map((event) => [event.id, event]));
   const published = records.flatMap((record) => {
     const photo = toPublishedPhoto(
       record,
       deviceNames.get(record.deviceId) ?? "Muse Cam 01",
-      record.eventId ? (eventNames.get(record.eventId) ?? null) : null,
+      record.eventId ? (eventsById.get(record.eventId) ?? null) : null,
     );
     return photo ? [photo] : [];
   });
 
-  if (!hasPersistentDatabase() && process.env.DEMO_MODE !== "false") {
+  if (!eventId && !hasPersistentDatabase() && process.env.DEMO_MODE !== "false") {
     return [...published, ...demoPhotos];
   }
 
   return published;
 }
 
-export async function listPublishedPhotos(): Promise<PublishedPhoto[]> {
-  return readPublishedPhotos();
+export async function listPublishedPhotos(eventId?: string | null): Promise<PublishedPhoto[]> {
+  return readPublishedPhotos(eventId);
 }
+
+export const getEventBySlug = cache((slug: string) => getFleetRepository().findEventBySlug(slug));
 
 export const getPublishedPhotoBySlug = cache(async (slug: string) => {
   const record = await getPhotoRepository().findByPublicSlug(slug);
@@ -68,7 +71,7 @@ export const getPublishedPhotoBySlug = cache(async (slug: string) => {
       getFleetRepository().findDeviceById(record.deviceId),
       record.eventId ? getFleetRepository().findEventById(record.eventId) : null,
     ]);
-    return toPublishedPhoto(record, device?.name ?? "Muse Cam 01", event?.name ?? null);
+    return toPublishedPhoto(record, device?.name ?? "Muse Cam 01", event);
   }
 
   return process.env.DEMO_MODE === "false"

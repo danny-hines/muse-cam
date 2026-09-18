@@ -46,8 +46,8 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
     <>
       <SiteHeader />
       <main className="detail-main">
-        <Link className="back-link" href="/">
-          <span aria-hidden="true">←</span> Back to the roll
+        <Link className="back-link" href={photo.eventSlug ? `/${photo.eventSlug}` : "/"}>
+          <span aria-hidden="true">←</span> {photo.eventName ? `Back to ${photo.eventName}` : "Back to the roll"}
         </Link>
         <div className="detail-layout">
           <div className="detail-image">
@@ -86,7 +86,9 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
               {photo.eventName ? (
                 <div className="detail-fact">
                   <dt>Event</dt>
-                  <dd>{photo.eventName}</dd>
+                  <dd>
+                    {photo.eventSlug ? <Link href={`/${photo.eventSlug}`}>{photo.eventName}</Link> : photo.eventName}
+                  </dd>
                 </div>
               ) : null}
               <div className="detail-fact">
