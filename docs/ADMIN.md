@@ -48,6 +48,14 @@ curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/i
   | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim XXXX-XXXX-XXXX-XXXX
 ```
 
+If the installer stops with `Registration failed (500)`, package installation has
+succeeded but the registration server failed. Check the server logs for
+`/api/device/claim` and resolve that error first. Then generate a fresh setup code
+and rerun the original installer command with the same hardware profile and the
+new code. The installer reuses the existing checkout and finishes writing the
+configuration and installing the services. Running `musecam claim` alone does not
+finish an interrupted first installation.
+
 ## Change a camera's event
 
 In **Cameras**, choose an event from the registered camera's **Event** dropdown and select **Save**. Choose **No event** to remove its assignment. The camera keeps its registration and token; no restart is needed.
