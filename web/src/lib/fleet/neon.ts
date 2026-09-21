@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
 import { deviceClaims, devices, events } from "@/db/schema";
@@ -62,9 +62,12 @@ export class NeonFleetRepository implements FleetRepository {
   }
 
   async claimDevice(input: ClaimDeviceInput): Promise<DeviceRecord | null> {
-    return getDb().transaction(async (transaction) => {
-      const now = new Date();
-      const claimed = await transaction
+    const db = getDb();
+    const now = new Date();
+    // neon-http cannot run interactive transactions. Consuming the code and
+    // inserting its device in one statement keeps both operations atomic.
+    const claim = db.$with("claimed_code").as(
+      db
         .update(deviceClaims)
         .set({ claimedAt: now })
         .where(
@@ -74,24 +77,24 @@ export class NeonFleetRepository implements FleetRepository {
             gt(deviceClaims.expiresAt, now),
           ),
         )
-        .returning();
-      const claim = claimed[0];
-      if (!claim) return null;
-      const rows = await transaction
-        .insert(devices)
-        .values({
-          id: input.deviceId,
-          name: input.deviceName || claim.suggestedName || "Muse Cam",
-          tokenHash: input.tokenHash,
+        .returning(),
+    );
+    const rows = await db.with(claim)
+      .insert(devices)
+      .select(
+        db.select({
+          id: sql<string>`${input.deviceId}`.as("id"),
+          name: sql<string>`coalesce(nullif(${input.deviceName}, ''), nullif(${claim.suggestedName}, ''), 'Muse Cam')`.as("name"),
+          tokenHash: sql<string>`${input.tokenHash}`.as("token_hash"),
           eventId: claim.eventId,
-          status: "active",
-          lastSeenAt: now,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      return firstOrThrow(rows, "Device", input.deviceId);
-    });
+          status: sql<"active">`'active'::device_status`.as("status"),
+          lastSeenAt: claim.claimedAt,
+          createdAt: claim.claimedAt,
+          updatedAt: claim.claimedAt,
+        }).from(claim),
+      )
+      .returning();
+    return rows[0] ?? null;
   }
 
   async findDeviceByTokenHash(tokenHash: string): Promise<DeviceRecord | null> {
