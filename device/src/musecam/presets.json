@@ -124,5 +124,89 @@
     "name": "Stained in Light",
     "description": "Luminous jewel-colored glass and carefully traced dark outlines.",
     "accent": "#78bed8"
+  },
+  {
+    "id": "brick-by-brick",
+    "version": 1,
+    "name": "Brick by Brick",
+    "description": "Plastic minifigures and a whole world built from glossy interlocking bricks.",
+    "accent": "#f4c542"
+  },
+  {
+    "id": "museum-piece",
+    "version": 1,
+    "name": "Museum Piece",
+    "description": "Rich oil paint, velvet clothing, and an unnecessarily regal old-master portrait.",
+    "accent": "#bd955b"
+  },
+  {
+    "id": "mall-portrait-1988",
+    "version": 1,
+    "name": "Mall Portrait, 1988",
+    "description": "Feathered hair, pastel sweaters, and gloriously soft-focus shopping-mall glamour.",
+    "accent": "#d4a6d5"
+  },
+  {
+    "id": "midnight-matinee",
+    "version": 1,
+    "name": "Midnight Matinee",
+    "description": "Silver-screen noir, hard shadows, and an everyday moment full of mystery.",
+    "accent": "#aab4c7"
+  },
+  {
+    "id": "rubber-hose",
+    "version": 1,
+    "name": "Rubber Hose",
+    "description": "Bendy limbs, pie-cut eyes, and the mischievous bounce of a 1930s cartoon.",
+    "accent": "#d8cbb0"
+  },
+  {
+    "id": "velvet-fever",
+    "version": 1,
+    "name": "Velvet Fever",
+    "description": "Fluorescent color, flowing patterns, and the glow of a psychedelic blacklight poster.",
+    "accent": "#dc79ef"
+  },
+  {
+    "id": "dream-logic",
+    "version": 1,
+    "name": "Dream Logic",
+    "description": "Ordinary people, floating furniture, and a photoreal world with impossible rules.",
+    "accent": "#9bbde5"
+  },
+  {
+    "id": "wish-you-were-here",
+    "version": 1,
+    "name": "Wish You Were Here",
+    "description": "A glamorous vintage travel illustration starring wherever you happen to be.",
+    "accent": "#ebaa74"
+  },
+  {
+    "id": "snow-globe",
+    "version": 1,
+    "name": "Snow Globe",
+    "description": "Your scene in a tiny glass globe, with drifting snow and curved reflections.",
+    "accent": "#a8d8e6"
+  },
+  {
+    "id": "deep-blue",
+    "version": 1,
+    "name": "Deep Blue",
+    "description": "An enchanted underwater world with rippling sunlight, bubbles, and passing fish.",
+    "accent": "#57bfd1"
+  },
+  {
+    "id": "high-seas",
+    "version": 1,
+    "name": "High Seas",
+    "description": "Tricorn hats, weathered coats, and a sunlit pirate adventure on the high seas.",
+    "accent": "#58b7af"
+  },
+  {
+    "id": "high-noon",
+    "version": 1,
+    "name": "High Noon",
+    "description": "Cowboy hats, worn leather, and the dusty golden light of a classic Western.",
+    "accent": "#d79861"
   }
 ]
