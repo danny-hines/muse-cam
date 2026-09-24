@@ -20,7 +20,7 @@ The web/API foundation is functional:
 - Event assignment and 30-minute, single-use device setup codes.
 - Idempotent capture IDs.
 - Generation, status, image download, share, and unshare endpoints.
-- Six versioned image presets.
+- Thirty versioned image presets.
 - Mock image transformation for end-to-end development without a Meta key.
 - Neon Postgres and private/public Vercel Blob adapters.
 - A protected operator dashboard for registration, moderation, and deletion.
