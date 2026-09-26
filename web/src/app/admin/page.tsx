@@ -11,7 +11,7 @@ import {
 } from "@/app/admin/actions";
 import { CreateClaimForm } from "@/components/create-claim-form";
 import { DeletePhotoForm } from "@/components/delete-photo-form";
-import { DeviceEventForm } from "@/components/device-event-form";
+import { DeviceEventForm, DeviceNameForm } from "@/components/device-event-form";
 import { EventSettingsForm } from "@/components/event-settings-form";
 import { getPreset } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
@@ -151,6 +151,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     {device.status === "active" ? "Revoke" : "Restore"}
                   </button>
                 </form>
+                <DeviceNameForm key={`${device.id}:${device.name}`} device={{ id: device.id, name: device.name }} />
                 <DeviceEventForm
                   key={`${device.id}:${device.eventId ?? ""}`}
                   device={{ id: device.id, name: device.name, eventId: device.eventId }}

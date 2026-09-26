@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { updateDeviceEvent } from "@/app/admin/actions";
+import { renameDevice, updateDeviceEvent } from "@/app/admin/actions";
 
 type DeviceEventFormProps = {
   device: { id: string; name: string; eventId: string | null };
@@ -43,6 +43,28 @@ export function DeviceEventForm({ device, events }: DeviceEventFormProps) {
         </select>
       </label>
       <SaveButton changed={eventId !== (device.eventId ?? "")} />
+    </form>
+  );
+}
+
+export function DeviceNameForm({ device }: { device: { id: string; name: string } }) {
+  const [name, setName] = useState(device.name);
+
+  return (
+    <form action={renameDevice} className="admin-form device-event-form">
+      <input type="hidden" name="id" value={device.id} />
+      <label>
+        Name
+        <input
+          name="name"
+          aria-label={`Name for ${device.name}`}
+          value={name}
+          maxLength={80}
+          required
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <SaveButton changed={name.trim() !== "" && name.trim() !== device.name} />
     </form>
   );
 }

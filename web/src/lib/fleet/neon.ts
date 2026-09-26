@@ -146,6 +146,15 @@ export class NeonFleetRepository implements FleetRepository {
     return firstOrThrow(rows, "Device", id);
   }
 
+  async updateDeviceName(id: string, name: string): Promise<DeviceRecord> {
+    const rows = await getDb()
+      .update(devices)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(devices.id, id))
+      .returning();
+    return firstOrThrow(rows, "Device", id);
+  }
+
   async updateDeviceStatus(
     id: string,
     status: DeviceRecord["status"],

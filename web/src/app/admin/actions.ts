@@ -122,6 +122,23 @@ export async function updateDeviceEvent(formData: FormData): Promise<void> {
   redirect(destination(`${device.name} assigned to ${event.name}`));
 }
 
+export async function renameDevice(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim().slice(0, 80);
+  if (!id || !name) redirect(destination("Camera name is required"));
+
+  const repository = getFleetRepository();
+  const device = await repository.findDeviceById(id);
+  if (!device) redirect(destination("Camera not found"));
+
+  await repository.updateDeviceName(id, name);
+  revalidatePath("/admin");
+  revalidatePath("/[eventSlug]", "page");
+  revalidatePath("/p/[slug]", "page");
+  redirect(destination(`${device.name} renamed to ${name}`));
+}
+
 export async function toggleDevice(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");

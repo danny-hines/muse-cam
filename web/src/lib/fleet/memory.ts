@@ -141,6 +141,12 @@ export class MemoryFleetRepository implements FleetRepository {
     return updated;
   }
 
+  async updateDeviceName(id: string, name: string): Promise<DeviceRecord> {
+    const updated = { ...requireDevice(id), name, updatedAt: new Date() };
+    state().devices.set(id, updated);
+    return updated;
+  }
+
   async updateDeviceStatus(
     id: string,
     status: DeviceRecord["status"],
