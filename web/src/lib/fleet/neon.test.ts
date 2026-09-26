@@ -127,4 +127,16 @@ describe("Neon HTTP camera registration", () => {
     expect(await repository.claimDevice(input())).not.toBeNull();
     expect(await repository.listDevices()).toHaveLength(2);
   });
+
+  it("keeps a renamed configured camera's name when it syncs and when its token rotates", async () => {
+    await repository.syncConfiguredDevice({ id: "muse-cam-01", tokenHash: "original-token" });
+    const renamed = await repository.updateDeviceName("muse-cam-01", "Seattle table");
+
+    await repository.syncConfiguredDevice({ id: "muse-cam-01", tokenHash: "original-token" });
+    expect(await repository.findDeviceById("muse-cam-01")).toMatchObject({ name: "Seattle table" });
+    await repository.syncConfiguredDevice({ id: "muse-cam-01", tokenHash: "rotated-token" });
+    expect(await repository.findDeviceById("muse-cam-01")).toMatchObject({
+      ...renamed, tokenHash: "rotated-token", updatedAt: expect.any(Date),
+    });
+  });
 });

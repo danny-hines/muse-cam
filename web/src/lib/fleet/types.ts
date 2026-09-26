@@ -36,5 +36,6 @@ export interface FleetRepository {
   listDevices(): Promise<DeviceRecord[]>;
   touchDevice(id: string): Promise<void>;
   updateDeviceEvent(id: string, eventId: string | null): Promise<DeviceRecord>;
+  updateDeviceName(id: string, name: string): Promise<DeviceRecord>;
   updateDeviceStatus(id: string, status: DeviceRecord["status"]): Promise<DeviceRecord>;
 }

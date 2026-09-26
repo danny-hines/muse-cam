@@ -56,6 +56,10 @@ new code. The installer reuses the existing checkout and finishes writing the
 configuration and installing the services. Running `musecam claim` alone does not
 finish an interrupted first installation.
 
+## Rename a camera
+
+In **Cameras**, edit the registered camera's **Name** and select **Save**. The name appears in the dashboard and on public photo cards and pages, including photos taken before the rename. Renaming is server-only: the camera keeps its registration, token, event, and revoked status, and needs no restart. Environment-configured cameras keep their new name when their token syncs or rotates.
+
 ## Change a camera's event
 
 In **Cameras**, choose an event from the registered camera's **Event** dropdown and select **Save**. A camera can move between events but cannot be left without one. The camera keeps its registration and token; no restart is needed.

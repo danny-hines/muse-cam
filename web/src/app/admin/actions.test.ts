@@ -7,7 +7,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
-import { createClaim, createEvent, updateDeviceEvent, updateEventSettings } from "./actions";
+import { createClaim, createEvent, renameDevice, updateDeviceEvent, updateEventSettings } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -116,6 +116,64 @@ describe("camera event reassignment", () => {
     expect(redirect).toHaveBeenCalledWith(`/admin?notice=${encodeURIComponent(message)}`);
     expect(await repository.findDeviceById(device.id)).toEqual(device);
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("camera renaming", () => {
+  function renameForm(id: string, name: string | null) {
+    const form = new FormData();
+    form.set("id", id);
+    if (name !== null) form.set("name", name);
+    return form;
+  }
+
+  it("changes only the name, keeping the camera's event, credential, status, and photos", async () => {
+    const { repository, events, device, token } = await setup();
+    await repository.updateDeviceStatus(device.id, "revoked");
+    const photo = await getPhotoRepository().create({
+      id: randomUUID(), captureId: randomUUID(), deviceId: device.id, eventId: events[0].id,
+      presetId: "test", presetVersion: 1, capturedAtDevice: null,
+    });
+
+    await expect(renameDevice(renameForm(device.id, "  Menlo Park table  "))).rejects.toThrow("Redirect:");
+
+    expect(redirect).toHaveBeenCalledWith(
+      `/admin?notice=${encodeURIComponent("Lobby camera renamed to Menlo Park table")}`,
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/[eventSlug]", "page");
+    expect(await repository.findDeviceById(device.id)).toMatchObject({
+      id: device.id, name: "Menlo Park table", eventId: events[0].id, tokenHash: sha256(token), status: "revoked",
+    });
+    expect(await getPhotoRepository().findById(photo.id)).toEqual(photo);
+  });
+
+  it("limits names to 80 characters", async () => {
+    const { repository, device } = await setup();
+    await expect(renameDevice(renameForm(device.id, "x".repeat(100)))).rejects.toThrow("Redirect:");
+    expect((await repository.findDeviceById(device.id))?.name).toBe("x".repeat(80));
+  });
+
+  it.each([
+    ["a blank name", "   ", "Camera name is required"],
+    ["a missing name", null, "Camera name is required"],
+  ])("rejects %s without renaming", async (_case, name, message) => {
+    const { repository, device } = await setup();
+    await expect(renameDevice(renameForm(device.id, name))).rejects.toThrow("Redirect:");
+    expect(redirect).toHaveBeenCalledWith(`/admin?notice=${encodeURIComponent(message)}`);
+    expect(await repository.findDeviceById(device.id)).toEqual(device);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown camera", async () => {
+    await expect(renameDevice(renameForm("missing-camera", "Seattle"))).rejects.toThrow("Redirect:");
+    expect(redirect).toHaveBeenCalledWith(`/admin?notice=${encodeURIComponent("Camera not found")}`);
+  });
+
+  it("requires an admin session", async () => {
+    const { repository, device } = await setup();
+    vi.mocked(isAdminAuthenticated).mockResolvedValue(false);
+    await expect(renameDevice(renameForm(device.id, "Seattle"))).rejects.toThrow("Redirect: /admin/login");
+    expect(await repository.findDeviceById(device.id)).toEqual(device);
   });
 });
 
