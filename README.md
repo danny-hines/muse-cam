@@ -15,7 +15,7 @@ This repository contains both sides of the project:
 
 The web/API foundation is functional:
 
-- Responsive public feed and individual photo pages.
+- Responsive per-event galleries, an event-code home page, and individual photo pages.
 - Individual, revocable device credentials plus a legacy single-token fallback.
 - Event assignment and 30-minute, single-use device setup codes.
 - Idempotent capture IDs.
@@ -39,7 +39,7 @@ pnpm install
 pnpm dev
 ```
 
-Set a development `DEVICE_API_TOKEN` in `web/.env.local`. With `MODEL_PROVIDER=mock`, Neon and Blob are optional. Open [http://localhost:3000](http://localhost:3000) for the feed and [http://localhost:3000/api/health](http://localhost:3000/api/health) for configuration status.
+Set a development `DEVICE_API_TOKEN` in `web/.env.local`. With `MODEL_PROVIDER=mock`, Neon and Blob are optional. Open [http://localhost:3000/demo](http://localhost:3000/demo) for the demo gallery and [http://localhost:3000/api/health](http://localhost:3000/api/health) for configuration status.
 
 Useful commands:
 
@@ -69,6 +69,8 @@ Production device mutations intentionally refuse to run until the database, both
 
 ## API smoke test from a workstation
 
+Every photo belongs to an event, so first assign the camera to an event at `/admin`. Until then, uploads return a retryable `503` (`camera_unassigned`).
+
 ```bash
 curl -X POST http://localhost:3000/api/device/generations \
   -H "Authorization: Bearer $MUSECAM_DEVICE_TOKEN" \
@@ -97,5 +99,5 @@ The [parts list](hardware/BOM.md), [illustrated build guide](hardware/BUILD.md),
 - Uploaded source images are normalized and stripped of EXIF before storage.
 - Originals and unshared results use a private Blob store.
 - A result is copied to the public Blob store only after the share endpoint is called.
-- The public feed never exposes the source photograph unless an operator explicitly enables originals for that photo or event.
+- Event galleries never expose the source photograph unless an operator explicitly enables originals for that photo or event.
 - Hiding a photo deletes both public copies but retains private media; permanent deletion removes the database record and all stored media.

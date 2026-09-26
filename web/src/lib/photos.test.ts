@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import { retiredPresets } from "@/config/presets";
-import type { PhotoRecord } from "@/lib/types";
+import type { EventRecord, PhotoRecord } from "@/lib/types";
 
 const repository = vi.hoisted(() => ({
   findByPublicSlug: vi.fn(),
@@ -9,10 +9,14 @@ const repository = vi.hoisted(() => ({
   findSharedNeighbors: vi.fn(),
 }));
 
+const event = vi.hoisted((): EventRecord => ({
+  id: "event-id", slug: "sei-nyc", name: "NYC Offsite", publishOriginals: false, autoShare: false,
+  createdAt: new Date(), updatedAt: new Date(),
+}));
+
 const fleet = vi.hoisted(() => ({
-  findEventById: vi.fn(),
+  findEventById: vi.fn(async (): Promise<EventRecord | null> => event),
   findEventBySlug: vi.fn(),
-  listEvents: vi.fn(async () => [] as Array<{ id: string; name: string; slug: string }>),
 }));
 
 vi.mock("@/lib/repository", () => ({
@@ -37,7 +41,7 @@ it.each(retiredPresets)("preserves shared links and gallery entries for $name", 
     id: "photo",
     captureId: "capture",
     deviceId: "camera",
-    eventId: null,
+    eventId: event.id,
     presetId: preset.id,
     presetVersion: preset.version,
     status: "complete",
@@ -67,29 +71,46 @@ it.each(retiredPresets)("preserves shared links and gallery entries for $name", 
     imageUrl: photo.resultPublicUrl,
     originalImageUrl: photo.originalPublicUrl,
     deviceName: "Test Camera",
+    eventName: event.name,
+    eventSlug: event.slug,
   });
-  expect(await listPublishedPhotos()).toEqual([shared]);
+  expect(await listPublishedPhotos(event)).toEqual([shared]);
 });
 
 it("resolves gallery URLs and passes the event filter to the repository", async () => {
-  const event = { id: "event-id", name: "NYC Offsite", slug: "sei-nyc" };
   fleet.findEventBySlug.mockResolvedValueOnce(event).mockResolvedValueOnce(null);
   repository.listShared.mockResolvedValue([]);
   expect(await getEventBySlug("sei-nyc")).toEqual(event);
   expect(await getEventBySlug("missing-event")).toBeNull();
-  expect(await listPublishedPhotos(event.id)).toEqual([]);
-  expect(repository.listShared).toHaveBeenCalledWith(60, event.id);
+  expect(await listPublishedPhotos(event)).toEqual([]);
+  expect(repository.listShared).toHaveBeenCalledWith(event.id, 60);
+});
+
+it("does not serve demo frames or the demo event when a database is connected", async () => {
+  fleet.findEventBySlug.mockResolvedValue(null);
+  repository.findByPublicSlug.mockResolvedValue(null);
+  expect(await getEventBySlug("demo")).toBeNull();
+  expect(await getPublishedPhotoBySlug("after-the-end")).toBeNull();
+});
+
+it("does not render a photo whose event cannot be found", async () => {
+  const date = new Date();
+  repository.findByPublicSlug.mockResolvedValue({
+    id: "orphan", deviceId: "camera", eventId: "missing", status: "complete",
+    presetId: "kid-drawing", publicSlug: "orphan", resultPublicUrl: "https://example.test/orphan.jpg",
+    sharedAt: date, createdAt: date,
+  });
+  fleet.findEventById.mockResolvedValueOnce(null);
+  expect(await getPublishedPhotoBySlug("orphan")).toBeNull();
 });
 
 it("includes the saved event's gallery link on a photo", async () => {
-  const event = { id: "event-id", name: "NYC Offsite", slug: "sei-nyc" };
   const date = new Date();
   repository.findByPublicSlug.mockResolvedValue({
     id: "event-photo", deviceId: "camera", eventId: event.id, status: "complete",
     presetId: "kid-drawing", publicSlug: "event-photo", resultPublicUrl: "https://example.test/event.jpg",
     sharedAt: date, createdAt: date,
   });
-  fleet.findEventById.mockResolvedValue(event);
   expect(await getPublishedPhotoBySlug("event-photo")).toMatchObject({
     eventName: event.name, eventSlug: event.slug,
   });
@@ -97,7 +118,7 @@ it("includes the saved event's gallery link on a photo", async () => {
 
 it("only exposes an original that has been published", async () => {
   repository.findByPublicSlug.mockResolvedValue({
-    id: "private-original", deviceId: "camera", status: "complete", presetId: "kid-drawing",
+    id: "private-original", deviceId: "camera", eventId: event.id, status: "complete", presetId: "kid-drawing",
     publicSlug: "private-original", resultPublicUrl: "https://example.test/result.jpg",
     originalPrivateRef: "private/original.jpg", originalPublicUrl: null,
     sharedAt: new Date(), createdAt: new Date(),
@@ -115,11 +136,9 @@ it("does not render a failed photo even if it has an old public slug", async () 
   expect(await getPublishedPhotoBySlug("failed")).toBeNull();
 });
 
-it("preserves event or public roll scope when finding neighboring photos", async () => {
+it("finds neighboring photos within the photo's event", async () => {
   const neighbors = { previousSlug: "newer", nextSlug: "older" };
   repository.findSharedNeighbors.mockResolvedValue(neighbors);
   expect(await getPublishedPhotoNeighbors("middle")).toEqual(neighbors);
-  expect(repository.findSharedNeighbors).toHaveBeenLastCalledWith("middle", true);
-  expect(await getPublishedPhotoNeighbors("middle", false)).toEqual(neighbors);
-  expect(repository.findSharedNeighbors).toHaveBeenLastCalledWith("middle", false);
+  expect(repository.findSharedNeighbors).toHaveBeenLastCalledWith("middle");
 });

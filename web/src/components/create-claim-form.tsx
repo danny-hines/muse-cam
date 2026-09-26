@@ -13,6 +13,10 @@ type CreateClaimFormProps = {
 export function CreateClaimForm({ events }: CreateClaimFormProps) {
   const [state, action, pending] = useActionState(createClaim, INITIAL_STATE);
 
+  if (events.length === 0) {
+    return <p className="device-event-help">Create an event before registering a camera.</p>;
+  }
+
   return (
     <>
       <form action={action} className="admin-form compact-form">
@@ -22,8 +26,8 @@ export function CreateClaimForm({ events }: CreateClaimFormProps) {
         </label>
         <label>
           Event
-          <select name="eventId" defaultValue="">
-            <option value="">No event</option>
+          <select name="eventId" defaultValue="" required>
+            <option value="" disabled>Choose an event</option>
             {events.map((event) => (
               <option key={event.id} value={event.id}>
                 {event.name}
@@ -34,6 +38,7 @@ export function CreateClaimForm({ events }: CreateClaimFormProps) {
         <button type="submit" disabled={pending}>
           {pending ? "Creating…" : "Create setup code"}
         </button>
+        {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}
       </form>
       {state.code ? (
         <div className="claim-banner compact-claim">

@@ -67,6 +67,8 @@ Example response:
 
 Submitting the same `capture_id` again returns the existing job and does not call the model twice.
 
+Every photo belongs to the camera's event. A camera without an event receives `503` with `details.code` set to `camera_unassigned`; the camera keeps the capture queued and retries, and the upload succeeds once an operator assigns an event.
+
 If the camera's event has auto-sharing enabled when the upload first arrives, the completed response includes `shareUrl` and `sharedAt`. The event's originals setting still controls whether the source is public. A temporary auto-share failure returns `503`; retry with the same capture ID to publish the saved result without regenerating. Retried older manual or hidden photos are not automatically published when event settings change.
 
 ## Read status
@@ -99,7 +101,7 @@ Copies the result from private to public Blob storage, assigns an unguessable sl
 DELETE /api/device/generations/:id/share
 ```
 
-Deletes all public copies and removes the frame from the feed. Private media is retained until an operator permanently deletes the capture.
+Deletes all public copies and removes the frame from its event gallery. Private media is retained until an operator permanently deletes the capture.
 
 ## Retract a camera-deleted capture
 

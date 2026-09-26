@@ -16,13 +16,13 @@ This lightweight operator-key flow is appropriate for the showcase build and a s
 
 ## Events and original photos
 
-Each event has a public gallery at `/<event-slug>` (for example, `/sei-nyc`). Open it with **View gallery** in the dashboard. The gallery shows only that event's shared photos; private photos stay private. Shared event photos also appear on the combined home feed, and their detail pages link back to the event. Camera assignments apply to new uploads; older photos keep their saved event.
+Every photo belongs to an event. Each event has a public gallery at `/<event-slug>` (for example, `/sei-nyc`). Open it with **View gallery** in the dashboard. The gallery shows only that event's shared photos; private photos stay private, and photo pages link back to and navigate within their event. The home page lists no photos: visitors enter an event code there, or a pasted gallery URL, and are taken to that event's gallery. Camera assignments apply to new uploads; older photos keep their saved event.
 
 Events also define the privacy default for original photos. “Allow before-and-after originals” means that photos shared by a camera assigned to that event publish both the transformed image and the normalized source image. It is off by default.
 
 For a photo shared without its original, an operator can later choose **Enable original**. The public detail page then displays explicit Transformed and Original controls. Originals are not revealed on feed hover.
 
-Each event also has an **Automatically share new photos to the public roll** setting, off by default. Set it when creating an event, or edit it under that event and select **Save settings**. You can also change whether future shares include originals there. Enabling auto-sharing does not publish older photos, and disabling it does not retract existing shares.
+Each event also has an **Automatically share new photos to the event gallery** setting, off by default. Set it when creating an event, or edit it under that event and select **Save settings**. You can also change whether future shares include originals there. Enabling auto-sharing does not publish older photos, and disabling it does not retract existing shares.
 
 The server applies the event's auto-share setting when an upload first arrives. Successful auto-shares return their link with the generated photo, so the camera shows it as shared without a restart. Sharing failures retry the saved result without another model generation.
 
@@ -32,10 +32,10 @@ Deployment requires applying the database migration with `pnpm --dir web db:migr
 
 ## Register a camera
 
-An existing camera configured with `DEVICE_API_TOKEN` or `DEVICE_API_TOKEN_SHA256` appears automatically when an operator opens the dashboard or the camera makes a request. It keeps its `DEVICE_ID` and credential, starts with **No event**, and supports the same event assignment and revoke controls as cameras registered with a setup code. No reinstall is needed. Syncing or rotating the configured token preserves its event and revoked status.
+An existing camera configured with `DEVICE_API_TOKEN` or `DEVICE_API_TOKEN_SHA256` appears automatically when an operator opens the dashboard or the camera makes a request. It keeps its `DEVICE_ID` and credential, starts without an event, and supports the same event assignment and revoke controls as cameras registered with a setup code. Assign it an event before use. No reinstall is needed. Syncing or rotating the configured token preserves its event and revoked status.
 
-1. Create or choose an event.
-2. Enter a suggested camera name and select **Create setup code**.
+1. Create or choose an event. Setup codes require one.
+2. Enter a suggested camera name, choose the event, and select **Create setup code**.
 3. Within 30 minutes, run the displayed command on the camera.
 4. Restart `musecam.service` if it is already running.
 
@@ -58,7 +58,9 @@ finish an interrupted first installation.
 
 ## Change a camera's event
 
-In **Cameras**, choose an event from the registered camera's **Event** dropdown and select **Save**. Choose **No event** to remove its assignment. The camera keeps its registration and token; no restart is needed.
+In **Cameras**, choose an event from the registered camera's **Event** dropdown and select **Save**. A camera can move between events but cannot be left without one. The camera keeps its registration and token; no restart is needed.
+
+A camera without an event, such as a newly synced environment-configured camera, is marked **Uploads paused** in the dashboard. The server answers its uploads with a retryable `503`, so the camera keeps captures queued; once assigned, they upload to that event.
 
 The change applies to new uploads, including captures waiting to be uploaded. Photos already uploaded keep their original event and follow that event's original-photo privacy setting.
 

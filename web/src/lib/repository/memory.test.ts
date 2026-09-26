@@ -5,7 +5,7 @@ import { MemoryPhotoRepository } from "./memory";
 
 afterEach(() => vi.useRealTimers());
 
-async function sharedPhoto(repository: MemoryPhotoRepository, eventId: string | null, id: string = randomUUID()) {
+async function sharedPhoto(repository: MemoryPhotoRepository, eventId: string, id: string = randomUUID()) {
   await repository.create({
     id, captureId: id, deviceId: "camera", eventId,
     presetId: "kid-drawing", presetVersion: 1, capturedAtDevice: null,
@@ -22,7 +22,7 @@ describe("event galleries", () => {
     const repository = new MemoryPhotoRepository();
     const eventId = randomUUID();
     const otherEventId = randomUUID();
-    async function photo(event: string | null, shared = true) {
+    async function photo(event: string, shared = true) {
       const id = randomUUID();
       await repository.create({
         id, captureId: id, deviceId: "camera", eventId: event,
@@ -42,15 +42,12 @@ describe("event galleries", () => {
     await repository.markFailed(failed, "test-error");
     const retracted = await photo(eventId);
     await repository.markUnshared(retracted);
-    const unassigned = await photo(null);
     for (let index = 0; index < 65; index++) await photo(otherEventId);
 
-    const eventPhotos = await repository.listShared(60, eventId);
+    const eventPhotos = await repository.listShared(eventId, 60);
     expect(eventPhotos.map(({ id }) => id).sort()).toEqual([first, second].sort());
-    expect(await repository.listShared(60, randomUUID())).toEqual([]);
-    expect((await repository.listShared(100, null)).map(({ id }) => id)).toContain(unassigned);
-    expect((await repository.listShared(100, null)).every((record) => record.eventId === null)).toBe(true);
-    expect(await repository.listShared(60, otherEventId)).toHaveLength(60);
+    expect(await repository.listShared(randomUUID(), 60)).toEqual([]);
+    expect(await repository.listShared(otherEventId, 60)).toHaveLength(60);
   });
 });
 
@@ -66,18 +63,18 @@ describe("photo navigation", () => {
       await sharedPhoto(repository, eventId, id);
       ids.push(id);
     }
-    expect((await repository.listShared(3, eventId)).map((photo) => photo.id)).toEqual(ids.slice(-3).reverse());
+    expect((await repository.listShared(eventId, 3)).map((photo) => photo.id)).toEqual(ids.slice(-3).reverse());
     expect(await repository.findSharedNeighbors(ids[64])).toEqual({ previousSlug: null, nextSlug: ids[63] });
     expect(await repository.findSharedNeighbors(ids[2])).toEqual({ previousSlug: ids[3], nextSlug: ids[1] });
     expect(await repository.findSharedNeighbors(ids[0])).toEqual({ previousSlug: ids[1], nextSlug: null });
   });
 
-  it("skips other events, private, failed, and deleted photos while allowing public roll navigation", async () => {
+  it("stays within the event and skips private, failed, and deleted photos", async () => {
     vi.useFakeTimers();
     const repository = new MemoryPhotoRepository();
     const eventId = randomUUID();
     let time = new Date("2099-09-18T12:00:00Z").getTime();
-    async function add(event: string | null = eventId) {
+    async function add(event: string = eventId) {
       vi.setSystemTime(time += 1000);
       return sharedPhoto(repository, event);
     }
@@ -89,13 +86,10 @@ describe("photo navigation", () => {
     const deleted = await add();
     await repository.delete(deleted.id);
     const otherEvent = await add(randomUUID());
-    const unassigned = await add(null);
     const newest = await add();
 
     expect(await repository.findSharedNeighbors(newest.publicSlug!)).toEqual({ previousSlug: null, nextSlug: oldest.publicSlug });
     expect(await repository.findSharedNeighbors(oldest.publicSlug!)).toEqual({ previousSlug: newest.publicSlug, nextSlug: null });
-    expect(await repository.findSharedNeighbors(newest.publicSlug!, false)).toEqual({ previousSlug: null, nextSlug: unassigned.publicSlug });
-    expect(await repository.findSharedNeighbors(unassigned.publicSlug!)).toEqual({ previousSlug: newest.publicSlug, nextSlug: otherEvent.publicSlug });
     for (const photo of [hidden, failed, deleted]) {
       expect(await repository.findSharedNeighbors(photo.publicSlug!)).toEqual({ previousSlug: null, nextSlug: null });
     }

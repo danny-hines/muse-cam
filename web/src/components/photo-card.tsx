@@ -4,8 +4,8 @@ import { PhotoImage } from "@/components/photo-image";
 import { relativeTime } from "@/lib/time";
 import type { PublishedPhoto } from "@/lib/types";
 
-export function PhotoCard({ photo, index, gallery }: { photo: PublishedPhoto; index: number; gallery?: "roll" }) {
-  const href = `/p/${photo.publicSlug}${gallery === "roll" ? "?gallery=roll" : ""}`;
+export function PhotoCard({ photo, index }: { photo: PublishedPhoto; index: number }) {
+  const href = `/p/${photo.publicSlug}`;
 
   return (
     <article className="photo-card">
@@ -24,7 +24,7 @@ export function PhotoCard({ photo, index, gallery }: { photo: PublishedPhoto; in
         <div className="photo-meta">
           <div>
             <p className="preset-name">{photo.presetName}</p>
-            <p className="photo-origin">{photo.eventName ?? photo.deviceName}</p>
+            <p className="photo-origin">{photo.deviceName}</p>
           </div>
           <time className="photo-time" dateTime={photo.sharedAt.toISOString()}>
             {relativeTime(photo.sharedAt)}

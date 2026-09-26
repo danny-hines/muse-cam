@@ -36,6 +36,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ]);
   const eventOptions = events.map(({ id, name }) => ({ id, name }));
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
+  const eventNames = new Map(events.map((event) => [event.id, event.name]));
 
   return (
     <main className="admin-main">
@@ -45,7 +46,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <h1>Muse Cam control room</h1>
         </div>
         <div className="admin-header-actions">
-          <Link href="/">View public roll</Link>
           <form action={logout}>
             <button type="submit">Sign out</button>
           </form>
@@ -91,7 +91,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </label>
             <label className="check-label">
               <input name="autoShare" type="checkbox" />
-              Automatically share new photos to the public roll
+              Automatically share new photos to the event gallery
             </label>
             <label className="check-label">
               <input name="publishOriginals" type="checkbox" />
@@ -128,7 +128,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <CreateClaimForm events={eventOptions} />
           {devices.length > 0 ? (
             <p className="device-event-help">
-              Event changes apply to new uploads. Existing photos keep their event.
+              Every camera needs an event. Changes apply to new uploads; existing photos keep their event.
             </p>
           ) : null}
           <div className="admin-list">
@@ -136,6 +136,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <div className="admin-list-row admin-device-row" key={device.id}>
                 <div>
                   <strong>{device.name}</strong>
+                  {device.eventId ? null : (
+                    <span className="device-unassigned">Uploads paused until assigned to an event</span>
+                  )}
                 </div>
                 <form action={toggleDevice}>
                   <input type="hidden" name="id" value={device.id} />
@@ -189,6 +192,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
                 <div className="admin-photo-copy">
                   <strong>{preset?.name ?? photo.presetId}</strong>
+                  <span>{eventNames.get(photo.eventId) ?? photo.eventId}</span>
                   <span>{deviceNames.get(photo.deviceId) ?? photo.deviceId}</span>
                   <span>{fullTimestamp(photo.capturedAtDevice ?? photo.createdAt)}</span>
                 </div>

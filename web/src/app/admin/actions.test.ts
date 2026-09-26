@@ -7,7 +7,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
-import { createEvent, updateDeviceEvent, updateEventSettings } from "./actions";
+import { createClaim, createEvent, updateDeviceEvent, updateEventSettings } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -79,19 +79,15 @@ describe("camera event reassignment", () => {
     expect(await photos.findById(photo.id)).toEqual(photo);
   });
 
-  it("allows removing an event without restoring a revoked camera", async () => {
-    const { repository, device, form } = await setup();
+  it("reassigns a revoked camera without restoring it", async () => {
+    const { repository, events, device, form } = await setup();
     await repository.updateDeviceStatus(device.id, "revoked");
-    form.set("eventId", "");
 
     await expect(updateDeviceEvent(form)).rejects.toThrow("Redirect:");
 
     expect(await repository.findDeviceById(device.id)).toMatchObject({
-      eventId: null, status: "revoked", tokenHash: device.tokenHash,
+      eventId: events[1].id, status: "revoked", tokenHash: device.tokenHash,
     });
-    expect(redirect).toHaveBeenCalledWith(
-      `/admin?notice=${encodeURIComponent("Lobby camera is now unassigned")}`,
-    );
   });
 
   it("requires an admin session before changing the assignment", async () => {
@@ -109,6 +105,7 @@ describe("camera event reassignment", () => {
     ["unknown event", "eventId", "missing-event", "Event not found"],
     ["missing camera", "id", null, "Camera and event selection are required"],
     ["missing event field", "eventId", null, "Camera and event selection are required"],
+    ["removed event", "eventId", "", "Camera and event selection are required"],
   ])("rejects %s without changing the assignment", async (_case, field, value, message) => {
     const { repository, device, form } = await setup();
     if (value === null) form.delete(field);
@@ -122,7 +119,47 @@ describe("camera event reassignment", () => {
   });
 });
 
+describe("camera setup codes", () => {
+  it("creates a code for an existing event", async () => {
+    const { repository, events } = await setup();
+    const form = new FormData();
+    form.set("eventId", events[1].id);
+    form.set("name", "Menlo Park camera");
+
+    const state = await createClaim({ code: null, error: null }, form);
+
+    expect(state).toEqual({ code: expect.stringMatching(/^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/), error: null });
+    const codeHash = sha256(state.code!.replaceAll("-", ""));
+    expect((await repository.listClaims(1_000)).find((claim) => claim.codeHash === codeHash)).toMatchObject({
+      eventId: events[1].id, suggestedName: "Menlo Park camera",
+    });
+  });
+
+  it.each([["no", null], ["an empty", ""], ["an unknown", "missing-event"]])(
+    "refuses a code with %s event",
+    async (_case, eventId) => {
+      const repository = getFleetRepository();
+      const before = await repository.listClaims(1_000);
+      const form = new FormData();
+      if (eventId !== null) form.set("eventId", eventId);
+
+      expect(await createClaim({ code: null, error: null }, form)).toEqual({
+        code: null, error: "Choose an event for this camera",
+      });
+      expect(await repository.listClaims(1_000)).toHaveLength(before.length);
+    },
+  );
+});
+
 describe("event sharing settings", () => {
+  it("derives the gallery URL from the name when the slug field is blank", async () => {
+    const form = new FormData();
+    form.set("name", "Social AILW");
+    form.set("slug", "");
+    await expect(createEvent(form)).rejects.toThrow("Redirect:");
+    expect(await getFleetRepository().findEventBySlug("social-ailw")).toMatchObject({ name: "Social AILW" });
+  });
+
   it.each(["admin", "api", "p"])("rejects a gallery slug reserved for /%s", async (slug) => {
     const form = new FormData();
     form.set("name", "Offsite");

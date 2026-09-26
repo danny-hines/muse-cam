@@ -19,7 +19,7 @@ export function EventSettingsForm({ event }: EventSettingsFormProps) {
       <input type="hidden" name="id" value={event.id} />
       <label className="check-label">
         <input name="autoShare" type="checkbox" defaultChecked={event.autoShare} />
-        Automatically share new photos to the public roll
+        Automatically share new photos to the event gallery
       </label>
       <label className="check-label">
         <input name="publishOriginals" type="checkbox" defaultChecked={event.publishOriginals} />

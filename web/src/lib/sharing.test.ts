@@ -78,8 +78,23 @@ function manualShare(id: string) {
 }
 
 describe("event auto-sharing and camera retractions", () => {
-  it("keeps unassigned cameras and events with auto-sharing off private", async () => {
-    expect((await (await upload()).json()).shareUrl).toBeNull();
+  it("keeps an unassigned camera's capture queued until the camera has an event", async () => {
+    const captureId = randomUUID();
+    const refused = await upload(captureId);
+    // The camera retries 503s, so the capture uploads once an operator assigns it.
+    expect(refused.status).toBe(503);
+    expect(await refused.json()).toEqual({
+      error: "Camera is not assigned to an event", details: { code: "camera_unassigned" },
+    });
+    expect(transform).not.toHaveBeenCalled();
+    expect(await getPhotoRepository().findByCaptureId(captureId)).toBeNull();
+
+    const assigned = await event(false);
+    expect((await upload(captureId)).status).toBe(201);
+    expect(await getPhotoRepository().findByCaptureId(captureId)).toMatchObject({ eventId: assigned.id });
+  });
+
+  it("keeps photos private when the event's auto-sharing is off", async () => {
     await event(false);
     expect((await (await upload()).json()).shareUrl).toBeNull();
     expect(getMediaStore().publish).not.toHaveBeenCalled();

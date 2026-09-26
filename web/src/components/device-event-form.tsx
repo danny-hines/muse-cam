@@ -34,7 +34,7 @@ export function DeviceEventForm({ device, events }: DeviceEventFormProps) {
           value={eventId}
           onChange={(event) => setEventId(event.target.value)}
         >
-          <option value="">No event</option>
+          {device.eventId ? null : <option value="" disabled>Choose an event</option>}
           {events.map((event) => (
             <option key={event.id} value={event.id}>
               {event.name}

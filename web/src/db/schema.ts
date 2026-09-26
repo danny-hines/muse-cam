@@ -65,7 +65,7 @@ export const photos = pgTable(
     id: text("id").primaryKey(),
     captureId: text("capture_id").notNull(),
     deviceId: text("device_id").notNull(),
-    eventId: text("event_id").references(() => events.id, { onDelete: "set null" }),
+    eventId: text("event_id").notNull().references(() => events.id, { onDelete: "restrict" }),
     presetId: text("preset_id").notNull(),
     presetVersion: integer("preset_version").notNull(),
     status: photoStatus("status").notNull().default("processing"),

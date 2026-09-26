@@ -11,6 +11,7 @@ import {
   verifyAdminKey,
 } from "@/lib/admin-auth";
 import { sha256 } from "@/lib/device-auth";
+import { toEventSlug } from "@/lib/event-slug";
 import { getFleetRepository } from "@/lib/fleet";
 import { getMediaStore } from "@/lib/media";
 import { getPhotoRepository } from "@/lib/repository";
@@ -38,11 +39,7 @@ export async function logout(): Promise<void> {
 export async function createEvent(formData: FormData): Promise<void> {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim().slice(0, 100);
-  const requestedSlug = String(formData.get("slug") ?? name)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
+  const requestedSlug = toEventSlug(String(formData.get("slug") || name));
   if (!name || !requestedSlug) redirect(destination("Event name is required"));
   if (["admin", "api", "p"].includes(requestedSlug)) {
     redirect(destination("That URL slug is reserved. Choose another event URL."));
@@ -88,10 +85,14 @@ export async function createClaim(
   formData: FormData,
 ): Promise<ClaimActionState> {
   await requireAdmin();
+  const eventId = String(formData.get("eventId") ?? "");
+  const repository = getFleetRepository();
+  if (!eventId || !(await repository.findEventById(eventId))) {
+    return { code: null, error: "Choose an event for this camera" };
+  }
   const code = claimCode();
-  const eventId = String(formData.get("eventId") ?? "") || null;
   const suggestedName = String(formData.get("name") ?? "").trim().slice(0, 80) || null;
-  await getFleetRepository().createClaim({
+  await repository.createClaim({
     id: randomUUID(),
     codeHash: sha256(code.replaceAll("-", "")),
     suggestedName,
@@ -105,23 +106,20 @@ export async function createClaim(
 export async function updateDeviceEvent(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = formData.get("id");
-  const requestedEventId = formData.get("eventId");
-  if (typeof id !== "string" || !id || typeof requestedEventId !== "string") {
+  const eventId = formData.get("eventId");
+  if (typeof id !== "string" || !id || typeof eventId !== "string" || !eventId) {
     redirect(destination("Camera and event selection are required"));
   }
 
   const repository = getFleetRepository();
   const device = await repository.findDeviceById(id);
   if (!device) redirect(destination("Camera not found"));
-  const eventId = requestedEventId || null;
-  const event = eventId ? await repository.findEventById(eventId) : null;
-  if (eventId && !event) redirect(destination("Event not found"));
+  const event = await repository.findEventById(eventId);
+  if (!event) redirect(destination("Event not found"));
 
   await repository.updateDeviceEvent(id, eventId);
   revalidatePath("/admin");
-  redirect(destination(event
-    ? `${device.name} assigned to ${event.name}`
-    : `${device.name} is now unassigned`));
+  redirect(destination(`${device.name} assigned to ${event.name}`));
 }
 
 export async function toggleDevice(formData: FormData): Promise<void> {
@@ -145,11 +143,10 @@ export async function unsharePhoto(formData: FormData): Promise<void> {
     photo.originalPublicUrl ? media.removePublic(photo.originalPublicUrl) : Promise.resolve(),
   ]);
   await repository.markUnshared(id);
-  revalidatePath("/");
   revalidatePath("/admin");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
-  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
-  redirect(destination("Photo removed from the public roll"));
+  revalidatePath("/[eventSlug]", "page");
+  redirect(destination("Photo removed from its event gallery"));
 }
 
 export async function publishOriginal(formData: FormData): Promise<void> {
@@ -170,7 +167,7 @@ export async function publishOriginal(formData: FormData): Promise<void> {
   }
   revalidatePath(`/p/${photo.publicSlug}`);
   revalidatePath("/admin");
-  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
+  revalidatePath("/[eventSlug]", "page");
   redirect(destination("Original enabled for before-and-after view"));
 }
 
@@ -188,9 +185,8 @@ export async function deletePhoto(formData: FormData): Promise<void> {
     if (ref) await media.removePrivate(ref);
   }
   await repository.delete(id);
-  revalidatePath("/");
   revalidatePath("/admin");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
-  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
+  revalidatePath("/[eventSlug]", "page");
   redirect(destination("Photo and stored media permanently deleted"));
 }
