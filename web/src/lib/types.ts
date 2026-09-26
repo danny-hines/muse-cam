@@ -6,7 +6,7 @@ export type PhotoRecord = {
   id: string;
   captureId: string;
   deviceId: string;
-  eventId: string | null;
+  eventId: string;
   presetId: string;
   presetVersion: number;
   status: PhotoStatus;
@@ -36,8 +36,8 @@ export type PublishedPhoto = {
   imageUrl: string;
   originalImageUrl: string | null;
   deviceName: string;
-  eventName: string | null;
-  eventSlug: string | null;
+  eventName: string;
+  eventSlug: string;
   width: number;
   height: number;
   capturedAt: Date;

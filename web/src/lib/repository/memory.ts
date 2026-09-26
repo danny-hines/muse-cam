@@ -73,18 +73,18 @@ export class MemoryPhotoRepository implements PhotoRepository {
     return [...getState().photos.values()].find((photo) => photo.publicSlug === slug) ?? null;
   }
 
-  async listShared(limit = 60, eventId?: string | null): Promise<PhotoRecord[]> {
+  async listShared(eventId: string, limit = 60): Promise<PhotoRecord[]> {
     return [...getState().photos.values()]
       .filter((photo) => photo.status === "complete" && photo.sharedAt && photo.resultPublicUrl && photo.publicSlug
-        && (eventId === undefined || photo.eventId === eventId))
+        && photo.eventId === eventId)
       .sort((a, b) => b.sharedAt!.getTime() - a.sharedAt!.getTime() || b.id.localeCompare(a.id))
       .slice(0, limit);
   }
 
-  async findSharedNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
+  async findSharedNeighbors(slug: string): Promise<PhotoNeighbors> {
     const current = await this.findByPublicSlug(slug);
     if (!current) return { previousSlug: null, nextSlug: null };
-    const shared = await this.listShared(Infinity, withinEvent ? current.eventId ?? undefined : undefined);
+    const shared = await this.listShared(current.eventId, Infinity);
     const index = shared.findIndex((photo) => photo.id === current.id);
     if (index < 0) return { previousSlug: null, nextSlug: null };
     return { previousSlug: shared[index - 1]?.publicSlug ?? null, nextSlug: shared[index + 1]?.publicSlug ?? null };

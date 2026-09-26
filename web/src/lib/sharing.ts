@@ -15,9 +15,8 @@ export async function unpublishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
     photo.originalPublicUrl ? media.removePublic(photo.originalPublicUrl) : Promise.resolve(),
   ]);
   const updated = await getPhotoRepository().markUnshared(photo.id);
-  revalidatePath("/");
   revalidatePath("/admin");
-  if (photo.eventId) revalidatePath("/[eventSlug]", "page");
+  revalidatePath("/[eventSlug]", "page");
   if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
   return updated;
 }
@@ -32,7 +31,7 @@ export async function publishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
   }
 
   const media = getMediaStore();
-  const event = photo.eventId ? await getFleetRepository().findEventById(photo.eventId) : null;
+  const event = await getFleetRepository().findEventById(photo.eventId);
   const published: string[] = [];
   let shared: PhotoRecord;
   try {
@@ -56,9 +55,8 @@ export async function publishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
     await unpublishPhoto(shared);
     throw new CaptureRetractedError("Photo was deleted on the camera");
   }
-  revalidatePath("/");
   revalidatePath("/admin");
-  if (shared.eventId) revalidatePath("/[eventSlug]", "page");
+  revalidatePath("/[eventSlug]", "page");
   revalidatePath(`/p/${shared.publicSlug}`);
   return shared;
 }

@@ -48,6 +48,11 @@ export async function POST(request: Request) {
   if (!deviceApiIsAvailable()) {
     return apiError("Production services are not fully configured", 503);
   }
+  // Every photo belongs to an event. A 503 keeps captures queued on the camera
+  // until an operator assigns it, and then they upload to that event.
+  if (!eventId) {
+    return apiError("Camera is not assigned to an event", 503, { code: "camera_unassigned" });
+  }
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (contentLength > MAX_IMAGE_BYTES + 256_000) {
@@ -99,7 +104,7 @@ export async function POST(request: Request) {
     return apiError("Unable to prepare image", 400);
   }
 
-  const event = eventId ? await getFleetRepository().findEventById(eventId) : null;
+  const event = await getFleetRepository().findEventById(eventId);
   const photo = await repository.create({
     id: randomUUID(),
     captureId: parsed.data.captureId,

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { getDb } from "@/db/client";
@@ -46,7 +46,7 @@ export class NeonPhotoRepository implements PhotoRepository {
     return rows[0] ?? null;
   }
 
-  async listShared(limit = 60, eventId?: string | null): Promise<PhotoRecord[]> {
+  async listShared(eventId: string, limit = 60): Promise<PhotoRecord[]> {
     return getDb()
       .select()
       .from(photos)
@@ -56,21 +56,20 @@ export class NeonPhotoRepository implements PhotoRepository {
           isNotNull(photos.sharedAt),
           isNotNull(photos.resultPublicUrl),
           isNotNull(photos.publicSlug),
-          eventId === undefined ? undefined : eventId === null
-            ? isNull(photos.eventId) : eq(photos.eventId, eventId),
+          eq(photos.eventId, eventId),
         ),
       )
       .orderBy(desc(photos.sharedAt), desc(photos.id))
       .limit(limit);
   }
 
-  async findSharedNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
+  async findSharedNeighbors(slug: string): Promise<PhotoNeighbors> {
     const current = alias(photos, "current_photo");
     const shared = and(
       eq(photos.status, "complete"), isNotNull(photos.sharedAt),
       isNotNull(photos.resultPublicUrl), isNotNull(photos.publicSlug),
       eq(current.status, "complete"), isNotNull(current.sharedAt), isNotNull(current.resultPublicUrl),
-      withinEvent ? or(isNull(current.eventId), eq(photos.eventId, current.eventId)) : undefined,
+      eq(photos.eventId, current.eventId),
     );
     // Compare in Postgres to retain timestamp precision; the ID also orders simultaneous shares.
     const [previous, next] = await Promise.all([

@@ -10,10 +10,10 @@ export default function NotFound() {
         <div className="empty-feed">
           <div>
             <strong>That frame is missing.</strong>
-            <p>It may have been removed from the public roll.</p>
+            <p>The event or photo may have been renamed or removed.</p>
             <p>
               <Link className="back-link" href="/">
-                ← Return to the camera roll
+                ← Enter an event code
               </Link>
             </p>
           </div>

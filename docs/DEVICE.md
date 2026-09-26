@@ -131,7 +131,7 @@ only marked ready after delivering a frame, and restarting the service reconnect
 the browser's preview stream. See the [Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf)
 for the main/lores stream and camera-buffer model.
 
-**Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the public roll only when explicitly tapped.
+**Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the camera's event gallery only when explicitly tapped.
 
 Swipe left for the next (older) gallery photo and right for the previous (newer)
 photo. Navigation follows the selected gallery filter, continues across loaded

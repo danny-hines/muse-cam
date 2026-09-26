@@ -15,7 +15,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       <section className="admin-login-card">
         <p className="section-kicker">Private controls</p>
         <h1>Muse Cam admin</h1>
-        <p>Use the operator key to manage cameras, events, and the public roll.</p>
+        <p>Use the operator key to manage cameras, events, and event galleries.</p>
         {configured ? (
           <form action={login} className="admin-form">
             <label htmlFor="admin-key">Operator key</label>

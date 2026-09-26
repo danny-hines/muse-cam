@@ -9,10 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { getPublishedPhotoBySlug, getPublishedPhotoNeighbors } from "@/lib/photos";
 import { fullTimestamp } from "@/lib/time";
 
-type PhotoPageProps = {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ gallery?: string }>;
-};
+type PhotoPageProps = { params: Promise<{ slug: string }> };
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +32,7 @@ export async function generateMetadata({ params }: PhotoPageProps): Promise<Meta
   };
 }
 
-export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
+export default async function PhotoPage({ params }: PhotoPageProps) {
   const { slug } = await params;
   const photo = await getPublishedPhotoBySlug(slug);
 
@@ -43,17 +40,15 @@ export default async function PhotoPage({ params, searchParams }: PhotoPageProps
     notFound();
   }
 
-  const inEvent = (await searchParams).gallery !== "roll" && Boolean(photo.eventSlug);
-  const neighbors = await getPublishedPhotoNeighbors(slug, inEvent);
-  const photoHref = (neighborSlug: string | null) => neighborSlug
-    ? `/p/${neighborSlug}${inEvent ? "" : "?gallery=roll"}` : null;
+  const neighbors = await getPublishedPhotoNeighbors(slug);
+  const photoHref = (neighborSlug: string | null) => neighborSlug ? `/p/${neighborSlug}` : null;
 
   return (
     <>
       <SiteHeader />
       <main className="detail-main">
-        <Link className="back-link" href={inEvent ? `/${photo.eventSlug}` : "/"}>
-          <span aria-hidden="true">←</span> {inEvent ? `Back to ${photo.eventName}` : "Back to the roll"}
+        <Link className="back-link" href={`/${photo.eventSlug}`}>
+          <span aria-hidden="true">←</span> Back to {photo.eventName}
         </Link>
         <div className="detail-layout">
           <PhotoViewer key={photo.id} previousHref={photoHref(neighbors.previousSlug)} nextHref={photoHref(neighbors.nextSlug)}>
@@ -79,14 +74,12 @@ export default async function PhotoPage({ params, searchParams }: PhotoPageProps
                 <dt>Camera</dt>
                 <dd>{photo.deviceName}</dd>
               </div>
-              {photo.eventName ? (
-                <div className="detail-fact">
-                  <dt>Event</dt>
-                  <dd>
-                    {photo.eventSlug ? <Link href={`/${photo.eventSlug}`}>{photo.eventName}</Link> : photo.eventName}
-                  </dd>
-                </div>
-              ) : null}
+              <div className="detail-fact">
+                <dt>Event</dt>
+                <dd>
+                  <Link href={`/${photo.eventSlug}`}>{photo.eventName}</Link>
+                </dd>
+              </div>
               <div className="detail-fact">
                 <dt>Model</dt>
                 <dd>Muse Image</dd>

@@ -27,7 +27,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const { eventSlug } = await params;
   const event = await getEventBySlug(eventSlug);
   if (!event) notFound();
-  const photos = await listPublishedPhotos(event.id);
+  const photos = await listPublishedPhotos(event);
 
   return (
     <>

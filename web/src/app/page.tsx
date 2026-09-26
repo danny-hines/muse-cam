@@ -1,12 +1,20 @@
-import { PhotoCard } from "@/components/photo-card";
+import Form from "next/form";
+import { redirect } from "next/navigation";
+
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { listPublishedPhotos } from "@/lib/photos";
+import { eventSlugFromInput } from "@/lib/event-slug";
+import { getEventBySlug } from "@/lib/photos";
+import { getSiteUrl } from "@/lib/site-url";
 
-export const dynamic = "force-dynamic";
+type HomePageProps = { searchParams: Promise<{ event?: string | string[] }> };
 
-export default async function HomePage() {
-  const photos = await listPublishedPhotos();
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const requested = [(await searchParams).event].flat()[0]?.trim() ?? "";
+  const slug = eventSlugFromInput(requested);
+  const event = slug ? await getEventBySlug(slug) : null;
+  if (event) redirect(`/${event.slug}`);
+  const notFound = requested !== "";
 
   return (
     <>
@@ -28,31 +36,40 @@ export default async function HomePage() {
           </p>
         </section>
 
-        <section aria-labelledby="latest-heading">
-          <div className="feed-heading">
-            <div>
-              <p className="section-kicker">Public roll</p>
-              <h2 id="latest-heading">Latest sightings</h2>
-            </div>
-            <span className="feed-count">
-              {photos.length} shared {photos.length === 1 ? "frame" : "frames"}
-            </span>
+        <section className="event-finder" aria-labelledby="event-finder-title">
+          <div className="event-finder-copy">
+            <p className="section-kicker">Find your photos</p>
+            <h2 id="event-finder-title">Enter your event code</h2>
+            <p>Look for the code on the sign next to the camera.</p>
           </div>
-
-          {photos.length > 0 ? (
-            <div className="photo-grid">
-              {photos.map((photo, index) => (
-                <PhotoCard key={photo.id} photo={photo} index={index} gallery="roll" />
-              ))}
+          <Form action="/" className="event-finder-form">
+            <label htmlFor="event-code">Event code</label>
+            <div className="event-finder-field">
+              <span className="event-finder-prefix" aria-hidden="true">{getSiteUrl().host}/</span>
+              <input
+                id="event-code"
+                name="event"
+                placeholder="your-event"
+                defaultValue={requested}
+                autoCapitalize="none"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                required
+                aria-invalid={notFound || undefined}
+                aria-describedby={notFound ? "event-code-error" : undefined}
+              />
             </div>
-          ) : (
-            <div className="empty-feed">
-              <div>
-                <strong>The roll is still empty.</strong>
-                <p>The next photo shared from the camera will appear here automatically.</p>
-              </div>
-            </div>
-          )}
+            <button type="submit">
+              See the photos <span aria-hidden="true">→</span>
+            </button>
+            {notFound ? (
+              <p className="form-error" id="event-code-error" role="alert">
+                We couldn’t find an event called “{requested}”. Check the sign and try again.
+              </p>
+            ) : null}
+          </Form>
         </section>
       </main>
       <SiteFooter />

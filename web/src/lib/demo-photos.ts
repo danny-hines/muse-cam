@@ -1,6 +1,17 @@
-import type { PublishedPhoto } from "@/lib/types";
+import type { EventRecord, PublishedPhoto } from "@/lib/types";
 
 const demoNow = new Date("2026-08-31T20:00:00.000Z");
+
+// Local development without a database serves the demo frames at /demo.
+export const demoEvent: EventRecord = {
+  id: "demo",
+  slug: "demo",
+  name: "Muse Cam Demo",
+  publishOriginals: false,
+  autoShare: false,
+  createdAt: demoNow,
+  updatedAt: demoNow,
+};
 
 export const demoPhotos: PublishedPhoto[] = [
   {
@@ -12,8 +23,8 @@ export const demoPhotos: PublishedPhoto[] = [
     imageUrl: "/demo/post-apocalypse.svg",
     originalImageUrl: null,
     deviceName: "Muse Cam 01",
-    eventName: null,
-    eventSlug: null,
+    eventName: demoEvent.name,
+    eventSlug: demoEvent.slug,
     width: 1200,
     height: 900,
     capturedAt: new Date(demoNow.getTime() - 7 * 60 * 1_000),
@@ -28,8 +39,8 @@ export const demoPhotos: PublishedPhoto[] = [
     imageUrl: "/demo/kid-drawing.svg",
     originalImageUrl: null,
     deviceName: "Muse Cam 01",
-    eventName: null,
-    eventSlug: null,
+    eventName: demoEvent.name,
+    eventSlug: demoEvent.slug,
     width: 1200,
     height: 900,
     capturedAt: new Date(demoNow.getTime() - 43 * 60 * 1_000),
@@ -44,8 +55,8 @@ export const demoPhotos: PublishedPhoto[] = [
     imageUrl: "/demo/alien-visitor.svg",
     originalImageUrl: null,
     deviceName: "Muse Cam 01",
-    eventName: null,
-    eventSlug: null,
+    eventName: demoEvent.name,
+    eventSlug: demoEvent.slug,
     width: 1200,
     height: 900,
     capturedAt: new Date(demoNow.getTime() - 3 * 60 * 60 * 1_000),

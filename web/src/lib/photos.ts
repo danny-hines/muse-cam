@@ -1,19 +1,26 @@
 import { cache } from "react";
 
 import { getPreset } from "@/config/presets";
-import { demoPhotos } from "@/lib/demo-photos";
+import { demoEvent, demoPhotos } from "@/lib/demo-photos";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository, hasPersistentDatabase } from "@/lib/repository";
 import type { PhotoNeighbors } from "@/lib/repository/types";
 import type { EventRecord, PhotoRecord, PublishedPhoto } from "@/lib/types";
 
+function isDemoMode(): boolean {
+  return !hasPersistentDatabase() && process.env.DEMO_MODE !== "false";
+}
+
 function toPublishedPhoto(
   photo: PhotoRecord,
-  deviceName = "Muse Cam 01",
-  event: Pick<EventRecord, "name" | "slug"> | null = null,
+  deviceName: string,
+  event: Pick<EventRecord, "name" | "slug"> | null,
 ): PublishedPhoto | null {
   const preset = getPreset(photo.presetId);
-  if (!preset || photo.status !== "complete" || !photo.publicSlug || !photo.resultPublicUrl || !photo.sharedAt) {
+  if (
+    !preset || !event || photo.status !== "complete" || !photo.publicSlug || !photo.resultPublicUrl
+    || !photo.sharedAt
+  ) {
     return null;
   }
 
@@ -26,8 +33,8 @@ function toPublishedPhoto(
     imageUrl: photo.resultPublicUrl,
     originalImageUrl: photo.originalPublicUrl,
     deviceName,
-    eventName: event?.name ?? null,
-    eventSlug: event?.slug ?? null,
+    eventName: event.name,
+    eventSlug: event.slug,
     width: photo.width ?? 1200,
     height: photo.height ?? 900,
     capturedAt: photo.capturedAtDevice ?? photo.createdAt,
@@ -35,38 +42,27 @@ function toPublishedPhoto(
   };
 }
 
-async function readPublishedPhotos(eventId?: string | null): Promise<PublishedPhoto[]> {
-  const [records, devices, events] = await Promise.all([
-    getPhotoRepository().listShared(60, eventId),
+export async function listPublishedPhotos(event: EventRecord): Promise<PublishedPhoto[]> {
+  const [records, devices] = await Promise.all([
+    getPhotoRepository().listShared(event.id, 60),
     getFleetRepository().listDevices(),
-    getFleetRepository().listEvents(),
   ]);
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
-  const eventsById = new Map(events.map((event) => [event.id, event]));
   const published = records.flatMap((record) => {
-    const photo = toPublishedPhoto(
-      record,
-      deviceNames.get(record.deviceId) ?? "Muse Cam 01",
-      record.eventId ? (eventsById.get(record.eventId) ?? null) : null,
-    );
+    const photo = toPublishedPhoto(record, deviceNames.get(record.deviceId) ?? "Muse Cam", event);
     return photo ? [photo] : [];
   });
 
-  if (!eventId && !hasPersistentDatabase() && process.env.DEMO_MODE !== "false") {
-    return [...published, ...demoPhotos];
-  }
-
-  return published;
+  return event.id === demoEvent.id && isDemoMode() ? [...published, ...demoPhotos] : published;
 }
 
-export async function listPublishedPhotos(eventId?: string | null): Promise<PublishedPhoto[]> {
-  return readPublishedPhotos(eventId);
-}
+export const getEventBySlug = cache(async (slug: string) => {
+  const event = await getFleetRepository().findEventBySlug(slug);
+  return event ?? (slug === demoEvent.slug && isDemoMode() ? demoEvent : null);
+});
 
-export const getEventBySlug = cache((slug: string) => getFleetRepository().findEventBySlug(slug));
-
-export async function getPublishedPhotoNeighbors(slug: string, withinEvent = true): Promise<PhotoNeighbors> {
-  if (!hasPersistentDatabase() && process.env.DEMO_MODE !== "false") {
+export async function getPublishedPhotoNeighbors(slug: string): Promise<PhotoNeighbors> {
+  if (isDemoMode()) {
     const demoIndex = demoPhotos.findIndex((photo) => photo.publicSlug === slug);
     if (demoIndex >= 0) {
       return {
@@ -75,7 +71,7 @@ export async function getPublishedPhotoNeighbors(slug: string, withinEvent = tru
       };
     }
   }
-  return getPhotoRepository().findSharedNeighbors(slug, withinEvent);
+  return getPhotoRepository().findSharedNeighbors(slug);
 }
 
 export const getPublishedPhotoBySlug = cache(async (slug: string) => {
@@ -83,12 +79,10 @@ export const getPublishedPhotoBySlug = cache(async (slug: string) => {
   if (record) {
     const [device, event] = await Promise.all([
       getFleetRepository().findDeviceById(record.deviceId),
-      record.eventId ? getFleetRepository().findEventById(record.eventId) : null,
+      getFleetRepository().findEventById(record.eventId),
     ]);
-    return toPublishedPhoto(record, device?.name ?? "Muse Cam 01", event);
+    return toPublishedPhoto(record, device?.name ?? "Muse Cam", event);
   }
 
-  return process.env.DEMO_MODE === "false"
-    ? null
-    : demoPhotos.find((photo) => photo.publicSlug === slug) ?? null;
+  return isDemoMode() ? demoPhotos.find((photo) => photo.publicSlug === slug) ?? null : null;
 });
