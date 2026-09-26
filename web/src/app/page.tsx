@@ -1,4 +1,5 @@
 import Form from "next/form";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { SiteFooter } from "@/components/site-footer";
@@ -15,6 +16,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const event = slug ? await getEventBySlug(slug) : null;
   if (event) redirect(`/${event.slug}`);
   const notFound = requested !== "";
+  // Show the domain the visitor used, which matches the URL on the event sign.
+  const host = ((await headers()).get("host") ?? getSiteUrl().host).replace(/^www\./, "");
 
   return (
     <>
@@ -45,7 +48,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <Form action="/" className="event-finder-form">
             <label htmlFor="event-code">Event code</label>
             <div className="event-finder-field">
-              <span className="event-finder-prefix" aria-hidden="true">{getSiteUrl().host}/</span>
+              <span className="event-finder-prefix" aria-hidden="true">{host}/</span>
               <input
                 id="event-code"
                 name="event"
