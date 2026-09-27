@@ -1,0 +1,20 @@
+{
+  "image": "screen-reel.webp",
+  "tileWidth": 570,
+  "tileHeight": 324,
+  "columns": 3,
+  "styles": [
+    "Brick by Brick",
+    "Museum Piece",
+    "Mall Portrait, 1988",
+    "Midnight Matinee",
+    "Rubber Hose",
+    "Velvet Fever",
+    "Dream Logic",
+    "Wish You Were Here",
+    "Snow Globe",
+    "Deep Blue",
+    "High Seas",
+    "High Noon"
+  ]
+}

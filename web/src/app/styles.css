@@ -175,6 +175,111 @@ select {
   font-weight: 750;
 }
 
+.home-hero {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  padding: clamp(36px, 6vw, 84px) 0 clamp(40px, 6vw, 80px);
+}
+
+.home-hero .hero-copy {
+  margin-top: clamp(24px, 3vw, 36px);
+}
+
+.camera-showcase {
+  min-width: 0;
+  margin: 0;
+}
+
+.camera-showcase[data-status="failed"] {
+  display: none;
+}
+
+.camera-stage {
+  aspect-ratio: 10 / 9;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.camera-stage:active {
+  cursor: grabbing;
+}
+
+.camera-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+
+.camera-showcase[data-status="ready"] canvas {
+  opacity: 1;
+}
+
+.camera-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.camera-colorway {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.camera-swatches {
+  display: inline-flex;
+}
+
+.camera-swatches span {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: background-color 700ms ease;
+}
+
+.camera-swatches span + span {
+  margin-left: -5px;
+}
+
+.camera-caption button {
+  padding: 9px 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .camera-caption button:hover {
+    background: var(--acid);
+  }
+}
+
+.camera-caption button[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.camera-caption button:focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 2px;
+}
+
 .feed-heading {
   display: flex;
   align-items: flex-end;

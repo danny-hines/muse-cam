@@ -2,6 +2,7 @@ import Form from "next/form";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { CameraShowcase } from "@/components/camera-showcase";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { eventSlugFromInput } from "@/lib/event-slug";
@@ -23,8 +24,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <>
       <SiteHeader />
       <main className="feed-main">
-        <section className="hero" aria-labelledby="hero-title">
-          <div>
+        <section className="hero home-hero" aria-labelledby="hero-title">
+          <div className="home-hero-text">
             <p className="hero-kicker">
               <span className="live-dot" aria-hidden="true" />
               A live feed from physical cameras
@@ -32,11 +33,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <h1 className="hero-title" id="hero-title">
               Point. Shoot. <span>Imagine.</span>
             </h1>
+            <p className="hero-copy">
+              A small camera with a very strange roll of film. Every picture is transformed by
+              <strong> Muse Image</strong> into a world that did not exist a moment ago.
+            </p>
           </div>
-          <p className="hero-copy">
-            A small camera with a very strange roll of film. Every picture is transformed by
-            <strong> Muse Image</strong> into a world that did not exist a moment ago.
-          </p>
+          <CameraShowcase />
         </section>
 
         <section className="event-finder" aria-labelledby="event-finder-title">
