@@ -465,7 +465,8 @@ export async function createCameraScene(
   for (const seat of FRONT_SCREWS) unit("front_screws").add(screw(at, screwShape, blackOxide, seat, 1));
   unit("rear_screw").add(screw(at, screwShape, blackOxide, REAR_SCREW, -1));
 
-  // Frame the camera assembled and fully apart, in millimetres.
+  // Measure the camera assembled and fully apart: its centre (mm), and in scene
+  // units the reach of its spinning footprint and half its height.
   function measure(t: number) {
     for (const { group, offset } of units) group.position.set(offset[0] * t, offset[1] * t, offset[2] * t);
     root.updateMatrixWorld(true);
@@ -476,7 +477,7 @@ export async function createCameraScene(
     const reach = Math.max(
       ...[box.min.x, box.max.x].flatMap((x) => [box.min.z, box.max.z].map((z) => Math.hypot(x - centre.x, z - centre.z))),
     );
-    return { centre, radius: (Math.max(reach, (box.max.y - box.min.y) / 2) * 1.04) / 100 };
+    return { centre, reach: (reach * 1.04) / 100, halfHeight: ((box.max.y - box.min.y) / 2 / 100) * 1.04 };
   }
   const together = measure(0);
   const apart = measure(1);
@@ -651,8 +652,14 @@ export async function createCameraScene(
       }
     }
 
-    const radius = together.radius + (apart.radius - together.radius) * exploded;
-    const distance = radius / Math.sin(((FOV / 2) * Math.PI) / 180) / Math.min(1, camera.aspect);
+    // Back off until the spinning footprint fits across and the tilted view of
+    // its height fits top to bottom.
+    const reach = together.reach + (apart.reach - together.reach) * exploded;
+    const halfHeight = together.halfHeight + (apart.halfHeight - together.halfHeight) * exploded;
+    const halfFov = ((FOV / 2) * Math.PI) / 180;
+    const across = reach / Math.sin(Math.atan(Math.tan(halfFov) * camera.aspect));
+    const tall = (halfHeight * Math.cos(ELEVATION) + reach * Math.sin(ELEVATION)) / Math.sin(halfFov);
+    const distance = Math.max(across, tall);
     const lookY = pivot.y / 100;
     camera.position.set(0, lookY + Math.sin(ELEVATION) * distance, Math.cos(ELEVATION) * distance);
     camera.lookAt(0, lookY, 0);

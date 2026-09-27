@@ -175,14 +175,14 @@ select {
   font-weight: 750;
 }
 
-.home-hero {
+.camera-hero {
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
   gap: clamp(24px, 4vw, 56px);
   align-items: center;
   padding: clamp(36px, 6vw, 84px) 0 clamp(40px, 6vw, 80px);
 }
 
-.home-hero .hero-copy {
+.camera-hero .hero-copy {
   margin-top: clamp(24px, 3vw, 36px);
 }
 
@@ -1187,6 +1187,10 @@ select {
 
   .event-finder-form {
     grid-template-columns: 1fr;
+  }
+
+  .camera-stage {
+    aspect-ratio: 4 / 3;
   }
 
   .event-finder-prefix {

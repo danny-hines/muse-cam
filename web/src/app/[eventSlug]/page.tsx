@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CameraShowcase } from "@/components/camera-showcase";
 import { PhotoCard } from "@/components/photo-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -33,18 +34,19 @@ export default async function EventPage({ params }: EventPageProps) {
     <>
       <SiteHeader />
       <main className="feed-main">
-        <section className="hero event-hero" aria-labelledby="event-title">
-          <div>
+        <section className="hero event-hero camera-hero" aria-labelledby="event-title">
+          <div className="camera-hero-text">
             <p className="hero-kicker">
               <span className="live-dot" aria-hidden="true" />
               The event roll
             </p>
             <h1 className="hero-title" id="event-title">{event.name}</h1>
+            <p className="hero-copy">
+              Your event, through a different lens. Photos captured with Muse Cam
+              and transformed by <strong>Muse Image</strong>.
+            </p>
           </div>
-          <p className="hero-copy">
-            Your event, through a different lens. Photos captured with Muse Cam
-            and transformed by <strong>Muse Image</strong>.
-          </p>
+          <CameraShowcase />
         </section>
         <section aria-labelledby="event-photos-heading">
           <div className="feed-heading">
