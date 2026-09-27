@@ -24,8 +24,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <>
       <SiteHeader />
       <main className="feed-main">
-        <section className="hero home-hero" aria-labelledby="hero-title">
-          <div className="home-hero-text">
+        <section className="hero camera-hero" aria-labelledby="hero-title">
+          <div className="camera-hero-text">
             <p className="hero-kicker">
               <span className="live-dot" aria-hidden="true" />
               A live feed from physical cameras
