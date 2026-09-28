@@ -70,7 +70,7 @@ The change applies to new uploads, including captures waiting to be uploaded. Ph
 
 ## Captions
 
-When a photo is first shared, Muse Spark writes a short "caption this" style joke about the transformed image. The caption appears on the gallery card, the photo page, and link previews about 10–15 seconds after sharing, without delaying the camera. It needs no camera update and uses the same `META_API_KEY` as Muse Image; with `MODEL_PROVIDER=mock`, captions are placeholders.
+When a photo is first shared, Muse Spark writes a short "caption this" style joke about the transformed image. The caption appears on the gallery card, the photo page, and link previews about 10–15 seconds after sharing, without delaying the camera. Muse Spark reads text in the photo, but captions leave out people's names, even from badges or name tags; a pet's name from a collar tag can appear. It needs no camera update and uses the same `META_API_KEY` as Muse Image; with `MODEL_PROVIDER=mock`, captions are placeholders.
 
 Each capture in the dashboard shows its caption. **Write caption** captions a photo that has none, such as one shared before captions existed or one whose caption request failed. **New caption** replaces a caption that didn't land. A photo keeps its caption when it is hidden and shared again.
 

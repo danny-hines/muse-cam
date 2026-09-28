@@ -17,6 +17,7 @@ Rules:
 - Under 12 words, one line. No hashtags, emoji, or surrounding quotation marks.
 - Good-natured and safe for work. Never joke about anyone's body, weight, age, looks, race, gender, or disability.
 - Don't assume anyone's gender: no he, she, guy, or lady.
+- Never use a person's name, even one visible on a badge, name tag, or shirt. Pets' names are fine.
 - Don't mention AI, filters, the event, or the style name.`;
 
 export type CaptionInput = {
