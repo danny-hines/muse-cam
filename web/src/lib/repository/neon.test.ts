@@ -169,4 +169,14 @@ describe("Neon event galleries", () => {
     });
     expect(await repository.findSharedNeighbors(other.publicSlug!)).toEqual({ previousSlug: null, nextSlug: null });
   });
+
+  it("saves captions and ignores photos deleted before their caption arrives", async () => {
+    const postgres = await connect();
+    const photo = await shared(postgres, "seattle", "2026-10-01T10:00:00Z");
+    expect(photo.caption).toBeNull();
+    await repository.saveCaption(photo.id, "Stepped on a Lego, became a Lego.");
+    expect((await repository.findById(photo.id))?.caption).toBe("Stepped on a Lego, became a Lego.");
+    await repository.delete(photo.id);
+    await expect(repository.saveCaption(photo.id, "Too late")).resolves.toBeUndefined();
+  });
 });

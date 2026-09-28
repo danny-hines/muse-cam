@@ -68,6 +68,12 @@ A camera without an event, such as a newly synced environment-configured camera,
 
 The change applies to new uploads, including captures waiting to be uploaded. Photos already uploaded keep their original event and follow that event's original-photo privacy setting.
 
+## Captions
+
+When a photo is first shared, Muse Spark writes a short "caption this" style joke about the transformed image. The caption appears on the gallery card, the photo page, and link previews about 10–15 seconds after sharing, without delaying the camera. It needs no camera update and uses the same `META_API_KEY` as Muse Image; with `MODEL_PROVIDER=mock`, captions are placeholders.
+
+Each capture in the dashboard shows its caption. **Write caption** captions a photo that has none, such as one shared before captions existed or one whose caption request failed. **New caption** replaces a caption that didn't land. A photo keeps its caption when it is hidden and shared again.
+
 ## Moderation
 
 - **Hide** removes transformed and original public Blob objects and clears the public URL. Private copies remain available to the operator.

@@ -9,6 +9,7 @@ import {
   toggleDevice,
   unsharePhoto,
 } from "@/app/admin/actions";
+import { CaptionPhotoForm } from "@/components/caption-photo-form";
 import { CreateClaimForm } from "@/components/create-claim-form";
 import { DeletePhotoForm } from "@/components/delete-photo-form";
 import { DeviceEventForm, DeviceNameForm } from "@/components/device-event-form";
@@ -196,6 +197,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <span>{eventNames.get(photo.eventId) ?? photo.eventId}</span>
                   <span>{deviceNames.get(photo.deviceId) ?? photo.deviceId}</span>
                   <span>{fullTimestamp(photo.capturedAtDevice ?? photo.createdAt)}</span>
+                  {photo.caption ? <span className="admin-caption">{photo.caption}</span> : null}
                 </div>
                 <div className="admin-photo-status">
                   <span className={`status-pill status-${photo.status}`}>{photo.status}</span>
@@ -214,6 +216,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <input type="hidden" name="id" value={photo.id} />
                       <button type="submit">Enable original</button>
                     </form>
+                  ) : null}
+                  {photo.resultPrivateRef ? (
+                    <CaptionPhotoForm id={photo.id} hasCaption={Boolean(photo.caption)} />
                   ) : null}
                   <DeletePhotoForm id={photo.id} />
                 </div>

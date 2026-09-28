@@ -84,6 +84,7 @@ export const photos = pgTable(
     width: integer("width"),
     height: integer("height"),
     errorCode: text("error_code"),
+    caption: text("caption"),
   },
   (table) => [
     uniqueIndex("photos_capture_id_unique").on(table.captureId),

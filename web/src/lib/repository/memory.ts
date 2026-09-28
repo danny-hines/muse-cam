@@ -58,6 +58,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
       width: null,
       height: null,
       errorCode: null,
+      caption: null,
     });
   }
 
@@ -149,6 +150,11 @@ export class MemoryPhotoRepository implements PhotoRepository {
 
   async markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord> {
     return save({ ...requirePhoto(id), originalPublicUrl, updatedAt: new Date() });
+  }
+
+  async saveCaption(id: string, caption: string): Promise<void> {
+    const photo = getState().photos.get(id);
+    if (photo) save({ ...photo, caption, updatedAt: new Date() });
   }
 
   async delete(id: string): Promise<void> {

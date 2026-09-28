@@ -4,16 +4,20 @@ import { redirect } from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { writeCaption } from "@/lib/captions";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
-import { createClaim, createEvent, renameDevice, updateDeviceEvent, updateEventSettings } from "./actions";
+import {
+  captionPhoto, createClaim, createEvent, renameDevice, updateDeviceEvent, updateEventSettings,
+} from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string): never => { throw new Error(`Redirect: ${url}`); }),
 }));
 vi.mock("@/lib/admin-auth", () => ({ isAdminAuthenticated: vi.fn() }));
+vi.mock("@/lib/captions", () => ({ writeCaption: vi.fn() }));
 vi.mock("@/lib/fleet", async () => {
   const { MemoryFleetRepository } = await import("@/lib/fleet/memory");
   const repository = new MemoryFleetRepository();
@@ -253,5 +257,45 @@ describe("event sharing settings", () => {
     vi.mocked(isAdminAuthenticated).mockResolvedValue(false);
     await expect(updateEventSettings(form)).rejects.toThrow("Redirect: /admin/login");
     expect(await repository.findEventById(events[0].id)).toEqual(events[0]);
+  });
+});
+
+describe("photo captions", () => {
+  async function completedPhoto() {
+    const id = randomUUID();
+    await getPhotoRepository().create({
+      id, captureId: id, deviceId: "camera", eventId: "event", presetId: "kid-drawing", presetVersion: 1,
+      capturedAtDevice: null,
+    });
+    const photo = await getPhotoRepository().markComplete(id, {
+      originalPrivateRef: "original", resultPrivateRef: "result", resultMimeType: "image/jpeg", width: 1, height: 1,
+    });
+    const form = new FormData();
+    form.set("id", id);
+    return { photo, form };
+  }
+
+  it("writes a new caption for the photo", async () => {
+    const { photo, form } = await completedPhoto();
+    await expect(captionPhoto(form)).rejects.toThrow(`Redirect: /admin?notice=${encodeURIComponent("New caption written")}`);
+    expect(writeCaption).toHaveBeenCalledWith(photo);
+    expect(revalidatePath).toHaveBeenCalledWith("/[eventSlug]", "page");
+  });
+
+  it("reports a failed caption without changing the photo", async () => {
+    const { photo, form } = await completedPhoto();
+    vi.spyOn(console, "error").mockImplementationOnce(() => {});
+    vi.mocked(writeCaption).mockRejectedValueOnce(new Error("Muse Spark unavailable"));
+    await expect(captionPhoto(form)).rejects.toThrow(
+      `Redirect: /admin?notice=${encodeURIComponent("Muse Spark couldn't write a caption. Try again.")}`,
+    );
+    expect(await getPhotoRepository().findById(photo.id)).toEqual(photo);
+  });
+
+  it("requires an admin session", async () => {
+    const { form } = await completedPhoto();
+    vi.mocked(isAdminAuthenticated).mockResolvedValue(false);
+    await expect(captionPhoto(form)).rejects.toThrow("Redirect: /admin/login");
+    expect(writeCaption).not.toHaveBeenCalled();
   });
 });

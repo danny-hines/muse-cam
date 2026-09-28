@@ -39,6 +39,7 @@ export interface PhotoRepository {
   ): Promise<PhotoRecord>;
   markUnshared(id: string): Promise<PhotoRecord>;
   markOriginalPublished(id: string, originalPublicUrl: string): Promise<PhotoRecord>;
+  saveCaption(id: string, caption: string): Promise<void>;
   delete(id: string): Promise<void>;
   retractCapture(deviceId: string, captureId: string): Promise<void>;
   isCaptureRetracted(deviceId: string, captureId: string): Promise<boolean>;

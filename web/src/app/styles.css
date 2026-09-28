@@ -377,6 +377,22 @@ select {
   pointer-events: none;
 }
 
+.photo-caption {
+  margin: 14px 2px 0;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+.photo-caption + .photo-meta {
+  padding-top: 8px;
+}
+
+.photo-caption + .photo-meta .preset-name {
+  font-size: 0.82rem;
+}
+
 .photo-meta {
   display: flex;
   justify-content: space-between;
@@ -1012,6 +1028,12 @@ select {
   font-size: 0.7rem;
 }
 
+.admin-photo-copy .admin-caption {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
 .admin-photo-status {
   gap: 8px;
   color: var(--muted);
@@ -1042,6 +1064,11 @@ select {
   gap: 9px 13px;
 }
 
+.admin-photo-actions button:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
 .admin-photo-actions .danger-button {
   color: #a53322;
 }
@@ -1064,6 +1091,15 @@ select {
 .detail-copy p {
   color: var(--muted);
   line-height: 1.65;
+}
+
+.detail-copy .detail-caption {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
 }
 
 .detail-rule {

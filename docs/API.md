@@ -93,7 +93,7 @@ Returns the generated image with private cache headers. Device authentication is
 POST /api/device/generations/:id/share
 ```
 
-Copies the result from private to public Blob storage, assigns an unguessable slug, and returns `shareUrl`. Repeated calls are idempotent. The normalized original is published too only when the photo's event has explicitly enabled originals.
+Copies the result from private to public Blob storage, assigns an unguessable slug, and returns `shareUrl`. Repeated calls are idempotent. The normalized original is published too only when the photo's event has explicitly enabled originals. After responding, the server asks Muse Spark for a gallery caption; the camera API response does not change.
 
 ## Unshare
 
