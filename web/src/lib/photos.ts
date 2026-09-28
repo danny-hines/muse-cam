@@ -30,6 +30,7 @@ function toPublishedPhoto(
     presetId: preset.id,
     presetName: preset.name,
     presetDescription: preset.description,
+    caption: photo.caption,
     imageUrl: photo.resultPublicUrl,
     originalImageUrl: photo.originalPublicUrl,
     deviceName,

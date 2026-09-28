@@ -21,12 +21,13 @@ export async function generateMetadata({ params }: PhotoPageProps): Promise<Meta
     return { title: "Photo not found" };
   }
 
+  const description = photo.caption ?? photo.presetDescription;
   return {
     title: photo.presetName,
-    description: photo.presetDescription,
+    description,
     openGraph: {
       title: `${photo.presetName} · Muse Cam`,
-      description: photo.presetDescription,
+      description,
       images: [{ url: photo.imageUrl, width: photo.width, height: photo.height }],
     },
   };
@@ -61,6 +62,12 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
             />
           </PhotoViewer>
           <aside className="detail-copy">
+            {photo.caption ? (
+              <>
+                <p className="detail-caption">{photo.caption}</p>
+                <hr className="detail-rule" />
+              </>
+            ) : null}
             <p className="section-kicker">Preset</p>
             <h1>{photo.presetName}</h1>
             <p>{photo.presetDescription}</p>

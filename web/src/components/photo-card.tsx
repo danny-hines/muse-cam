@@ -21,6 +21,7 @@ export function PhotoCard({ photo, index }: { photo: PublishedPhoto; index: numb
         <span className="photo-index">{String(index + 1).padStart(2, "0")}</span>
       </div>
       <Link href={href}>
+        {photo.caption ? <p className="photo-caption">{photo.caption}</p> : null}
         <div className="photo-meta">
           <div>
             <p className="preset-name">{photo.presetName}</p>

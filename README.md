@@ -25,6 +25,7 @@ The web/API foundation is functional:
 - Neon Postgres and private/public Vercel Blob adapters.
 - A protected operator dashboard for registration, moderation, and deletion.
 - Opt-in original-photo publishing with an accessible before/after control.
+- Muse Spark captions for shared photos, written after publishing.
 - In-memory development fallbacks and included demo frames.
 
 The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. It has two interchangeable front ends: the proven native framebuffer app for SPI/HAT displays and a local Chromium interface for the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
@@ -61,7 +62,7 @@ pnpm --dir web admin:credentials
 5. Run `pnpm --dir web db:migrate` against the connected Neon database.
 6. Generate operator credentials with `pnpm --dir web admin:credentials`, then add the two emitted environment variables to Vercel.
 7. Keep the existing `DEVICE_API_TOKEN_SHA256` and `DEVICE_ID` during migration. New cameras can use individual credentials created at `/admin`.
-8. Add `SITE_URL`. When enabling Muse Image, add `META_API_KEY`; the documented endpoint and `muse-image-1.0` model are built-in defaults.
+8. Add `SITE_URL`. When enabling Muse Image, add `META_API_KEY`; the documented endpoint and `muse-image-1.0` model are built-in defaults. The same key lets `muse-spark-1.3` caption shared photos.
 9. Set `MODEL_PROVIDER=mock` for the first deployment smoke test.
 10. Switch to `MODEL_PROVIDER=meta` after adding the Meta API key and running a live image-edit smoke test.
 

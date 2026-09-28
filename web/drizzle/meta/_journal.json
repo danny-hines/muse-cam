@@ -29,6 +29,13 @@
       "when": 1790410831981,
       "tag": "0003_require_photo_event",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790633320689,
+      "tag": "0004_photo_captions",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ export type PhotoRecord = {
   width: number | null;
   height: number | null;
   errorCode: string | null;
+  caption: string | null;
 };
 
 export type PublishedPhoto = {
@@ -33,6 +34,7 @@ export type PublishedPhoto = {
   presetId: string;
   presetName: string;
   presetDescription: string;
+  caption: string | null;
   imageUrl: string;
   originalImageUrl: string | null;
   deviceName: string;

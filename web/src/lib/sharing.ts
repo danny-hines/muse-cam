@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
+import { captionAfterResponse } from "@/lib/captions";
 import { getFleetRepository } from "@/lib/fleet";
 import { getMediaStore } from "@/lib/media";
 import { getPhotoRepository } from "@/lib/repository";
@@ -58,5 +59,6 @@ export async function publishPhoto(photo: PhotoRecord): Promise<PhotoRecord> {
   revalidatePath("/admin");
   revalidatePath("/[eventSlug]", "page");
   revalidatePath(`/p/${shared.publicSlug}`);
+  captionAfterResponse(shared);
   return shared;
 }

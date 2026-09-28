@@ -60,6 +60,7 @@ it.each(retiredPresets)("preserves shared links and gallery entries for $name", 
     width: 1920,
     height: 1280,
     errorCode: null,
+    caption: null,
   };
   repository.findByPublicSlug.mockResolvedValue(photo);
   repository.listShared.mockResolvedValue([photo]);

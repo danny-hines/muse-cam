@@ -10,7 +10,13 @@ import { getPhotoRepository } from "@/lib/repository";
 
 const auth = vi.hoisted(() => ({ deviceId: "", eventId: null as string | null }));
 const transform = vi.hoisted(() => vi.fn());
+const caption = vi.hoisted(() => vi.fn());
+const afterResponse = vi.hoisted(() => [] as (() => Promise<void>)[]);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/server")>(),
+  after: (task: () => Promise<void>) => { afterResponse.push(task); },
+}));
 vi.mock("@/lib/device-auth", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/device-auth")>(),
   authenticateDevice: vi.fn(async () => ({ ...auth })),
@@ -20,7 +26,10 @@ vi.mock("@/lib/model/image", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/model/image")>(),
   normalizeInputImage: vi.fn(async () => Buffer.from("normalized test image")),
 }));
-vi.mock("@/lib/model", () => ({ getImageModelProvider: () => ({ transform }) }));
+vi.mock("@/lib/model", () => ({
+  getImageModelProvider: () => ({ transform }),
+  getCaptionProvider: () => ({ caption }),
+}));
 vi.mock("@/lib/fleet", async () => {
   const { MemoryFleetRepository } = await import("@/lib/fleet/memory");
   const repository = new MemoryFleetRepository();
@@ -38,6 +47,8 @@ vi.mock("@/lib/media", async () => {
 });
 
 beforeEach(() => {
+  afterResponse.length = 0;
+  caption.mockReset().mockResolvedValue("Commissioned portrait, paid in fruit snacks.");
   auth.deviceId = randomUUID();
   auth.eventId = null;
   transform.mockReset().mockResolvedValue({
@@ -55,6 +66,10 @@ async function event(autoShare: boolean, publishOriginals = false) {
   });
   auth.eventId = created.id;
   return created;
+}
+
+async function finishResponses() {
+  await Promise.all(afterResponse.splice(0).map((task) => task()));
 }
 
 function upload(captureId = randomUUID()) {
@@ -218,5 +233,49 @@ describe("event auto-sharing and camera retractions", () => {
     expect((await manualShare(generated.id)).status).toBe(410);
     expect((await remove(captureId)).status).toBe(200);
     expect((await getPhotoRepository().findById(generated.id))?.publicSlug).toBeNull();
+  });
+});
+
+describe("publish captions", () => {
+  it("captions a photo after the share response without captioning private photos", async () => {
+    await event(true);
+    const generated = await (await upload()).json();
+    const privateCapture = await event(false).then(() => upload());
+    expect(privateCapture.status).toBe(201);
+
+    expect(caption).not.toHaveBeenCalled();
+    expect((await getPhotoRepository().findById(generated.id))?.caption).toBeNull();
+    await finishResponses();
+    expect(caption).toHaveBeenCalledOnce();
+    expect(caption).toHaveBeenCalledWith({
+      bytes: Buffer.from("transformed test image"),
+      preset: expect.objectContaining({ id: "kid-drawing" }),
+    });
+    expect((await getPhotoRepository().findById(generated.id))?.caption)
+      .toBe("Commissioned portrait, paid in fruit snacks.");
+  });
+
+  it("keeps the share when captioning fails", async () => {
+    await event(false);
+    const generated = await (await upload()).json();
+    caption.mockRejectedValueOnce(new Error("Muse Spark unavailable"));
+    expect((await manualShare(generated.id)).status).toBe(200);
+    await finishResponses();
+    expect(await getPhotoRepository().findById(generated.id)).toMatchObject({ caption: null });
+    expect((await getPhotoRepository().findById(generated.id))?.publicSlug).toBeTruthy();
+    expect(console.error).toHaveBeenCalledWith("Unable to caption photo", expect.anything());
+  });
+
+  it("keeps a photo's caption when it is hidden and shared again", async () => {
+    await event(false);
+    const generated = await (await upload()).json();
+    await manualShare(generated.id);
+    await finishResponses();
+    await unshare(new Request("https://camera.test/share", { method: "DELETE" }), { params: Promise.resolve({ id: generated.id }) });
+    await manualShare(generated.id);
+    await finishResponses();
+    expect(caption).toHaveBeenCalledOnce();
+    expect((await getPhotoRepository().findById(generated.id))?.caption)
+      .toBe("Commissioned portrait, paid in fruit snacks.");
   });
 });

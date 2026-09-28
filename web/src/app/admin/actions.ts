@@ -10,6 +10,7 @@ import {
   isAdminAuthenticated,
   verifyAdminKey,
 } from "@/lib/admin-auth";
+import { writeCaption } from "@/lib/captions";
 import { sha256 } from "@/lib/device-auth";
 import { toEventSlug } from "@/lib/event-slug";
 import { getFleetRepository } from "@/lib/fleet";
@@ -186,6 +187,23 @@ export async function publishOriginal(formData: FormData): Promise<void> {
   revalidatePath("/admin");
   revalidatePath("/[eventSlug]", "page");
   redirect(destination("Original enabled for before-and-after view"));
+}
+
+export async function captionPhoto(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const photo = await getPhotoRepository().findById(id);
+  if (!photo?.resultPrivateRef) redirect(destination("Photo not found"));
+  try {
+    await writeCaption(photo);
+  } catch (error) {
+    console.error("Unable to caption photo", { photoId: photo.id, error });
+    redirect(destination("Muse Spark couldn't write a caption. Try again."));
+  }
+  revalidatePath("/admin");
+  if (photo.publicSlug) revalidatePath(`/p/${photo.publicSlug}`);
+  revalidatePath("/[eventSlug]", "page");
+  redirect(destination("New caption written"));
 }
 
 export async function deletePhoto(formData: FormData): Promise<void> {

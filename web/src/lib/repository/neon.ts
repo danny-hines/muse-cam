@@ -155,6 +155,11 @@ export class NeonPhotoRepository implements PhotoRepository {
     return firstOrThrow(rows, id);
   }
 
+  async saveCaption(id: string, caption: string): Promise<void> {
+    // Captions finish after the publish response, so the photo may have been deleted by then.
+    await getDb().update(photos).set({ caption, updatedAt: new Date() }).where(eq(photos.id, id));
+  }
+
   async delete(id: string): Promise<void> {
     await getDb().delete(photos).where(eq(photos.id, id));
   }
