@@ -9,7 +9,7 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Fridge Masterpiece | Wobbly crayons and joyful childlike drawings |
 | First Contact | A friendly visitor and everyday science-fiction wonder |
 | Tiny Clay World | Hand-shaped characters and miniature stop-motion sets |
-| Found in 1997 | Flash, soft focus, grain, and a nostalgic timestamp |
+| Found in 1997 | Direct flash, grain, and late-90s outfits, hair, and gadgets |
 | Bedtime Legend | Warm, richly painted storybook illustration |
 | Panel One | Comic brush inks, halftone dots, and printed color |
 | Anime Cel | Nostalgic cel anime with expressive faces and painted scenery |
@@ -23,6 +23,23 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Soft Spot | Stuffed felt puppets and embroidered textile scenery |
 | Neon Rain | Cinematic futuristic night lighting and reflected neon |
 | Stained in Light | Jewel-colored stained glass with slender lead contours |
+
+## September 28: Found in 1997 v2
+
+Version 1 only changed the photographic treatment, so results often looked like a
+modern photo with a flash. **Version 2** keeps the disposable-camera flash, grain,
+and color cast, and adds a restrained late-90s makeover: everyday period clothes,
+a 1990s version of each person's hair, and modern devices and furnishings swapped
+for period equivalents in the same places. It allows at most two added props,
+asks for plain tape and disc labels, and keeps buildings and skylines as
+photographed. It uses the shared costume preservation instructions, so faces,
+ages, poses, and layout stay recognizable.
+
+Before adopting it, current and new prompts were compared on five published
+originals: a posed group, a group at a skyline window, a gym mirror selfie, a
+child in a living room, and a dog on a couch. None were filtered. A first draft
+piled up VHS tapes and electronics and printed real movie titles on tape
+spines, which led to the prop limit and label wording.
 
 ## September 8 curation
 

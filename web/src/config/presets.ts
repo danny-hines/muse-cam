@@ -61,12 +61,12 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
   },
   {
     id: "disposable-90s",
-    version: 1,
+    version: 2,
     name: "Found in 1997",
-    description: "Direct flash, soft focus, chunky grain, and a slightly questionable timestamp.",
+    description: "Direct flash, chunky grain, and a late-90s makeover for outfits, hair, and gadgets.",
     accent: "#5ac6c8",
     hue: 184,
-    prompt: `Make the supplied photograph look like an authentic late-1990s consumer disposable-camera print. Use direct on-camera flash, slightly missed focus, visible film grain, modest color casts, imperfect exposure, and candid snapshot energy. Do not add a border or timestamp. ${preservationPrompt}`,
+    prompt: `Restage the supplied photograph as a candid snapshot taken in 1997 on a consumer disposable camera. Give it a late-1990s makeover that is noticeable at a glance but still believable as a real photo from that year, not a themed costume party. Dress people in everyday late-1990s clothes suited to their age and activity, such as flannel or plaid shirts, light-wash baggy jeans, denim jackets, overalls, oversized sweaters, windbreakers, ringer tees, cargo pants, slip dresses, and chunky sneakers. Give each person a plausible 1990s version of their own hair, such as curtain bangs, a center part, frosted or gelled spikes, butterfly clips, or a scrunchie. Replace modern devices and furnishings with late-1990s equivalents in the same places: CRT televisions and monitors, beige computers, corded or cordless phones, flip phones, portable CD players with wired headphones, boomboxes, VHS tapes, and period furniture and decor. Beyond those replacements, add at most two small period props and leave the rest of the scene as it was; do not pile up tapes, discs, or electronics. Keep labels on tapes, discs, and packaging plain or unreadable. Keep buildings, skylines, and landmarks exactly as photographed. Use direct on-camera flash, slightly missed focus, visible film grain, a modest warm or green color cast, and imperfect exposure. Do not add a border or date stamp. ${costumePreservationPrompt}`,
   },
   {
     id: "storybook",

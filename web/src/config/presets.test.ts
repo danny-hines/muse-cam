@@ -68,8 +68,9 @@ describe("preset catalog", () => {
 
     expect(preset?.version).toBe(3);
     expect(getPreset("alien-visitor")?.version).toBe(2);
-    for (const id of ["kid-drawing", "claymation", "disposable-90s", "storybook"]) {
+    for (const id of ["kid-drawing", "claymation", "storybook"]) {
       expect(getPreset(id)?.version).toBe(1);
     }
+    expect(getPreset("disposable-90s")?.version).toBe(2);
   });
 });
