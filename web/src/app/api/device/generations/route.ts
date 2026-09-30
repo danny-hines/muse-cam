@@ -5,6 +5,7 @@ import {
   getPreset,
   type Preset,
   presetAllowedForEvent,
+  presetsForEvent,
   surpriseCandidates,
   surprisePreset,
 } from "@/config/presets";
@@ -123,7 +124,12 @@ export async function POST(request: Request) {
   }
 
   const event = await getFleetRepository().findEventById(eventId);
-  const candidates = requested ? [requested] : surpriseCandidates(event).slice(0, SURPRISE_ATTEMPTS);
+  const candidates = requested
+    ? [requested]
+    : surpriseCandidates(
+      event,
+      await repository.listRecentPresetIds(deviceId, presetsForEvent(event).length),
+    ).slice(0, SURPRISE_ATTEMPTS);
   if (requested && !presetAllowedForEvent(requested, event)) {
     // Not retryable: the camera keeps the original so a guest can restyle it.
     return apiError("This style isn't available at this camera's event", 403, {

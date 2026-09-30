@@ -30,7 +30,7 @@ Authorization: Bearer <device token>
 
 The credential is optional. A camera assigned to an event that chooses its own styles receives that event's list, with event-only styles first. Any other request, including one without a credential or with an unknown one, receives the default catalog. If the server can't load the camera's event it returns `503`, and the camera keeps its cached list. Responses are `private, no-store`.
 
-When the event has the server pick styles, the list holds one entry, `surprise`. Sending `preset_id=surprise` to the generation endpoint makes the server choose from the event's styles. It tries up to three when Muse Image filters one, and the response's `presetId` is the style it used.
+When the event has the server pick styles, the list holds one entry, `surprise`. Sending `preset_id=surprise` to the generation endpoint makes the server choose from the event's styles, preferring ones the camera hasn't used recently. It tries up to three when Muse Image filters one, and the response's `presetId` is the style it used.
 
 Prompts are deliberately omitted from this response. The device receives names, versions, descriptions, and display colors. Cameras load the list when the camera service starts.
 

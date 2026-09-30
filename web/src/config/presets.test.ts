@@ -127,10 +127,20 @@ describe("event styles", () => {
 
   it("shuffles an event's styles for a surprise photo", () => {
     const presetIds = ["kid-drawing", special.id, "claymation"];
-    const ids = (random: () => number) => surpriseCandidates({ presetIds }, random).map(({ id }) => id);
+    const ids = (random: () => number) => surpriseCandidates({ presetIds }, [], random).map(({ id }) => id);
     expect(ids(() => 0).sort()).toEqual([...presetIds].sort());
     expect(ids(() => 0)).not.toEqual(ids(() => 0.99));
     expect(surpriseCandidates(null)).toHaveLength(presets.length);
     expect(getPreset(surprisePreset.id)).toBeUndefined();
+  });
+
+  it("puts a camera's unused styles first, then the ones it used longest ago", () => {
+    const presetIds = ["kid-drawing", special.id, "claymation", "storybook"];
+    const recent = ["claymation", "kid-drawing"];
+    for (const random of [() => 0, () => 0.5, () => 0.99]) {
+      const ids = surpriseCandidates({ presetIds }, recent, random).map(({ id }) => id);
+      expect(ids.slice(0, 2).sort()).toEqual([special.id, "storybook"].sort());
+      expect(ids.slice(2)).toEqual(["kid-drawing", "claymation"]);
+    }
   });
 });

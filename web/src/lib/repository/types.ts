@@ -29,6 +29,8 @@ export interface PhotoRepository {
   listShared(eventId: string, limit?: number): Promise<PhotoRecord[]>;
   findSharedNeighbors(slug: string): Promise<PhotoNeighbors>;
   listAll(limit?: number): Promise<PhotoRecord[]>;
+  // A camera's styles, most recent photo first.
+  listRecentPresetIds(deviceId: string, limit: number): Promise<string[]>;
   markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord>;
   markFailed(id: string, errorCode: string): Promise<PhotoRecord>;
   markShared(

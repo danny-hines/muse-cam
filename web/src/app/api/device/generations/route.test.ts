@@ -113,6 +113,17 @@ describe("surprise styles", () => {
     expect(triedIds()).toEqual([presetId]);
   });
 
+  it("works through every style on a camera before repeating one", async () => {
+    await assign(pool);
+    const picks = [];
+    for (let photo = 0; photo < pool.length * 2; photo += 1) {
+      picks.push((await (await upload("surprise")).json()).presetId);
+    }
+    expect([...picks.slice(0, pool.length)].sort()).toEqual([...pool].sort());
+    // The second round repeats the first in the same order: least recently used first.
+    expect(picks.slice(pool.length)).toEqual(picks.slice(0, pool.length));
+  });
+
   it("tries another style when the model filters one", async () => {
     await assign(pool);
     transform.mockRejectedValueOnce(filtered());
