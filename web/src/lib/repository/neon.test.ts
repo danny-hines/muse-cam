@@ -179,4 +179,23 @@ describe("Neon event galleries", () => {
     await repository.delete(photo.id);
     await expect(repository.saveCaption(photo.id, "Too late")).resolves.toBeUndefined();
   });
+
+  it("lists a camera's recent styles, newest first", async () => {
+    const postgres = await connect();
+    const photos = [
+      ["camera", "kid-drawing", "2026-10-01T10:00:00Z"],
+      ["other-camera", "storybook", "2026-10-01T10:01:00Z"],
+      ["camera", "claymation", "2026-10-01T10:02:00Z"],
+      ["camera", "headset-on", "2026-10-01T10:03:00Z"],
+    ];
+    for (const [deviceId, presetId, createdAt] of photos) {
+      const id = randomUUID();
+      await repository.create({
+        id, captureId: id, deviceId, eventId: "seattle", presetId, presetVersion: 1, capturedAtDevice: null,
+      });
+      await postgres.query("UPDATE photos SET created_at = $2 WHERE id = $1", [id, createdAt]);
+    }
+    expect(await repository.listRecentPresetIds("camera", 2)).toEqual(["headset-on", "claymation"]);
+    expect(await repository.listRecentPresetIds("camera", 10)).toEqual(["headset-on", "claymation", "kid-drawing"]);
+  });
 });

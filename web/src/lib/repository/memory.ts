@@ -97,6 +97,16 @@ export class MemoryPhotoRepository implements PhotoRepository {
       .slice(0, limit);
   }
 
+  async listRecentPresetIds(deviceId: string, limit: number): Promise<string[]> {
+    // Newest insertions first, so photos created in the same millisecond stay in order.
+    return [...getState().photos.values()]
+      .reverse()
+      .filter((photo) => photo.deviceId === deviceId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit)
+      .map((photo) => photo.presetId);
+  }
+
   async markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord> {
     const now = new Date();
     return save({

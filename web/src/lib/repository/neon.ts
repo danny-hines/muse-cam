@@ -89,6 +89,16 @@ export class NeonPhotoRepository implements PhotoRepository {
     return getDb().select().from(photos).orderBy(desc(photos.createdAt)).limit(limit);
   }
 
+  async listRecentPresetIds(deviceId: string, limit: number): Promise<string[]> {
+    const rows = await getDb()
+      .select({ presetId: photos.presetId })
+      .from(photos)
+      .where(eq(photos.deviceId, deviceId))
+      .orderBy(desc(photos.createdAt))
+      .limit(limit);
+    return rows.map(({ presetId }) => presetId);
+  }
+
   async markComplete(id: string, input: CompletePhotoInput): Promise<PhotoRecord> {
     const now = new Date();
     const rows = await getDb()

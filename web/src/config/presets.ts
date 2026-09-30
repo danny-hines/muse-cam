@@ -519,14 +519,25 @@ export function presetsForEvent(event: EventStyles): Preset[] {
 }
 
 // The styles a surprise photo tries, in order, so a style the model refuses for
-// one photo can fall through to the next.
-export function surpriseCandidates(event: EventStyles, random = Math.random): Preset[] {
+// one photo can fall through to the next. Styles the camera hasn't used lately come
+// first, so it works through the whole list before repeating one. `recentIds` is the
+// camera's styles, most recent first.
+export function surpriseCandidates(
+  event: EventStyles,
+  recentIds: readonly string[] = [],
+  random = Math.random,
+): Preset[] {
   const pool = [...presetsForEvent(event)];
   for (let i = pool.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool;
+  const lastUsed = (preset: Preset) => {
+    const index = recentIds.indexOf(preset.id);
+    return index === -1 ? Infinity : index;
+  };
+  // Stable, so unused styles keep their shuffled order.
+  return pool.sort((a, b) => lastUsed(b) - lastUsed(a));
 }
 
 // Cameras with an out-of-date list, and photos queued offline, may still send any
