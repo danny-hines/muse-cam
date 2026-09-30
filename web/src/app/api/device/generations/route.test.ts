@@ -108,8 +108,9 @@ describe("surprise styles", () => {
     await assign(pool);
     const response = await upload("surprise");
     expect(response.status).toBe(201);
-    const { presetId } = await response.json();
+    const { presetId, presetName } = await response.json();
     expect(pool).toContain(presetId);
+    expect(presetName).toBe(getPreset(presetId)?.name);
     expect(triedIds()).toEqual([presetId]);
   });
 

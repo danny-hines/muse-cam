@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from musecam.models import Preset
@@ -87,3 +88,39 @@ def test_share_retraction_survives_deletion_retry_and_restart(tmp_path, monkeypa
         assert recovered.retraction_count() == 0
     finally:
         recovered.close()
+
+
+def test_surprise_photos_keep_the_style_the_server_used(tmp_path: Path) -> None:
+    database = tmp_path / "musecam.sqlite3"
+    # A database from before the style-name column existed.
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "CREATE TABLE captures (capture_id TEXT PRIMARY KEY, preset_id TEXT NOT NULL, "
+        "source_path TEXT NOT NULL, result_path TEXT, generation_id TEXT, status TEXT NOT NULL, "
+        "attempts INTEGER NOT NULL DEFAULT 0, error TEXT, share_url TEXT, "
+        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+        "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+    )
+    connection.execute(
+        "INSERT INTO captures (capture_id, preset_id, source_path, status) "
+        "VALUES ('old', 'storybook', 'old.jpg', 'complete')"
+    )
+    connection.commit()
+    connection.close()
+
+    store = CaptureStore(database)
+    try:
+        assert store.get("old").preset_name is None  # type: ignore[union-attr]
+        store.enqueue("surprise", "surprise", tmp_path / "capture.jpg")
+        store.mark_complete(
+            "surprise", "generation_1", tmp_path / "result.jpg",
+            preset_id="muse-mode", preset_name="Muse Mode",
+        )
+        job = store.get("surprise")
+        assert (job.preset_id, job.preset_name) == ("muse-mode", "Muse Mode")  # type: ignore[union-attr]
+        store.enqueue("plain", "storybook", tmp_path / "plain.jpg")
+        store.mark_complete("plain", "generation_2", tmp_path / "plain-result.jpg")
+        assert store.get("plain").preset_id == "storybook"  # type: ignore[union-attr]
+    finally:
+        store.close()
+

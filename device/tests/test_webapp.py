@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from concurrent.futures import Future
 from pathlib import Path
 
 import httpx
@@ -12,7 +13,7 @@ from PIL import Image
 
 from musecam.app import FALLBACK_PRESETS, RETIRED_PRESETS
 from musecam.config import DeviceConfig, load_profile
-from musecam.models import Preset
+from musecam.models import Generation, Preset
 from musecam.webapp import CameraWebController, create_web_app
 
 
@@ -766,6 +767,47 @@ def test_a_single_server_style_has_no_random_entry(tmp_path):
         assert shot.preset_id == "surprise"
         controller._remix({"captureId": shot.capture_id, "presetId": "surprise"}, retry=False)
         assert controller.gallery()["items"][0]["presetName"] == "Surprise"
+    finally:
+        controller.close()
+
+
+def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
+    controller = make_controller(tmp_path)
+    surprise = Preset(
+        id="surprise", version=1, name="Surprise",
+        description="A different style for every photo, picked for you.", accent="#d6b8ff",
+    )
+    controller._store.save_presets([surprise])
+    controller._load_presets()
+
+    class SurpriseClient:
+        def generate(self, image, capture_id, preset_id):
+            assert preset_id == "surprise"
+            return Generation(
+                "generation-surprise", capture_id, "complete", "muse-mode",
+                "https://camera.example/image", None, None, preset_name="Muse Mode",
+            )
+
+        def download_result(self, url, output):
+            Image.new("RGB", (80, 60), "red").save(output, "JPEG")
+
+        def close(self):
+            pass
+
+    source = tmp_path / "captures" / "surprise.jpg"
+    Image.new("RGB", (100, 80), "orange").save(source)
+    controller._store.enqueue("capture-surprise", "surprise", source)
+    controller._client = SurpriseClient()
+    try:
+        outcome = controller._process_job(controller._store.get("capture-surprise"))
+        assert (outcome.job.preset_id, outcome.job.preset_name) == ("muse-mode", "Muse Mode")
+        item = controller.gallery()["items"][0]
+        assert (item["presetId"], item["presetName"]) == ("muse-mode", "Muse Mode")
+        finished = Future()
+        finished.set_result(outcome)
+        controller._future, controller._processing_id = finished, "capture-surprise"
+        controller._poll_future()
+        assert controller.state()["notifications"][-1]["message"] == "Muse Mode"
     finally:
         controller.close()
 

@@ -34,6 +34,7 @@ class Generation:
     image_url: str | None
     share_url: str | None
     error_code: str | None
+    preset_name: str | None = None
 
     @classmethod
     def from_api(cls, value: dict[str, Any]) -> Generation:
@@ -45,6 +46,7 @@ class Generation:
             image_url=value.get("imageUrl"),
             share_url=value.get("shareUrl"),
             error_code=value.get("errorCode"),
+            preset_name=value.get("presetName"),
         )
 
 
@@ -60,6 +62,9 @@ class CaptureJob:
     error: str | None
     share_url: str | None
     created_at: str = ""
+    # The style the server used. A Surprise photo asks for "surprise" and gets a
+    # style the camera may not have in its list.
+    preset_name: str | None = None
 
 
 class ScreenState(StrEnum):

@@ -44,6 +44,9 @@ class CaptureStore:
         self._lock = threading.Lock()
         with self._connection:
             self._connection.executescript(SCHEMA)
+            columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(captures)")}
+            if "preset_name" not in columns:
+                self._connection.execute("ALTER TABLE captures ADD COLUMN preset_name TEXT")
             # A power loss can interrupt an upload after it is marked in-flight.
             # No request survives a reboot, so make those jobs retryable again.
             self._connection.execute(
@@ -81,11 +84,14 @@ class CaptureStore:
         generation_id: str,
         result_path: Path,
         share_url: str | None = None,
+        preset_id: str | None = None,
+        preset_name: str | None = None,
     ) -> None:
         self._update(
             capture_id,
-            "status = 'complete', generation_id = ?, result_path = ?, share_url = ?, error = NULL",
-            (generation_id, str(result_path), share_url),
+            "status = 'complete', generation_id = ?, result_path = ?, share_url = ?, error = NULL, "
+            "preset_id = COALESCE(?, preset_id), preset_name = COALESCE(?, preset_name)",
+            (generation_id, str(result_path), share_url, preset_id, preset_name),
         )
 
     def mark_shared(self, capture_id: str, share_url: str) -> None:
@@ -284,4 +290,5 @@ class CaptureStore:
             error=row["error"],
             share_url=row["share_url"],
             created_at=row["created_at"],
+            preset_name=row["preset_name"],
         )

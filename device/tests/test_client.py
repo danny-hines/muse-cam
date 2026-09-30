@@ -36,6 +36,7 @@ def test_client_parses_presets_and_generation(tmp_path: Path) -> None:
                     "captureId": "capture_0001",
                     "status": "complete",
                     "presetId": "storybook",
+                    "presetName": "Bedtime Legend",
                     "imageUrl": "https://camera.example/private/image",
                     "shareUrl": None,
                     "errorCode": None,
@@ -63,6 +64,7 @@ def test_client_parses_presets_and_generation(tmp_path: Path) -> None:
     assert presets[0].name == "Bedtime Legend"
     assert generation.id == "generation_1"
     assert generation.image_url == "https://camera.example/private/image"
+    assert generation.preset_name == "Bedtime Legend"
     assert requests[1].headers["authorization"] == "Bearer device-secret"
     assert "multipart/form-data" in requests[1].headers["content-type"]
     assert b"capture_0001" in requests[1].content
