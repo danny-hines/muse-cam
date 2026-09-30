@@ -351,6 +351,11 @@ export function PhotoDetail({
               className="primary-button"
               disabled={pending}
               onClick={() => {
+                // With a single style there is nothing to pick.
+                if (state.presets.length === 1) {
+                  void perform("remix", { presetId: state.presets[0].id });
+                  return;
+                }
                 if (!state.presets.some((preset) => preset.id === presetId)) {
                   setPresetId(state.preset.id);
                 }

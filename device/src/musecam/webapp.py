@@ -203,7 +203,10 @@ class CameraWebController:
                 self._network_online = False
         loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
         styles = [p for p in loaded if p.id not in RETIRED_PRESETS and p.id != "random"]
-        self._presets = [RANDOM_PRESET, *(styles or FALLBACK_PRESETS)]
+        styles = styles or FALLBACK_PRESETS
+        # A single style, such as an event's server-picked Surprise, needs no Random
+        # entry, and the interface hides the picker.
+        self._presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
             selected = "age-of-legends"

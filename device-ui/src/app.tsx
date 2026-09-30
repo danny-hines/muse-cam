@@ -108,6 +108,8 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [screen, act, report, state.status, camera]);
   const working = state.queued + (state.processingId ? 1 : 0);
+  // An event can give the camera a single style, such as a server-picked Surprise.
+  const choosesStyle = state.presets.length > 1;
   const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
     <main
@@ -199,7 +201,7 @@ export function App() {
               </button>
             </div>
           </header>
-          {stylesOpen && (
+          {choosesStyle && stylesOpen && (
             <aside className="style-rail" aria-label="Choose a style">
               <div className="rail-heading">
                 <span>IMAGINE IT AS</span>
@@ -280,7 +282,7 @@ export function App() {
                 <Icon name="next" size={16} />
               </button>
             )}
-            {!stylesOpen && (
+            {choosesStyle && !stylesOpen && (
               <button
                 className="glass-button"
                 onClick={() => setStylesOpen(true)}

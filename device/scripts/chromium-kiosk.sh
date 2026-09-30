@@ -41,6 +41,12 @@ if command -v matchbox-window-manager >/dev/null 2>&1 && command -v xprop >/dev/
   done
 fi
 
+# Debian's Chromium adds --disable-dev-shm-usage whenever /dev/shm has less than
+# 3.8 GB free, which is always true on a Pi. Chromium then keeps shared memory,
+# including every preview frame, in $TMPDIR or /tmp on the SD card: tens of MB/s
+# of writes that stall the preview for a second or two every few seconds.
+export TMPDIR=/dev/shm
+
 display_size=$(xrandr --current | awk '/^Screen / {gsub(",", "", $10); print $8 "," $10; exit}')
 
 exec "${browser}" \
