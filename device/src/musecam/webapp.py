@@ -613,7 +613,12 @@ class CameraWebController:
                     image.verify()
                 temporary.replace(result_path)
             self._store.mark_complete(
-                job.capture_id, generation.id, result_path, generation.share_url
+                job.capture_id,
+                generation.id,
+                result_path,
+                generation.share_url,
+                preset_id=generation.preset_id,
+                preset_name=generation.preset_name,
             )
             return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
         except httpx.TransportError:
@@ -658,7 +663,7 @@ class CameraWebController:
                 self._notify(
                     "success",
                     "Your photo is ready",
-                    self._preset_name(job.preset_id),
+                    self._job_preset_name(job),
                     job.capture_id,
                 )
             elif result.queued:
@@ -817,6 +822,9 @@ class CameraWebController:
             )
             self._publish_locked()
 
+    def _job_preset_name(self, job: CaptureJob) -> str:
+        return job.preset_name or self._preset_name(job.preset_id)
+
     def _preset_name(self, preset_id: str) -> str:
         retired = RETIRED_PRESETS.get(preset_id)
         return next(
@@ -879,7 +887,7 @@ class CameraWebController:
         return {
             "id": job.capture_id,
             "presetId": job.preset_id,
-            "presetName": self._preset_name(job.preset_id),
+            "presetName": self._job_preset_name(job),
             "status": job.status,
             "error": gallery_error(job.error),
             "shareUrl": job.share_url,

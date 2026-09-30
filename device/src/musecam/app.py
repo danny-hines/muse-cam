@@ -286,7 +286,12 @@ class MuseCamApp:
                 return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
             self._client.download_result(generation.image_url, result_path)
             self._store.mark_complete(
-                job.capture_id, generation.id, result_path, generation.share_url
+                job.capture_id,
+                generation.id,
+                result_path,
+                generation.share_url,
+                preset_id=generation.preset_id,
+                preset_name=generation.preset_name,
             )
             self._prune_local_history()
             return CaptureOutcome(self._store.get(job.capture_id) or job, generation)

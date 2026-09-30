@@ -1,3 +1,4 @@
+import { getPreset } from "@/config/presets";
 import type { PhotoRecord } from "@/lib/types";
 
 export function apiError(error: string, status: number, details?: unknown) {
@@ -11,6 +12,8 @@ export function photoApiResponse(photo: PhotoRecord, request: Request) {
     captureId: photo.captureId,
     status: photo.status,
     presetId: photo.presetId,
+    // Surprise photos use a style the camera may not know, so it needs the name.
+    presetName: getPreset(photo.presetId)?.name ?? null,
     presetVersion: photo.presetVersion,
     createdAt: photo.createdAt.toISOString(),
     completedAt: photo.completedAt?.toISOString() ?? null,
