@@ -12,6 +12,7 @@ from PIL import Image
 
 from musecam.app import FALLBACK_PRESETS, RETIRED_PRESETS
 from musecam.config import DeviceConfig, load_profile
+from musecam.models import Preset
 from musecam.webapp import CameraWebController, create_web_app
 
 
@@ -740,6 +741,31 @@ def test_random_style_resolves_each_shot_and_retry_keeps_the_choice(tmp_path, mo
         assert controller.gallery()["items"][0]["presetId"] == FALLBACK_PRESETS[2].id
         controller._load_presets()
         assert controller.state()["preset"]["id"] == "random"
+    finally:
+        controller.close()
+
+
+def test_a_single_server_style_has_no_random_entry(tmp_path):
+    controller = make_controller(tmp_path)
+    surprise = Preset(
+        id="surprise", version=1, name="Surprise",
+        description="A different style for every photo, picked for you.", accent="#d6b8ff",
+    )
+    controller._store.save_presets([surprise])
+    controller._store.set_setting("presetId", "random")
+    controller._load_presets()
+    controller._start_camera()
+    try:
+        state = controller.state()
+        assert [p["id"] for p in state["presets"]] == ["surprise"]
+        assert state["preset"]["id"] == "surprise"
+        with pytest.raises(ValueError, match="available style"):
+            controller.dispatch("select", {"presetId": "random"})
+        controller._handle_action("capture", {})
+        shot = controller._store.get(controller.state()["lastCaptureId"])
+        assert shot.preset_id == "surprise"
+        controller._remix({"captureId": shot.capture_id, "presetId": "surprise"}, retry=False)
+        assert controller.gallery()["items"][0]["presetName"] == "Surprise"
     finally:
         controller.close()
 

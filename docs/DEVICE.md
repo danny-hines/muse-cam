@@ -99,6 +99,8 @@ The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then
 
 The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. Its framebuffer writes only changed scanlines and requests a conservative 20 MHz SPI clock. The DSI profile captures a 15 FPS preview and supplies up to 10 FPS local MJPEG to the 800×480 Chromium UI. Above 75°C, preview delivery slows to at most 5 FPS until the Pi cools to 68°C; still-photo resolution is unchanged. The display itself refreshes at native DSI speed.
 
+The kiosk sets `TMPDIR=/dev/shm` for Chromium. Debian's Chromium adds `--disable-dev-shm-usage` whenever `/dev/shm` has less than 3.8 GB free, which is always true on a Pi. Chromium then keeps shared memory, including every preview frame, in `/tmp` on the SD card. On 2026-09-29 that meant about 38 MB/s of card writes and a 1–2 second preview freeze every few seconds. With RAM-backed `TMPDIR`, card writes drop to near zero. To check a camera, watch the `bo` column of `vmstat 1`; it should stay near zero while the preview runs.
+
 ## DSI touchscreen controls (0.3)
 
 The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. **Random**, the first option, chooses an available style separately for each shot. The actual style is saved with the photo, so retries keep that choice. Random is also available when restyling an existing original.
