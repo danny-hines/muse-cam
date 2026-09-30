@@ -24,6 +24,61 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Neon Rain | Cinematic futuristic night lighting and reflected neon |
 | Stained in Light | Jewel-colored stained glass with slender lead contours |
 
+## September 29: Event-only styles for Meta's internal event
+
+Events can now choose their own style list in `/admin` (see
+[ADMIN.md](ADMIN.md#event-styles)). These six styles are **event-only**. They
+are not in the default catalog or the camera's bundled list, and the server
+generates them only for cameras at an event that turns them on.
+
+| Style | Treatment |
+| --- | --- |
+| Headset On | A Quest-style VR headset on every person, and on pets |
+| Keynote Fit | Alexandr Wang's Connect 2026 outfit: deer tie-dye tee, hiking pants, camo clogs |
+| Muse Mode | Every person becomes a plush Muse in their own clothes, pose, and expression |
+| Legs Sold Separately | Legless, floating 2022 metaverse avatars in front of a flat Eiffel Tower |
+| Gold Chain Era | Oversized black tees, gold chains, and grown-out curls; pets get a chain collar |
+| Hydrofoil Freedom | Tuxedos on electric hydrofoils, with one rider holding a flag |
+
+Keynote Fit and Muse Mode send a reference image after the photo
+(`web/src/lib/model/references/`). The Keynote Fit reference is cropped below
+the face and the prompt uses it only for clothing.
+
+Drafts were tested on six published originals: a posed group of nine, a close
+group of four, a gym mirror selfie, a child, a dog, and a family with a dog.
+Changes before adoption:
+
+- **Legs Sold Separately:** the first draft left legs on standing people. The
+  prompt now spells out that nothing is below the waist, for everyone.
+- **Muse Mode:** early drafts put Muse heads on human bodies in groups, left
+  some adults human, added small toy Muses instead, or stretched Muses to human
+  proportions. The prompt now puts Muse's pear-shaped body first and scales
+  each Muse to roughly the person's size without stretching it, so the framing
+  holds and clothes fit the round body like a plush toy's. It names men, women,
+  and children and forbids extra figures. A draft that made Muses waist-high
+  kept the shape but went back to adding toys beside people.
+- **Gold Chain Era:** the first draft put most people in shearling jackets,
+  hiding the tee and chain, so outerwear is now left off.
+- **Hydrofoil Freedom:** group photos were often filtered. Removing the flag did
+  not fix it, so a single flag, held by the center rider, is kept for the joke.
+- **Keynote Fit:** the first draft pulled back to show everyone's shoes; it now
+  keeps the original framing.
+
+The final prompts were then run once more on all six photos (36 requests) with
+production input normalization. No gallery entries or public images were
+created. Headset On, Keynote Fit, Muse Mode, and Legs Sold Separately
+completed 6 of 6. The body-shape revision of Muse Mode then turned every person
+into a round Muse on the close group and the family photo, the two that had
+failed before. The large group, which had passed with the previous draft, was
+filtered in that run. Gold Chain Era completed 5 of 6.
+The close group of four was filtered on every outfit-swap prompt tried, but
+passed the other styles. Hydrofoil Freedom completed 2 of 6 in that run, and
+about half of its requests were filtered across all drafts, including a dog and a
+child that had passed earlier. It is the least reliable of the six.
+
+Events that let the server pick styles fall back to another style when one is
+filtered, which covers most of these failures.
+
 ## September 28: Found in 1997 v2
 
 Version 1 only changed the photographic treatment, so results often looked like a
@@ -127,6 +182,10 @@ name, description, accent). `device/src/musecam/retired-presets.json` preserves
 metadata for retired styles. Both are included in the installed Python package.
 Update these files when changing metadata; web tests verify parity and ensure
 prompts are absent from the public API response.
+
+Event-only styles are never bundled: `presets.json` holds the default catalog
+only, and the API sends event-only styles just to cameras whose event turns
+them on.
 
 Connected cameras fetch the active server catalog at startup and cache it for
 offline use. Local filtering also removes retired styles from older cached lists.

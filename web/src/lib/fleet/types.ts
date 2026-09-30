@@ -3,9 +3,12 @@ import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 export type CreateEventInput = Pick<
   EventRecord,
   "id" | "slug" | "name" | "publishOriginals"
-> & { autoShare?: boolean };
+> & { autoShare?: boolean; presetIds?: string[] | null; surpriseStyles?: boolean };
 
-export type EventSettings = Pick<EventRecord, "autoShare" | "publishOriginals">;
+export type EventSettings = Pick<EventRecord, "autoShare" | "publishOriginals"> & {
+  presetIds?: string[] | null;
+  surpriseStyles?: boolean;
+};
 
 export type CreateClaimInput = Pick<
   DeviceClaimRecord,

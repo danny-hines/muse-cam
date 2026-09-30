@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPreset, presets } from "@/config/presets";
+import { getPreset, presets, referenceImageNames } from "@/config/presets";
 
 import {
   DEFAULT_META_IMAGE_EDIT_URL,
@@ -10,6 +10,7 @@ import {
   MetaMuseProvider,
 } from "./meta";
 import { ImageModelError } from "./errors";
+import { referenceImages } from "./references";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -130,6 +131,32 @@ describe("MetaMuseProvider", () => {
       format: "jpeg", width: 1710, height: 900,
     });
     expect(reference.equals(original)).toBe(false);
+  });
+
+  it.each(referenceImageNames)("bundles the %s reference as a JPEG", async (name) => {
+    const metadata = await sharp(Buffer.from(referenceImages[name].base64, "base64")).metadata();
+    expect(metadata.format).toBe("jpeg");
+    expect(Math.max(metadata.width!, metadata.height!)).toBeLessThanOrEqual(2048);
+  });
+
+  it("sends the Muse character after the photo for Muse Mode", async () => {
+    vi.stubEnv("META_API_KEY", "test-meta-key");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return Response.json({ data: [{ b64_json: "a".repeat(120) }], output_format: "jpeg" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MetaMuseProvider().transform({
+      bytes: Buffer.from("photo"), contentType: "image/jpeg", preset: getPreset("muse-mode")!,
+    }).catch(() => {});
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.images.map(({ image_url }: { image_url: string }) => image_url)).toEqual([
+      `data:image/jpeg;base64,${Buffer.from("photo").toString("base64")}`,
+      `data:image/jpeg;base64,${referenceImages.muse.base64}`,
+    ]);
   });
 
   it("surfaces the provider's structured error message", async () => {

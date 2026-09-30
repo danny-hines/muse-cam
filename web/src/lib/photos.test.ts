@@ -10,7 +10,7 @@ const repository = vi.hoisted(() => ({
 }));
 
 const event = vi.hoisted((): EventRecord => ({
-  id: "event-id", slug: "sei-nyc", name: "NYC Offsite", publishOriginals: false, autoShare: false,
+  id: "event-id", slug: "sei-nyc", name: "NYC Offsite", publishOriginals: false, autoShare: false, presetIds: null, surpriseStyles: false,
   createdAt: new Date(), updatedAt: new Date(),
 }));
 

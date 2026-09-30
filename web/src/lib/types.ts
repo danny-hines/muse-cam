@@ -52,6 +52,8 @@ export type EventRecord = {
   name: string;
   publishOriginals: boolean;
   autoShare: boolean;
+  presetIds: string[] | null;
+  surpriseStyles: boolean;
   createdAt: Date;
   updatedAt: Date;
 };

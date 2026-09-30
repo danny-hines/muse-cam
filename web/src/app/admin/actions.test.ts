@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { eventPresets, presets } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { writeCaption } from "@/lib/captions";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
@@ -239,6 +240,7 @@ describe("event sharing settings", () => {
     form.set("id", events[0].id);
     form.set("autoShare", "on");
     form.set("publishOriginals", "on");
+    for (const { id } of presets) form.append("presetIds", id);
     await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
     expect(await repository.findEventById(events[0].id)).toMatchObject({
       ...events[0], autoShare: true, publishOriginals: true, updatedAt: expect.any(Date),
@@ -246,7 +248,50 @@ describe("event sharing settings", () => {
     form.delete("autoShare");
     form.delete("publishOriginals");
     await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
-    expect(await repository.findEventById(events[0].id)).toMatchObject({ autoShare: false, publishOriginals: false });
+    expect(await repository.findEventById(events[0].id))
+      .toMatchObject({ autoShare: false, publishOriginals: false, presetIds: null });
+  });
+
+  it("stores a custom style list and returns to the default catalog", async () => {
+    const { repository, events } = await setup();
+    const form = new FormData();
+    form.set("id", events[0].id);
+    form.append("presetIds", "kid-drawing");
+    form.append("presetIds", eventPresets[0].id);
+    form.append("presetIds", "not-a-style");
+    await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
+    // Event-only styles lead the list whatever order the form sends.
+    expect((await repository.findEventById(events[0].id))?.presetIds)
+      .toEqual([eventPresets[0].id, "kid-drawing"]);
+
+    form.delete("presetIds");
+    for (const { id } of presets) form.append("presetIds", id);
+    await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
+    expect((await repository.findEventById(events[0].id))?.presetIds).toBeNull();
+  });
+
+  it("switches between guests and the server picking styles", async () => {
+    const { repository, events } = await setup();
+    const form = new FormData();
+    form.set("id", events[0].id);
+    for (const { id } of presets) form.append("presetIds", id);
+    form.set("styleChoice", "surprise");
+    await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
+    expect((await repository.findEventById(events[0].id))?.surpriseStyles).toBe(true);
+    form.set("styleChoice", "guest");
+    await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
+    expect((await repository.findEventById(events[0].id))?.surpriseStyles).toBe(false);
+  });
+
+  it("requires at least one style", async () => {
+    const { repository, events } = await setup();
+    const form = new FormData();
+    form.set("id", events[0].id);
+    form.set("autoShare", "on");
+    await expect(updateEventSettings(form)).rejects.toThrow(
+      `Redirect: /admin?notice=${encodeURIComponent("Choose at least one style for Original event")}`,
+    );
+    expect(await repository.findEventById(events[0].id)).toEqual(events[0]);
   });
 
   it("requires an admin session", async () => {

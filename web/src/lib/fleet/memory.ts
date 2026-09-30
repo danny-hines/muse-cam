@@ -34,7 +34,14 @@ function requireDevice(id: string): DeviceRecord {
 export class MemoryFleetRepository implements FleetRepository {
   async createEvent(input: CreateEventInput): Promise<EventRecord> {
     const now = new Date();
-    const event = { ...input, autoShare: input.autoShare ?? false, createdAt: now, updatedAt: now };
+    const event = {
+      ...input,
+      autoShare: input.autoShare ?? false,
+      presetIds: input.presetIds ?? null,
+      surpriseStyles: input.surpriseStyles ?? false,
+      createdAt: now,
+      updatedAt: now,
+    };
     state().events.set(event.id, event);
     return event;
   }

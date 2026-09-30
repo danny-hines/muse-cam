@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import type { EventRecord } from "@/lib/types";
+
+export const referenceImageNames = ["disc-2", "muse", "keynote-fit"] as const;
+export type ReferenceImageName = (typeof referenceImageNames)[number];
+
 const presetSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   version: z.number().int().positive(),
@@ -8,7 +13,11 @@ const presetSchema = z.object({
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   hue: z.number().min(0).max(360),
   prompt: z.string().min(24),
-  referenceImage: z.enum(["disc-2"]).optional(),
+  // Named images sent to the model after the photo; the prompt describes each one.
+  referenceImages: z.array(z.enum(referenceImageNames)).min(1).optional(),
+  // Event-only styles are hidden from the default catalog and the camera's bundled
+  // list, and generate only for events that turn them on.
+  eventOnly: z.literal(true).optional(),
 });
 
 export type Preset = z.infer<typeof presetSchema>;
@@ -21,6 +30,9 @@ const fantasyPreservationPrompt =
 
 const costumePreservationPrompt =
   "Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks.";
+
+const editPreservationPrompt =
+  "Keep each person's recognizable facial identity, age, skin tone, body proportions, expression, and pose, and keep the composition, camera angle, lighting, and background as photographed. Change only what the request describes. Do not add captions, lettering, logos, borders, signatures, or watermarks.";
 
 const presetCatalog: Preset[] = z.array(presetSchema).parse([
   {
@@ -193,7 +205,7 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
     accent: "#8ebf96",
     hue: 130,
     prompt: "Image 1 is the photograph to transform. Image 2 is a visual rendering reference only. Rebuild the people, animals, and location from image 1 using the precise old-game rendering aesthetic visible in image 2: large blocky segmented limbs and torsos, simple chunky heads, realistic human proportions, blurry photographic faces and clothing textures, smooth shading across broad surfaces, and detailed low-resolution scenery. Match the relationship between coarse geometry and soft photographic texture in image 2. Preserve the recognizable appearances, ages, expressions, clothing colors, poses, subject count, and composition from image 1. Keep the original photographed activity peaceful. Use image 2 only to guide rendering technique; do not copy its people, outfits, props, setting, or text. Do not add text, interfaces, borders, logos, or watermarks.",
-    referenceImage: "disc-2",
+    referenceImages: ["disc-2"],
   },
   {
     id: "cartridge-world",
@@ -393,6 +405,69 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
     hue: 28,
     prompt: `Reimagine the supplied photograph as a cinematic live-action Western during a relaxed everyday moment in a frontier town or ranch. Dress people in broad-brimmed cowboy hats, woven work shirts, denim, worn leather vests, neckerchiefs, practical boots, and long dusters as appropriate to their pose and activity. Keep hat brims lifted enough to see every face clearly. Translate the photographed surroundings into weathered timber storefronts, ranch buildings, hitching rails, rustic furniture, and dusty paths while preserving the original layout. For interiors, use warm window light, aged wood, and simple brass lamps; for exteriors, use golden sunlight, long shadows, and a little dust in the air. Use warm earth colors, tactile fabrics, and subtle widescreen-era film grain without changing the image aspect ratio. Keep the mood friendly and unhurried, with no showdown. ${costumePreservationPrompt}`,
   },
+  // Event-only styles for Meta's internal event.
+  {
+    id: "headset-on",
+    version: 1,
+    name: "Headset On",
+    description: "Everyone's strapped into a VR headset, pets included.",
+    accent: "#9fd4f5",
+    hue: 203,
+    eventOnly: true,
+    prompt: `Edit the supplied photograph so that every person is wearing a modern standalone virtual reality headset like a Meta Quest 3: a smooth, rounded white or light-gray front visor with small dark camera sensors, a soft gray fabric face cushion, and an adjustable strap around the back of the head. Fit each headset naturally to that person's head angle and hair, covering the eyes and brows while leaving the nose, mouth, jaw, ears, and hairstyle visible. Give any animals a small matching headset sized to their head. Keep everyone's clothing, hands, and gestures as photographed, and do not add controllers. Render the headsets photorealistically with the photograph's lighting, reflections, shadows, perspective, color, and grain so they look captured in camera. ${editPreservationPrompt}`,
+  },
+  {
+    id: "keynote-fit",
+    version: 1,
+    name: "Keynote Fit",
+    description: "Alexandr Wang's Connect 2026 look: deer tie-dye tee, hiking pants, and camo Crocs.",
+    accent: "#7e9a62",
+    hue: 92,
+    eventOnly: true,
+    referenceImages: ["keynote-fit"],
+    prompt: `Image 1 is the photograph to edit. Image 2 is a reference photo of an outfit, cropped below the face: an oversized, faded green crystal-wash tie-dye T-shirt with a large vintage wildlife graphic of a whitetail buck's head and antlers above a small snowy forest scene with two deer and an orange banner; dark charcoal slim hiking pants with a gray zippered thigh pocket; and brown camouflage-print clogs worn with white socks. Dress every person in image 1 in this exact outfit, replacing their own clothes, fitted naturally to each person's body and pose. Where feet are already in the frame, show the camouflage clogs and socks; keep the original framing rather than pulling back to show them. Give any animals a small matching tie-dye deer T-shirt. Keep the banner and sleeve text blank or unreadable. Use image 2 only for the clothing; do not copy the face, skin, hands, body, pose, or background from it. Keep glasses and hair as photographed. Keep the result photorealistic, with the photograph's lighting, fabric shadows, color, and grain. ${editPreservationPrompt}`,
+  },
+  {
+    id: "muse-mode",
+    version: 1,
+    name: "Muse Mode",
+    description: "Everyone becomes a round, fluffy Muse, in their own outfit, pose, and expression.",
+    accent: "#e8d9c0",
+    hue: 38,
+    eventOnly: true,
+    referenceImages: ["muse"],
+    prompt: "Image 1 is the photograph to edit. Image 2 is a character design called Muse. Muse's body shape matters most in this edit: a plump, pear-shaped plush figure whose head and body form one continuous rounded shape, wider at the bottom, with a big rounded fur hood, no neck or shoulders, short stubby arms ending in mitten-like paws, and two short stumpy legs. It is covered in soft cream-colored fur, with a smooth pale face, small glossy black dot eyes, rosy pink cheeks, and a thin curved smile. Replace every person in image 1 with a Muse of exactly this shape in their spot, scaled up to roughly that person's size but never stretched: the Muse keeps its round, pear-shaped proportions, so it is much wider and rounder than the person, with its face roughly where the person's face was. Never give a Muse a human neck, shoulders, torso, long arms, or long legs. Put each person's own clothes on their Muse, reshaped to the round body the way clothes fit a plush toy: a shirt or jacket becomes a short, wide top stretched over the round belly, trousers or shorts become short cuffs around the stubby legs, and hats, glasses, bags, and held items stay on the Muse. Carry over each person's pose and expression in simplified form: a raised hand becomes a raised paw, a grin becomes a wide smile. Every person becomes a Muse, men, women, and children alike, in front or behind; nobody is left human, and no human faces, skin, or hair remain. Do not add extra Muse figures as toys, props, or companions. Keep every Muse the same cream color with the same face, rendered as a photoreal plush 3D character that looks physically present in the scene. Leave animals as photographed. If the photograph has no people, add one Muse sitting naturally beside the main subject. Keep the background, objects, lighting, camera angle, and composition of image 1, and match its lighting, shadows, color, and grain. Use image 2 only for the character design, not for its pose, framing, or white background. Do not add captions, lettering, logos, borders, signatures, or watermarks.",
+  },
+  {
+    id: "legs-sold-separately",
+    version: 1,
+    name: "Legs Sold Separately",
+    description: "Floating, legless 2022 metaverse avatars in front of a very flat Eiffel Tower.",
+    accent: "#7fb0ff",
+    hue: 217,
+    eventOnly: true,
+    prompt: "Recreate the supplied photograph as an in-world screenshot from an early-2022 social virtual reality app, famous for avatars that had no legs. Turn each person into a simple 3D cartoon avatar that keeps their face shape, skin tone, hairstyle, hair color, glasses, and clothing colors: smooth untextured skin, large simple eyes, a fixed and slightly vacant pleasant smile, rounded simplified features, and clothing reduced to flat-colored shapes with no folds. Every avatar is only a head, torso, arms, and hands. The body ends in a clean rounded edge just below the waist, and there is nothing beneath it: no legs, knees, feet, shoes, trousers, or shorts, only empty air and the ground below, as if each avatar hovers at standing height. This is true for every person, including people who are standing, sitting, or crouching. Keep the people in the same positions, poses, and framing as the photograph. Replace the real surroundings with a sparse, low-polygon virtual plaza: flat bright-green ground, a few blocky trees, a cloudless pastel-blue sky, and a simplified, low-detail Eiffel Tower in the background. Use flat even lighting, almost no shadows, simple untextured materials, and the slightly soft, low-resolution look of a 2022 headset capture. Turn any animals into equally simple cartoon avatars. Do not add interface elements, captions, lettering, logos, borders, signatures, or watermarks.",
+  },
+  {
+    id: "gold-chain-era",
+    version: 1,
+    name: "Gold Chain Era",
+    description: "Oversized tees, a chunky gold chain, and big 2024 Zuck energy.",
+    accent: "#e2b646",
+    hue: 43,
+    eventOnly: true,
+    prompt: `Give everyone in the supplied photograph the relaxed, confident tech-founder look of 2024. Replace their tops with an oversized heavyweight T-shirt, mostly black, with a boxy fit and dropped shoulders, and add a thick, polished gold chain necklace worn over each shirt, catching a warm glint of light. Keep outerwear off so the T-shirt and chain are clearly visible. Where legs are visible, use relaxed dark trousers or jeans. Let each person's own hair look a little grown out, tousled, and loosely curly while keeping its color and recognizable shape. Keep glasses. Give any animals a small gold chain collar. Keep shirts plain, with no printed text or graphics. Keep the result photorealistic, with the photograph's lighting, fabric shadows, color, and grain. ${editPreservationPrompt}`,
+  },
+  {
+    id: "hydrofoil-freedom",
+    version: 1,
+    name: "Hydrofoil Freedom",
+    description: "Black tie, a flag in hand, and an electric hydrofoil skimming open water.",
+    accent: "#5c93e0",
+    hue: 215,
+    eventOnly: true,
+    prompt: "Restage the supplied photograph as a sun-drenched action photo on open water. Dress each person in a sharp classic black tuxedo with a white shirt and black bow tie, standing on their own sleek electric hydrofoil board that glides above calm blue water on a slender mast, leaving a trail of white spray, with a relaxed, confident stance and knees slightly bent for balance. The rider nearest the center holds a large American flag on a pole that ripples in the wind behind them. Keep everyone in the same left-to-right order and relative positions as the photograph, riding in a loose formation. If the photograph is a close-up, pull back just enough to show each person's board. Any animals ride along on a board of their own. Use bright midday sun, a clear blue sky, sparkling water, a distant green shoreline, crisp telephoto sports-photography detail, and a little motion blur in the spray. Keep each person's recognizable facial identity, age, skin tone, hairstyle, and expression. Do not add captions, lettering, logos, borders, signatures, or watermarks.",
+  },
 ]);
 
 // Retired styles remain resolvable for existing photos, shared links, and queued jobs.
@@ -411,9 +486,60 @@ const retiredIds = new Set([
   "blueprint-universe",
 ]);
 
-export const presets = presetCatalog.filter((preset) => !retiredIds.has(preset.id));
+const activePresets = presetCatalog.filter((preset) => !retiredIds.has(preset.id));
+
+// The default catalog, which every camera shows unless its event chooses its own styles.
+export const presets = activePresets.filter((preset) => !preset.eventOnly);
+export const eventPresets = activePresets.filter((preset) => preset.eventOnly);
 export const retiredPresets = presetCatalog.filter((preset) => retiredIds.has(preset.id));
+// Event-only styles come first so they lead an event's camera picker.
+export const selectablePresets = [...eventPresets, ...presets];
 
 export function getPreset(id: string): Preset | undefined {
   return presetCatalog.find((preset) => preset.id === id);
+}
+
+// Cameras at a surprise event list only this entry, so every photo sends it and the
+// server picks a real style. It is never stored on a photo.
+export const surprisePreset = {
+  id: "surprise",
+  version: 1,
+  name: "Surprise",
+  description: "A different style for every photo, picked for you.",
+  accent: "#d6b8ff",
+};
+
+type EventStyles = Pick<EventRecord, "presetIds"> | null;
+
+export function presetsForEvent(event: EventStyles): Preset[] {
+  const ids = event?.presetIds;
+  if (!ids) return presets;
+  const chosen = selectablePresets.filter((preset) => ids.includes(preset.id));
+  return chosen.length > 0 ? chosen : presets;
+}
+
+// The styles a surprise photo tries, in order, so a style the model refuses for
+// one photo can fall through to the next.
+export function surpriseCandidates(event: EventStyles, random = Math.random): Preset[] {
+  const pool = [...presetsForEvent(event)];
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool;
+}
+
+// Cameras with an out-of-date list, and photos queued offline, may still send any
+// default style. Only event-only styles are limited to the events that enable them.
+export function presetAllowedForEvent(preset: Preset, event: EventStyles): boolean {
+  return !preset.eventOnly || Boolean(event?.presetIds?.includes(preset.id));
+}
+
+// Choosing exactly the default catalog stores null, so the event keeps receiving
+// new default styles as they are added.
+export function eventPresetIds(selectedIds: readonly string[]): string[] | null {
+  const chosen = selectablePresets.filter((preset) => selectedIds.includes(preset.id));
+  const isDefault =
+    chosen.length === presets.length && chosen.every((preset) => !preset.eventOnly);
+  return isDefault ? null : chosen.map((preset) => preset.id);
 }

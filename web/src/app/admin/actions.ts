@@ -10,6 +10,7 @@ import {
   isAdminAuthenticated,
   verifyAdminKey,
 } from "@/lib/admin-auth";
+import { eventPresetIds } from "@/config/presets";
 import { writeCaption } from "@/lib/captions";
 import { sha256 } from "@/lib/device-auth";
 import { toEventSlug } from "@/lib/event-slug";
@@ -64,9 +65,13 @@ export async function updateEventSettings(formData: FormData): Promise<void> {
   const repository = getFleetRepository();
   const event = await repository.findEventById(id);
   if (!event) redirect(destination("Event not found"));
+  const presetIds = eventPresetIds(formData.getAll("presetIds").map(String));
+  if (presetIds?.length === 0) redirect(destination(`Choose at least one style for ${event.name}`));
   await repository.updateEventSettings(id, {
     autoShare: formData.get("autoShare") === "on",
     publishOriginals: formData.get("publishOriginals") === "on",
+    presetIds,
+    surpriseStyles: formData.get("styleChoice") === "surprise",
   });
   revalidatePath("/admin");
   redirect(destination(`Settings saved for ${event.name}`));

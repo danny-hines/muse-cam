@@ -30,6 +30,16 @@ Deleting a photo in the camera gallery also retracts its public share, including
 
 Deployment requires applying the database migration with `pnpm --dir web db:migrate`, deploying the updated web app, and updating the camera service and bundled device UI for deletion syncing. Deploy the server before updating cameras. Existing events retain manual sharing after migration.
 
+## Event styles
+
+Each event has a **Camera styles** list under its settings. By default an event uses the default catalog, and it picks up new default styles as they are added. Check or uncheck styles and select **Save settings** to give the event its own list. Checking exactly the default catalog returns the event to the default. An event needs at least one style.
+
+**Event-only** styles, such as the Meta event's, never appear in the default catalog. They are available only at events that check them, and the server refuses them from cameras at any other event with a non-retryable `403` (`preset_unavailable`). The camera marks that photo as failed and keeps the original for **Restyle**. Default styles an event has unchecked are still accepted, so a camera with an out-of-date list, or photos queued offline, never fail.
+
+**Who picks the style** chooses between guests and the server. With **Surprise: the server picks for each photo**, cameras list a single **Surprise** style (next to the camera's own **Random**, which resolves to it too). For each photo, the server tries up to three styles from the event's list in random order. It moves on to the next one only when Muse Image filters a style for that photo, and it records the style that worked on the photo. The camera labels these photos "Surprise"; galleries and captions use the real style. A camera that hasn't restarted still sends the style a guest chose, and the server honors it.
+
+Cameras load their style list when the camera service starts, so **restart the camera after changing an event's styles or who picks them** or moving a camera to an event with different styles. No camera update is needed: cameras have always sent their credential with the style request. A camera that can't reach the server when it starts keeps the last list it loaded.
+
 ## Register a camera
 
 An existing camera configured with `DEVICE_API_TOKEN` or `DEVICE_API_TOKEN_SHA256` appears automatically when an operator opens the dashboard or the camera makes a request. It keeps its `DEVICE_ID` and credential, starts without an event, and supports the same event assignment and revoke controls as cameras registered with a setup code. Assign it an event before use. No reinstall is needed. Syncing or rotating the configured token preserves its event and revoked status.

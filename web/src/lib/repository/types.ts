@@ -11,7 +11,7 @@ export type CreatePhotoInput = Pick<
   | "capturedAtDevice"
 > & { autoSharePending?: boolean };
 
-export type CompletePhotoInput = {
+export type CompletePhotoInput = Partial<Pick<PhotoRecord, "presetId" | "presetVersion">> & {
   originalPrivateRef: string;
   resultPrivateRef: string;
   resultMimeType: string;
