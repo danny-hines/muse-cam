@@ -15,7 +15,7 @@ This repository contains both sides of the project:
 
 The web/API foundation is functional:
 
-- Responsive per-event galleries, an event-code home page, and individual photo pages.
+- Responsive per-event galleries that update live, a full-screen slideshow for event screens, an event-code home page, and individual photo pages.
 - Individual, revocable device credentials plus a legacy single-token fallback.
 - Event assignment and 30-minute, single-use device setup codes.
 - Idempotent capture IDs.

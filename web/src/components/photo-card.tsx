@@ -27,7 +27,7 @@ export function PhotoCard({ photo, index }: { photo: PublishedPhoto; index: numb
             <p className="preset-name">{photo.presetName}</p>
             <p className="photo-origin">{photo.deviceName}</p>
           </div>
-          <time className="photo-time" dateTime={photo.sharedAt.toISOString()}>
+          <time className="photo-time" dateTime={photo.sharedAt.toISOString()} suppressHydrationWarning>
             {relativeTime(photo.sharedAt)}
           </time>
         </div>

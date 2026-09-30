@@ -306,6 +306,38 @@ select {
   text-transform: uppercase;
 }
 
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.slideshow-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--paper);
+  background: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.slideshow-link:hover {
+  background: var(--violet);
+}
+
+.slideshow-link:focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 2px;
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1164,6 +1196,281 @@ select {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+/* Event slideshow for big screens */
+.slideshow {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  color: #f4f0e8;
+  background: #0b0b09;
+}
+
+.slideshow.is-idle {
+  cursor: none;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  animation: slide-in 900ms ease both;
+}
+
+/* The outgoing slide stays put underneath while the next one fades in over it. */
+.slide-leaving {
+  animation: none;
+}
+
+.slide-backdrop {
+  object-fit: cover;
+  filter: blur(48px) brightness(0.42) saturate(1.2);
+  transform: scale(1.15);
+}
+
+.slide-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.slide-image {
+  object-fit: contain;
+}
+
+.slide-result {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 1400ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.slide-result.is-hidden {
+  clip-path: inset(0 100% 0 0);
+  transition: none;
+}
+
+.slide-chip {
+  position: absolute;
+  top: clamp(64px, 9vh, 110px);
+  left: 50%;
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(244, 240, 232, 0.92);
+  font-size: clamp(0.8rem, 1.1vw, 1.15rem);
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.slide-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: clamp(80px, 14vh, 180px) clamp(24px, 4vw, 72px) clamp(24px, 5vh, 64px);
+  background: linear-gradient(to top, rgba(11, 11, 9, 0.82), rgba(11, 11, 9, 0.4) 55%, transparent);
+}
+
+.slide-caption > * {
+  max-width: min(62vw, 1100px);
+}
+
+.slide-badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--acid);
+  font-size: clamp(0.75rem, 1vw, 1.05rem);
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.slide-quote {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.7vw, 3.2rem);
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+  animation: caption-in 700ms ease both;
+}
+
+.slide-meta {
+  margin: 0;
+  color: rgba(244, 240, 232, 0.72);
+  font-size: clamp(0.8rem, 1.1vw, 1.15rem);
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slideshow-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(16px, 3vh, 32px) clamp(20px, 3vw, 48px);
+  pointer-events: none;
+}
+
+.slideshow-header p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(0.72rem, 0.95vw, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+}
+
+.slideshow .live-dot {
+  background: var(--acid);
+  box-shadow: 0 0 0 4px rgba(215, 255, 66, 0.2);
+}
+
+.slideshow-controls {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+  transition: opacity 400ms ease;
+}
+
+.slideshow.is-idle .slideshow-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.slideshow-controls button,
+.slideshow-controls a {
+  padding: 10px 16px;
+  border: 1px solid rgba(244, 240, 232, 0.24);
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(20, 20, 16, 0.6);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.slideshow-controls button:focus-visible,
+.slideshow-controls a:focus-visible {
+  outline: 3px solid var(--acid);
+  outline-offset: 2px;
+}
+
+.slideshow-qr {
+  position: absolute;
+  right: clamp(20px, 3vw, 48px);
+  bottom: clamp(20px, 4vh, 48px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  text-align: center;
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.slideshow-qr-code {
+  width: clamp(84px, 8.5vw, 150px);
+  aspect-ratio: 1;
+  margin: 8px 0;
+}
+
+.slideshow-qr-code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.slideshow-qr strong {
+  font-size: clamp(0.85rem, 1.05vw, 1.15rem);
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.slideshow-qr span {
+  color: var(--muted);
+  font-size: clamp(0.68rem, 0.82vw, 0.92rem);
+  font-weight: 700;
+  line-height: 1.25;
+  /* The domain and the slug each stay on one line; a long slug widens the card. */
+  white-space: nowrap;
+}
+
+.slideshow-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+}
+
+.slideshow-empty h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 8vw, 8rem);
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.slideshow-empty p {
+  margin: 0;
+  color: rgba(244, 240, 232, 0.72);
+  font-size: clamp(1rem, 1.6vw, 1.6rem);
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .slide-quote {
+    animation: none;
+  }
+
+  .slide-result {
+    transition: none;
+  }
 }
 
 @keyframes card-in {

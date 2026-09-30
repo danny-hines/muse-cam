@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CameraShowcase } from "@/components/camera-showcase";
-import { PhotoCard } from "@/components/photo-card";
+import { LiveEventPhotos } from "@/components/live-event-photos";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getEventBySlug, listPublishedPhotos } from "@/lib/photos";
@@ -48,29 +48,7 @@ export default async function EventPage({ params }: EventPageProps) {
           </div>
           <CameraShowcase />
         </section>
-        <section aria-labelledby="event-photos-heading">
-          <div className="feed-heading">
-            <div>
-              <p className="section-kicker">Shared moments</p>
-              <h2 id="event-photos-heading">From the event</h2>
-            </div>
-            <span className="feed-count">
-              {photos.length} shared {photos.length === 1 ? "frame" : "frames"}
-            </span>
-          </div>
-          {photos.length > 0 ? (
-            <div className="photo-grid">
-              {photos.map((photo, index) => <PhotoCard key={photo.id} photo={photo} index={index} />)}
-            </div>
-          ) : (
-            <div className="empty-feed">
-              <div>
-                <strong>The event roll is still empty.</strong>
-                <p>Photos shared from cameras assigned to this event will appear here.</p>
-              </div>
-            </div>
-          )}
-        </section>
+        <LiveEventPhotos eventSlug={event.slug} initialPhotos={photos} />
       </main>
       <SiteFooter />
     </>

@@ -40,6 +40,20 @@ Each event has a **Camera styles** list under its settings. By default an event 
 
 Cameras load their style list when the camera service starts, so **restart the camera after changing an event's styles or who picks them** or moving a camera to an event with different styles. No camera update is needed: cameras have always sent their credential with the style request. A camera that can't reach the server when it starts keeps the last list it loaded.
 
+## Live gallery and slideshow
+
+An event's gallery at `/<event-slug>` updates itself. It checks for new photos every 5 seconds, adds them at the top, and drops photos that were hidden or deleted. **Start slideshow** opens `/<event-slug>/show`, a full-screen view for big screens:
+
+- Each photo from the roll stays up for 8 seconds, newest first, then the roll repeats.
+- A new photo is shown next, ahead of the roll, with a **Just now** badge for 10 seconds. If the event publishes originals, the real snapshot shows first ("The real moment") and wipes to the transformed photo after 2.5 seconds.
+- Captions fade in when Muse Spark finishes, usually 10–15 seconds after a photo is shared.
+- **Hide** or **Delete permanently** in this dashboard removes a photo from every open gallery and slideshow within about 5 seconds.
+- A QR code links to the event gallery so guests can find their photo.
+
+On the laptop driving a screen, open the slideshow, then select **Full screen** or press `F`; the browser needs that click or key press. Moving the mouse shows the controls, and they fade after 3 seconds along with the cursor. The right arrow key skips ahead. The page asks the browser to keep the screen awake, but set the laptop not to sleep on power as well. If the network drops, the slideshow keeps cycling the photos it has and catches up when it reconnects.
+
+Only shared photos appear, so turn on auto-sharing for events with a live screen. A photo usually appears 20–40 seconds after the shutter.
+
 ## Register a camera
 
 An existing camera configured with `DEVICE_API_TOKEN` or `DEVICE_API_TOKEN_SHA256` appears automatically when an operator opens the dashboard or the camera makes a request. It keeps its `DEVICE_ID` and credential, starts without an event, and supports the same event assignment and revoke controls as cameras registered with a setup code. Assign it an event before use. No reinstall is needed. Syncing or rotating the configured token preserves its event and revoked status.
