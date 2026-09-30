@@ -1,6 +1,6 @@
 # Device API
 
-All camera routes except presets require:
+All camera routes require the camera's credential, except presets, where it is optional:
 
 ```http
 Authorization: Bearer <device token>
@@ -25,9 +25,14 @@ The response contains a new plaintext token exactly once. The device CLI stores 
 
 ```http
 GET /api/device/presets
+Authorization: Bearer <device token>
 ```
 
-Prompts are deliberately omitted from this public response. The device receives names, versions, descriptions, and display colors.
+The credential is optional. A camera assigned to an event that chooses its own styles receives that event's list, with event-only styles first. Any other request, including one without a credential or with an unknown one, receives the default catalog. If the server can't load the camera's event it returns `503`, and the camera keeps its cached list. Responses are `private, no-store`.
+
+When the event has the server pick styles, the list holds one entry, `surprise`. Sending `preset_id=surprise` to the generation endpoint makes the server choose from the event's styles. It tries up to three when Muse Image filters one, and the response's `presetId` is the style it used.
+
+Prompts are deliberately omitted from this response. The device receives names, versions, descriptions, and display colors. Cameras load the list when the camera service starts.
 
 ## Generate a frame
 
@@ -41,7 +46,7 @@ Fields:
 | Field | Required | Description |
 | --- | --- | --- |
 | `capture_id` | Yes | 8–128 URL-safe characters, reused for retries. |
-| `preset_id` | Yes | ID returned by the presets endpoint. |
+| `preset_id` | Yes | ID returned by the presets endpoint, or `surprise` for a server-picked style. |
 | `captured_at` | No | ISO-8601 timestamp including an offset. |
 | `image` | Yes | JPEG, PNG, or WebP, at most 2.5 MB. |
 

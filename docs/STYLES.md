@@ -24,6 +24,13 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Neon Rain | Cinematic futuristic night lighting and reflected neon |
 | Stained in Light | Jewel-colored stained glass with slender lead contours |
 
+## September 29: Event-only styles
+
+Events can now choose their own style list in `/admin` (see
+[ADMIN.md](ADMIN.md#event-styles)), including event-only styles made for a
+private event. Those styles are private configuration and not part of this
+repository.
+
 ## September 28: Found in 1997 v2
 
 Version 1 only changed the photographic treatment, so results often looked like a
@@ -127,6 +134,10 @@ name, description, accent). `device/src/musecam/retired-presets.json` preserves
 metadata for retired styles. Both are included in the installed Python package.
 Update these files when changing metadata; web tests verify parity and ensure
 prompts are absent from the public API response.
+
+Event-only styles are never bundled: `presets.json` holds the default catalog
+only, and the API sends event-only styles just to cameras whose event turns
+them on.
 
 Connected cameras fetch the active server catalog at startup and cache it for
 offline use. Local filtering also removes retired styles from older cached lists.

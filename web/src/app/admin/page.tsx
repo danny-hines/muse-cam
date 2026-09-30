@@ -14,7 +14,7 @@ import { CreateClaimForm } from "@/components/create-claim-form";
 import { DeletePhotoForm } from "@/components/delete-photo-form";
 import { DeviceEventForm, DeviceNameForm } from "@/components/device-event-form";
 import { EventSettingsForm } from "@/components/event-settings-form";
-import { getPreset } from "@/config/presets";
+import { getPreset, selectablePresets } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { syncConfiguredDevice } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
@@ -38,6 +38,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const eventOptions = events.map(({ id, name }) => ({ id, name }));
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
   const eventNames = new Map(events.map((event) => [event.id, event.name]));
+  const styleOptions = selectablePresets.map(({ id, name, eventOnly }) => ({
+    id, name, eventOnly: Boolean(eventOnly),
+  }));
 
   return (
     <main className="admin-main">
@@ -111,8 +114,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <Link className="text-button" href={`/${event.slug}`}>View gallery /{event.slug} →</Link>
                 </div>
                 <EventSettingsForm
-                  key={`${event.id}:${event.autoShare}:${event.publishOriginals}`}
-                  event={{ id: event.id, name: event.name, autoShare: event.autoShare, publishOriginals: event.publishOriginals }}
+                  key={`${event.id}:${event.autoShare}:${event.publishOriginals}:${event.surpriseStyles}:${event.presetIds?.join(",") ?? ""}`}
+                  event={{
+                    id: event.id,
+                    name: event.name,
+                    autoShare: event.autoShare,
+                    publishOriginals: event.publishOriginals,
+                    presetIds: event.presetIds,
+                    surpriseStyles: event.surpriseStyles,
+                  }}
+                  styles={styleOptions}
                 />
               </div>
             ))}

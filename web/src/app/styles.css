@@ -943,6 +943,28 @@ select {
   justify-self: start;
 }
 
+.event-styles summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.event-style-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.event-style-group legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
 .admin-device-row strong {
   overflow-wrap: anywhere;
 }

@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-import disc2Reference from "./references/disc-2.json";
+import { referenceImages } from "./references";
 import { ImageModelError, type ImageModelErrorCode } from "./errors";
 import type { ImageModelProvider, TransformInput, TransformResult } from "./types";
 
@@ -94,9 +94,9 @@ export class MetaMuseProvider implements ImageModelProvider {
 
     const imageDataUrl = `data:${contentType};base64,${bytes.toString("base64")}`;
     const images = [{ image_url: imageDataUrl }];
-    if (preset.referenceImage === "disc-2") {
-      // The prompt identifies image 1 as the user's photo and image 2 as rendering guidance.
-      images.push({ image_url: `data:image/jpeg;base64,${disc2Reference.base64}` });
+    for (const name of preset.referenceImages ?? []) {
+      // The prompt identifies image 1 as the user's photo and describes each later image.
+      images.push({ image_url: `data:image/jpeg;base64,${referenceImages[name].base64}` });
     }
     const deviceId = process.env.DEVICE_ID;
     const response = await fetch(endpoint, {

@@ -21,6 +21,10 @@ export const events = pgTable(
     name: text("name").notNull(),
     publishOriginals: boolean("publish_originals").notNull().default(false),
     autoShare: boolean("auto_share").notNull().default(false),
+    // Null means the default style catalog.
+    presetIds: text("preset_ids").array(),
+    // The server picks a style from the list for each photo instead of guests.
+    surpriseStyles: boolean("surprise_styles").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
   },

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-import { getPreset } from "@/config/presets";
+import {
+  getPreset,
+  type Preset,
+  presetAllowedForEvent,
+  surpriseCandidates,
+  surprisePreset,
+} from "@/config/presets";
 import { apiError, photoApiResponse } from "@/lib/api";
 import { authenticateDevice, DeviceAuthError } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
@@ -15,6 +21,9 @@ import { CaptureRetractedError, publishPhoto } from "@/lib/sharing";
 import type { PhotoRecord } from "@/lib/types";
 
 export const maxDuration = 300;
+
+// A surprise photo tries up to this many styles when the model filters one.
+const SURPRISE_ATTEMPTS = 3;
 
 const generationFields = z.object({
   captureId: z.string().min(8).max(128).regex(/^[a-zA-Z0-9_-]+$/),
@@ -33,6 +42,22 @@ async function generationResponse(photo: PhotoRecord, request: Request, status: 
     }
   }
   return Response.json(photoApiResponse(photo, request), { status });
+}
+
+// Tries each style in turn. Only a filtered style falls through to the next, since
+// other failures would likely repeat and the camera already retries busy errors.
+async function transformWithFallback(bytes: Buffer, candidates: Preset[]) {
+  for (const [index, preset] of candidates.entries()) {
+    try {
+      const result = await getImageModelProvider().transform({ bytes, contentType: "image/jpeg", preset });
+      return { preset, result };
+    } catch (error) {
+      const last = index === candidates.length - 1;
+      if (last || classifyGenerationError(error).code !== "content_filtered") throw error;
+      console.warn("Surprise style was filtered; trying another", { presetId: preset.id });
+    }
+  }
+  throw new Error("No styles to try");
 }
 
 export async function POST(request: Request) {
@@ -80,8 +105,9 @@ export async function POST(request: Request) {
     return apiError("The image field is required", 400);
   }
 
-  const preset = getPreset(parsed.data.presetId);
-  if (!preset) {
+  const surprise = parsed.data.presetId === surprisePreset.id;
+  const requested = surprise ? null : getPreset(parsed.data.presetId);
+  if (!surprise && !requested) {
     return apiError("Unknown preset", 400);
   }
 
@@ -96,6 +122,15 @@ export async function POST(request: Request) {
     return generationResponse(existing, request, status);
   }
 
+  const event = await getFleetRepository().findEventById(eventId);
+  const candidates = requested ? [requested] : surpriseCandidates(event).slice(0, SURPRISE_ATTEMPTS);
+  if (requested && !presetAllowedForEvent(requested, event)) {
+    // Not retryable: the camera keeps the original so a guest can restyle it.
+    return apiError("This style isn't available at this camera's event", 403, {
+      code: "preset_unavailable",
+    });
+  }
+
   let normalizedImage: Buffer;
   try {
     normalizedImage = await normalizeInputImage(image);
@@ -104,15 +139,14 @@ export async function POST(request: Request) {
     return apiError("Unable to prepare image", 400);
   }
 
-  const event = await getFleetRepository().findEventById(eventId);
   const photo = await repository.create({
     id: randomUUID(),
     captureId: parsed.data.captureId,
     deviceId,
     eventId,
     autoSharePending: event?.autoShare ?? false,
-    presetId: preset.id,
-    presetVersion: preset.version,
+    presetId: candidates[0].id,
+    presetVersion: candidates[0].version,
     capturedAtDevice: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null,
   });
 
@@ -124,11 +158,7 @@ export async function POST(request: Request) {
       normalizedImage,
       "image/jpeg",
     );
-    const result = await getImageModelProvider().transform({
-      bytes: normalizedImage,
-      contentType: "image/jpeg",
-      preset,
-    });
+    const { preset, result } = await transformWithFallback(normalizedImage, candidates);
     const resultPrivateRef = await media.storePrivate(
       "results",
       photo.id,
@@ -136,6 +166,8 @@ export async function POST(request: Request) {
       result.contentType,
     );
     const completed = await repository.markComplete(photo.id, {
+      presetId: preset.id,
+      presetVersion: preset.version,
       originalPrivateRef,
       resultPrivateRef,
       resultMimeType: result.contentType,
@@ -148,8 +180,7 @@ export async function POST(request: Request) {
     await repository.markFailed(photo.id, code);
     console.error("Generation failed", {
       photoId: photo.id,
-      presetId: preset.id,
-      presetVersion: preset.version,
+      presetIds: candidates.map(({ id }) => id),
       errorCode: code,
       error,
     });

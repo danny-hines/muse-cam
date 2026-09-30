@@ -139,4 +139,20 @@ describe("Neon HTTP camera registration", () => {
       ...renamed, tokenHash: "rotated-token", updatedAt: expect.any(Date),
     });
   });
+
+  it("stores an event's style list and keeps existing events on the default catalog", async () => {
+    const event = await repository.createEvent({
+      id: randomUUID(), slug: "meta", name: "Meta", publishOriginals: false,
+    });
+    expect(event).toMatchObject({ presetIds: null, surpriseStyles: false });
+    await repository.updateEventSettings(event.id, {
+      autoShare: true, publishOriginals: false, presetIds: ["event-style-1", "kid-drawing"], surpriseStyles: true,
+    });
+    expect(await repository.findEventById(event.id))
+      .toMatchObject({ autoShare: true, presetIds: ["event-style-1", "kid-drawing"], surpriseStyles: true });
+    await repository.updateEventSettings(event.id, { autoShare: true, publishOriginals: false });
+    expect((await repository.findEventById(event.id))?.presetIds).toEqual(["event-style-1", "kid-drawing"]);
+    await repository.updateEventSettings(event.id, { autoShare: true, publishOriginals: false, presetIds: null });
+    expect((await repository.findEventById(event.id))?.presetIds).toBeNull();
+  });
 });

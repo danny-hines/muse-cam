@@ -9,6 +9,8 @@ export const demoEvent: EventRecord = {
   name: "Muse Cam Demo",
   publishOriginals: false,
   autoShare: false,
+  presetIds: null,
+  surpriseStyles: false,
   createdAt: demoNow,
   updatedAt: demoNow,
 };

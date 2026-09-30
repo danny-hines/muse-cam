@@ -36,6 +36,13 @@
       "when": 1790633320689,
       "tag": "0004_photo_captions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790730040308,
+      "tag": "0005_event_presets",
+      "breakpoints": true
     }
   ]
 }
