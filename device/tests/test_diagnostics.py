@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from musecam.config import load_profile
-from musecam.diagnostics import _camera_check, _camera_overlay_check
+from musecam.config import DeviceConfig, load_profile
+from musecam.diagnostics import _camera_check, _camera_overlay_check, _image_model_check
 
 
 @pytest.mark.parametrize("detected,expected_status", [
@@ -33,3 +33,18 @@ def test_doctor_ignores_comments_and_reports_conflicting_overlays(tmp_path, sett
     config.write_text(settings)
     profile = load_profile("pi3bplus-cam3-dsi43", Path(__file__).parents[1] / "profiles")
     assert _camera_overlay_check(config, profile).status == status
+
+
+@pytest.mark.parametrize("provider,environment,status", [
+    ("meta", {"META_API_KEY": "key"}, "ok"),
+    ("openai", {"META_API_KEY": "key"}, "failed"),
+    ("mock", {}, "warning"),
+])
+def test_doctor_checks_standalone_model_without_calling_it(provider, environment, status):
+    config = DeviceConfig(
+        server_url="", device_token="", mode="standalone",
+        model_provider=provider, environment=environment,
+    )
+    check = _image_model_check(config)
+    assert check.status == status
+    assert "key" not in check.detail.replace("API_KEY", "")

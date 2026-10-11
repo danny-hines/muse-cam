@@ -12,6 +12,7 @@ import httpx
 from .boot_config import CAMERA_OVERLAYS
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
+from .image_model import describe_image_model
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,10 @@ def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[Diag
     except OSError as error:
         checks.append(DiagnosticCheck("storage", "failed", str(error)))
 
+    if config.standalone:
+        checks.append(_image_model_check(config))
+        return checks
+
     client = MuseCamClient(config)
     try:
         health = client.health()
@@ -195,3 +200,14 @@ def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[Diag
         client.close()
 
     return checks
+
+
+def _image_model_check(config: DeviceConfig) -> DiagnosticCheck:
+    """Checks the standalone setup without a paid model call."""
+    model = describe_image_model(config)
+    detail = f"{model['provider']} · {model['model']}"
+    if model["provider"] == "mock":
+        return DiagnosticCheck("image model", "warning", f"{detail}; photos get a test tint")
+    if model["apiKey"].endswith("missing"):
+        return DiagnosticCheck("image model", "failed", f"{detail}; {model['apiKey']}")
+    return DiagnosticCheck("image model", "ok", f"{detail}; {model['apiKey']}")

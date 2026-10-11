@@ -4,22 +4,26 @@ import argparse
 import json
 import logging
 import os
+import shutil
+import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .app import MuseCamApp
+from .app import FALLBACK_PRESETS, MuseCamApp
+from .camera import prepare_capture
 from .client import MuseCamClient
-from .config import DEFAULT_CONFIG_PATH, load_config, load_profile
+from .config import DEFAULT_CONFIG_PATH, DeviceConfig, load_config, load_profile
 from .diagnostics import run_diagnostics
+from .image_model import ImageModelError, create_image_model, describe_image_model, style_prompt
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="musecam")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     subcommands = parser.add_subparsers(dest="command", required=True)
-    subcommands.add_parser("health", help="Check the deployed API")
+    subcommands.add_parser("health", help="Check the deployed API or standalone model setup")
     subcommands.add_parser("presets", help="List available style presets")
 
     claim = subcommands.add_parser("claim", help="Register this camera with a setup code")
@@ -70,8 +74,38 @@ def _print_json(value: Any) -> None:
     print(json.dumps(value, indent=2, default=_json_value))
 
 
+def _run_standalone_command(args: argparse.Namespace, config: DeviceConfig) -> int:
+    if args.command == "health":
+        # Checks configuration only; a real model call would cost money.
+        result = describe_image_model(config)
+        _print_json(result)
+        return 1 if result.get("apiKey", "").endswith("missing") else 0
+    if args.command == "presets":
+        _print_json({"presets": FALLBACK_PRESETS})
+        return 0
+    if args.share:
+        raise SystemExit("Sharing needs a Muse Cam server; standalone cameras keep photos local.")
+    style = style_prompt(args.preset)
+    model = create_image_model(config)
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "capture.jpg"
+            shutil.copyfile(args.image, source)
+            prepare_capture(source)
+            args.output.write_bytes(model.transform(source.read_bytes(), style))
+    except ImageModelError as error:
+        raise SystemExit(error.message) from error
+    finally:
+        model.close()
+    _print_json({"presetId": style.id, "presetName": style.name, "downloadedTo": args.output})
+    return 0
+
+
 def _run_api_command(args: argparse.Namespace) -> int:
-    client = MuseCamClient(load_config(args.config))
+    config = load_config(args.config)
+    if config.standalone:
+        return _run_standalone_command(args, config)
+    client = MuseCamClient(config)
     try:
         if args.command == "health":
             result: Any = client.health()
@@ -146,6 +180,8 @@ def _run_claim(args: argparse.Namespace) -> int:
 
 def _run_app(args: argparse.Namespace) -> int:
     config = load_config(args.config, require_credentials=not args.offline)
+    if config.standalone and not args.offline:
+        raise SystemExit("Standalone mode needs a browser display profile. Use `musecam serve`.")
     profile = load_profile(
         args.profile or config.profile_id, config.profiles_dir, power_backend=config.power_backend
     )
