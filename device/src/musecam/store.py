@@ -44,7 +44,9 @@ class CaptureStore:
         self._lock = threading.Lock()
         with self._connection:
             self._connection.executescript(SCHEMA)
-            columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(captures)")}
+            columns = {
+                row["name"] for row in self._connection.execute("PRAGMA table_info(captures)")
+            }
             if "preset_name" not in columns:
                 self._connection.execute("ALTER TABLE captures ADD COLUMN preset_name TEXT")
             # A power loss can interrupt an upload after it is marked in-flight.

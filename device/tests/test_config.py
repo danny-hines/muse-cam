@@ -110,3 +110,64 @@ def test_pi3_touch_orientation_matches_landscape_display() -> None:
     assert profile.touch_invert_y is False
     assert profile.camera_fps == 15
     assert profile.preview_fps == 6
+
+
+
+def clear_mode_settings(monkeypatch) -> None:
+    for key in (
+        "MUSECAM_MODE",
+        "MUSECAM_MODEL_PROVIDER",
+        "MUSECAM_SERVER_URL",
+        "MUSECAM_DEVICE_TOKEN",
+        "META_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_existing_connected_config_needs_no_mode(tmp_path: Path, monkeypatch) -> None:
+    clear_mode_settings(monkeypatch)
+    config_path = tmp_path / "device.env"
+    config_path.write_text(
+        "MUSECAM_SERVER_URL=https://camera.example\nMUSECAM_DEVICE_TOKEN=secret-token\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.mode == "connected" and not config.standalone
+    assert config.server_url == "https://camera.example"
+
+
+def test_standalone_config_needs_no_server_and_hides_keys(tmp_path: Path, monkeypatch) -> None:
+    clear_mode_settings(monkeypatch)
+    config_path = tmp_path / "device.env"
+    config_path.write_text(
+        "MUSECAM_MODE=Standalone\nMUSECAM_MODEL_PROVIDER=openai\nMETA_API_KEY=meta-secret\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.standalone
+    assert config.model_provider == "openai"
+    assert config.environment["META_API_KEY"] == "meta-secret"
+    assert "meta-secret" not in repr(config)
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    (
+        ({"MUSECAM_MODE": "cloud"}, "connected or standalone"),
+        (
+            {"MUSECAM_MODE": "standalone", "MUSECAM_MODEL_PROVIDER": "dalle"},
+            "meta, openai, or mock",
+        ),
+    ),
+)
+def test_unknown_mode_or_provider_is_rejected(tmp_path: Path, monkeypatch, values, message) -> None:
+    clear_mode_settings(monkeypatch)
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+
+    with pytest.raises(ValueError, match=message):
+        load_config(tmp_path / "device.env", require_credentials=False)

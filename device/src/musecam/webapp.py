@@ -35,6 +35,7 @@ from .battery import create_battery
 from .camera import Camera, FocusState, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
+from .image_model import ImageModelError, create_image_model, style_prompt
 from .models import CaptureJob, Generation, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
@@ -127,7 +128,13 @@ class CameraWebController:
         for directory in (self._captures_dir, self._results_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self._store = CaptureStore(config.data_dir / "musecam.sqlite3")
-        self._client = None if offline else MuseCamClient(config)
+        # Standalone cameras call the image model themselves; there is no server to
+        # share to. Offline standalone simulation uses the mock model.
+        self._standalone = config.standalone
+        self._client = None if offline or self._standalone else MuseCamClient(config)
+        self._image_model = (
+            create_image_model(config, offline=offline) if self._standalone else None
+        )
         self._camera: Camera = create_camera(profile, simulate=simulate)
         self._battery = create_battery(profile.battery_telemetry and not simulate)
         self._system = DeviceSystem(config.data_dir, simulate=simulate)
@@ -201,7 +208,12 @@ class CameraWebController:
             except (httpx.HTTPError, ValueError, KeyError):
                 LOGGER.warning("Unable to refresh presets; using cache")
                 self._network_online = False
-        loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
+        if self._standalone:
+            # Only the bundled styles have prompts on the camera. Ignore any server
+            # list cached while the camera was connected.
+            loaded = FALLBACK_PRESETS
+        else:
+            loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
         styles = [p for p in loaded if p.id not in RETIRED_PRESETS and p.id != "random"]
         styles = styles or FALLBACK_PRESETS
         # A single style, such as an event's server-picked Surprise, needs no Random
@@ -582,7 +594,9 @@ class CameraWebController:
     def _process_job(self, job: CaptureJob) -> CaptureOutcome:
         result_path = self._results_dir / f"{job.capture_id}.jpg"
         try:
-            if self._client is None:
+            if self._image_model is not None:
+                generation = self._transform_locally(job, result_path)
+            elif self._client is None:
                 # Simulated processing is intentionally visible for UX verification.
                 self._stop.wait(1.2)
                 with Image.open(job.source_path) as original:
@@ -621,6 +635,11 @@ class CameraWebController:
                 preset_name=generation.preset_name,
             )
             return CaptureOutcome(self._store.get(job.capture_id) or job, generation)
+        except ImageModelError as error:
+            if error.retry:
+                self._store.mark_queued(job.capture_id, error.message)
+                return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
+            self._store.mark_failed(job.capture_id, error.message)
         except httpx.TransportError:
             self._store.mark_queued(
                 job.capture_id, "Connection interrupted. Saved for automatic retry."
@@ -639,6 +658,19 @@ class CameraWebController:
                 job.capture_id, "Couldn’t finish this photo. Your original is saved."
             )
         return CaptureOutcome(self._store.get(job.capture_id) or job, None)
+
+    def _transform_locally(self, job: CaptureJob, result_path: Path) -> Generation:
+        image = self._image_model.transform(
+            job.source_path.read_bytes(), style_prompt(job.preset_id)
+        )
+        temporary = result_path.with_suffix(".download")
+        temporary.write_bytes(image)
+        with Image.open(temporary) as opened:
+            opened.verify()
+        temporary.replace(result_path)
+        return Generation(
+            f"local-{job.capture_id}", job.capture_id, "complete", job.preset_id, None, None, None
+        )
 
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
@@ -696,6 +728,8 @@ class CameraWebController:
             raise ValueError("This photo isn’t ready to share")
         if job.share_url:
             return
+        if self._standalone:
+            raise ValueError("Sharing needs a Muse Cam server")
         if self._client is None or job.generation_id.startswith("offline-"):
             raise ValueError("Sharing is unavailable in the simulator")
         if self._share_future is not None:
@@ -868,6 +902,7 @@ class CameraWebController:
                 "volume": self._sound.volume,
                 "processingSound": self._sound.processing_enabled,
                 "maintenance": self._maintenance,
+                "canShare": not self._standalone,
                 "simulate": self._simulate,
                 "revision": self._revision,
                 "sessionId": self._session_id,
@@ -937,7 +972,8 @@ class CameraWebController:
                         path.unlink(missing_ok=True)
             except OSError as error:
                 raise ValueError("Could not remove the photo files. Please try again.") from error
-            retract_share = bool(
+            # A standalone camera never uploads, so it has nothing to unshare.
+            retract_share = not self._standalone and bool(
                 (job.generation_id and not job.generation_id.startswith("offline-"))
                 or (job.attempts > 0 and not self._offline)
             )
@@ -1078,6 +1114,8 @@ class CameraWebController:
         self._sound.close()
         if self._client is not None:
             self._client.close()
+        if self._image_model is not None:
+            self._image_model.close()
         self._store.close()
 
 

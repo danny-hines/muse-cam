@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ DEFAULT_CONFIG_PATH = Path("/etc/musecam/device.env")
 DEFAULT_DATA_DIR = Path("/var/lib/musecam")
 BUILTIN_PROFILES_DIR = Path(__file__).resolve().parents[2] / "profiles"
 INSTALL_PROFILES_DIR = Path("/opt/muse-cam/device/profiles")
+MODES = ("connected", "standalone")
+MODEL_PROVIDERS = ("meta", "openai", "mock")
 
 
 def default_profiles_dir() -> Path:
@@ -60,6 +63,17 @@ class DeviceConfig:
     framebuffer_device: str | None = None
     profiles_dir: Path = BUILTIN_PROFILES_DIR
     power_backend: str | None = None
+    # Connected cameras send photos through a Muse Cam server. Standalone cameras
+    # call the image model directly with the owner's own API key.
+    mode: str = "connected"
+    model_provider: str = "meta"
+    # The config file merged with the process environment, which holds standalone
+    # API keys. Kept out of repr so a logged config never shows a key.
+    environment: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
+
+    @property
+    def standalone(self) -> bool:
+        return self.mode == "standalone"
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
@@ -79,9 +93,15 @@ def load_config(
     path: Path = DEFAULT_CONFIG_PATH, *, require_credentials: bool = True
 ) -> DeviceConfig:
     values = {**_read_env_file(path), **os.environ}
+    mode = values.get("MUSECAM_MODE", "connected").strip().lower() or "connected"
+    if mode not in MODES:
+        raise ValueError(f"MUSECAM_MODE must be connected or standalone, not {mode!r}")
+    provider = values.get("MUSECAM_MODEL_PROVIDER", "meta").strip().lower() or "meta"
+    if mode == "standalone" and provider not in MODEL_PROVIDERS:
+        raise ValueError(f"MUSECAM_MODEL_PROVIDER must be meta, openai, or mock, not {provider!r}")
     server_url = values.get("MUSECAM_SERVER_URL", "").rstrip("/")
     token = values.get("MUSECAM_DEVICE_TOKEN", "")
-    if require_credentials and (not server_url or not token):
+    if require_credentials and mode == "connected" and (not server_url or not token):
         raise ValueError(f"Missing MUSECAM_SERVER_URL or MUSECAM_DEVICE_TOKEN in {path}")
 
     return DeviceConfig(
@@ -94,6 +114,9 @@ def load_config(
         framebuffer_device=values.get("MUSECAM_FRAMEBUFFER") or None,
         profiles_dir=Path(values.get("MUSECAM_PROFILES_DIR", str(default_profiles_dir()))),
         power_backend=values.get("MUSECAM_POWER_BACKEND") or None,
+        mode=mode,
+        model_provider=provider,
+        environment=values,
     )
 
 
