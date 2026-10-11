@@ -65,7 +65,64 @@ requires Arducam's camera packages.
 
 The installer can exchange a 30-minute setup code from `/admin` for an individual device credential. Without `--claim`, it asks for the legacy plaintext token through `/dev/tty`. It creates a locked-down `musecam` system user, installs the selected display and camera configuration, installs the Python package, verifies the API, and enables `musecam.service`. The DSI profiles also install and enable `musecam-kiosk.service` and `musecam-control.service` for local Wi-Fi and software updates. It reboots automatically when a hardware overlay changes. Rerunning performs a fast-forward update and preserves the secret; add `--reconfigure --claim CODE` to replace an existing credential.
 
+To run without a Muse Cam server, replace `--claim YOUR-SETUP-CODE` with `--standalone` on a DSI profile. See [Standalone mode](#standalone-mode).
+
 The DSI installer follows Waveshare's current 800×480 setup: it enables full KMS and uses the dedicated Waveshare panel overlay when the OS provides it, otherwise the compatible 7-inch DSI overlay. The display is driven at its native refresh rate rather than copying frames over SPI.
+
+## Standalone mode
+
+A standalone camera calls the image model itself with the owner's API key. It
+needs no Muse Cam server, setup code, or device token. It works like a connected
+camera: the style rail, Random, timer, gallery, Restyle, Retry, and Delete are
+the same, and photos queue and retry when the network or model is busy. Only
+**Share** is missing, since there is no event gallery to publish to.
+
+Install with `--standalone` on one of the DSI profiles. The installer asks for
+the key on the terminal without echoing it; `--api-key-stdin` reads it from
+standard input instead.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
+  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --standalone
+```
+
+The installer writes these settings to `/etc/musecam/device.env`, which is owned
+by root, readable by the `musecam` group, and mode 0640:
+
+| Setting | Values |
+| --- | --- |
+| `MUSECAM_MODE` | `standalone`. Without it, the camera is connected. |
+| `MUSECAM_MODEL_PROVIDER` | `meta` (Muse Image, the default), `openai`, or `mock` for a no-cost test tint. |
+| `META_API_KEY` / `OPENAI_API_KEY` | The key for the selected provider. |
+| `MUSECAM_MODEL_ID` | Optional model override. Defaults: `muse-image-1.0` and `gpt-image-2.5-flare`. |
+
+The key is used only by the camera service. It is never passed on a command line,
+written to logs, or returned to the touchscreen interface. To change a setting,
+run `sudoedit /etc/musecam/device.env`, then `sudo systemctl restart musecam`.
+Rerunning the installer keeps the mode, key, and any settings added by hand. Add
+`--reconfigure` to enter a new key, or `--provider openai` to switch providers;
+the installer then asks for that provider's key.
+
+The camera sends the same prompts and request as the server's Muse Image
+provider. It bundles the 30 public styles in
+`device/src/musecam/standalone-presets.json`. After changing a built-in style in
+`web/src/config/presets.ts`, run `pnpm --dir web styles:export`; a web test fails
+until the two match. Event-only styles stay on the server. The prompts were
+tuned on Muse Image, so OpenAI results look different and are filtered
+differently.
+
+Check the setup without a paid call, then make one test edit from a file:
+
+```bash
+sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env health
+sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env \
+  submit /path/to/photo.jpg --preset alien-visitor --output /tmp/muse-test.jpg
+```
+
+`doctor` reports the provider, model, and whether the key is set. To connect a
+standalone camera to a Muse Cam server later, rerun the installer with
+`--claim YOUR-SETUP-CODE`. Standalone mode needs the touchscreen runtime; the
+native SPI and Display HAT profiles stay connected.
 
 ## Validate before starting the enclosure
 
@@ -163,7 +220,7 @@ or shared must finish before deletion becomes available.
 
 Updates fetch `origin/main` and accept only clean, fast-forward releases with prebuilt UI assets. Pending processing/sharing blocks installation. The update worker installs the Python package and control service, verifies the camera starts, and restores the previous commit/package if startup fails. Photos, sound settings, Wi-Fi profiles, and device credentials live outside the release checkout and are preserved. Keep power connected during an update. Local source edits block the release updater rather than being discarded.
 
-This repository is private. The assembled camera uses a dedicated read-only GitHub deploy key under `/root/.ssh/musecam-update`, pinned GitHub host keys, and an SSH origin URL. The private key never leaves the camera. Other cameras need their own read-only repository access before update checks can fetch releases; do not copy an account-wide GitHub token onto a camera.
+The repository is public, so a camera installed from the default HTTPS URL fetches updates without credentials. The first assembled camera was set up while the repository was private and uses a dedicated read-only GitHub deploy key under `/root/.ssh/musecam-update`, pinned GitHub host keys, and an SSH origin URL; that keeps working. Never copy an account-wide GitHub token onto a camera.
 
 The browser and camera API bind only to loopback. Mutating API requests require a local Host, matching Origin when supplied, and `X-MuseCam-Request: 1`. A root-owned helper exposes only fixed Wi-Fi/status/update operations on a Unix socket accessible to the `musecam` group. Wi-Fi passwords travel over that socket and NetworkManager D-Bus, never command arguments or application logs. The helper must be running for these settings to work:
 
@@ -200,6 +257,14 @@ To exercise the 800×480 browser UI instead:
 pnpm --dir device-ui build
 MUSECAM_DATA_DIR=./data .venv/bin/musecam serve \
   --profile pi3bplus-imx415-dsi43 --simulate --offline --port 8080
+```
+
+Add `MUSECAM_MODE=standalone` to simulate a standalone camera. With `--offline`,
+it uses the mock model, so no key is needed and nothing is billed:
+
+```bash
+MUSECAM_MODE=standalone MUSECAM_DATA_DIR=./data .venv/bin/musecam serve \
+  --profile pi3bplus-cam3-dsi43 --simulate --offline --port 8080
 ```
 
 Open `http://127.0.0.1:8080`. Arrow keys change presets, Space/Enter captures, and Escape returns to the live view. Gallery, restyling, sound controls, Wi-Fi keyboard, and update checks can be explored without hardware. Simulated results are local test images; sounds play only on the physical camera.

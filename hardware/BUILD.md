@@ -196,13 +196,18 @@ cables, and screws touching the battery or components. Then turn on PiSugar.
 Keep the front cover supported and accessible for the first test; power off
 again before changing any connection.
 
-Follow [DEVICE.md](../docs/DEVICE.md) for OS setup and device registration.
-For **this camera**, install with:
+Follow [DEVICE.md](../docs/DEVICE.md) for OS setup. For **this camera**, install
+in standalone mode and paste your Meta Model API key when asked. Add
+`--provider openai` to use an OpenAI key instead:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --claim YOUR-SETUP-CODE
+  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --standalone
 ```
+
+To connect the camera to a Muse Cam server and its event galleries instead, use
+`--claim YOUR-SETUP-CODE` in place of `--standalone`; see
+[camera registration](../docs/ADMIN.md#register-a-camera).
 
 The installer may reboot when hardware configuration changes. Then complete:
 
@@ -235,8 +240,8 @@ Check before fitting the front cover:
 - Settings → Sounds plays clean cues at low volume.
 - Battery percentage appears after PiSugar setup, and the camera runs on battery
   with the charger removed.
-- A capture, processing, and gallery-viewing cycle succeeds over Wi-Fi. Test
-  sharing only with an image intended for the public roll.
+- A capture, processing, and gallery-viewing cycle succeeds over Wi-Fi. On a
+  connected camera, test sharing only with an image intended for the public roll.
 
 ## 7. Close the camera and check the finished build
 

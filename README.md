@@ -2,6 +2,29 @@
 
 Muse Cam is a physical AI camera that captures a photograph, applies a playful Muse Image preset through Meta Model API, shows the result on the camera, and optionally publishes it to a public web roll.
 
+## Build your own
+
+Print it, build it, then make it do whatever you want. A camera you build needs no server: in **standalone mode** it sends each photo straight to the image model with your own API key and keeps every original and result in its gallery.
+
+1. **Get the parts.** The [parts list](hardware/BOM.md) covers a Raspberry Pi 3 Model B+, Camera Module 3, Waveshare 4.3-inch DSI touchscreen, PiSugar 3 Plus battery, MAX98357A amplifier and speaker, and a shutter button.
+2. **Print the enclosure.** Six parts: [STL files](hardware/stl/README.md), also on Printables and MakerWorld (links coming soon). <!-- TODO: add the Printables and MakerWorld links. -->
+3. **Assemble it.** Follow the [build guide](hardware/BUILD.md) and [wiring reference](hardware/WIRING.md).
+4. **Install the software.** Flash Raspberry Pi OS Lite (Legacy, 64-bit) with Wi-Fi and SSH ([details](docs/DEVICE.md#prepare-raspberry-pi-os)), then run this on the Pi and paste your Meta Model API key when asked:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
+     | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --standalone
+   ```
+
+   To use OpenAI's image model instead, add `--provider openai` and paste an OpenAI key. The installer reboots once to turn on the display and camera.
+5. **Take your first photo.** Pick a style from the rail on the touchscreen and press the shutter. A notice appears when the restyled photo is ready in **Your roll**. Then finish [battery reporting](docs/POWER.md) and [sound](docs/DEVICE.md#amplifier-and-speaker-bring-up).
+
+Each photo is one image edit billed to your API account. The key stays in `/etc/musecam/device.env`; the touchscreen interface never receives it. See [standalone mode](docs/DEVICE.md#standalone-mode) for settings, switching providers, and testing in the desktop simulator.
+
+To make it your own, start with the camera service in [`device/`](device/) and the touchscreen interface in [`device-ui/`](device-ui/).
+
+## What's in this repository
+
 This repository contains both sides of the project:
 
 - `web/` — Next.js site and device API deployed to Vercel.
@@ -28,7 +51,7 @@ The web/API foundation is functional:
 - Muse Spark captions for shared photos, written after publishing.
 - In-memory development fallbacks and included demo frames.
 
-The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. It has two interchangeable front ends: the proven native framebuffer app for SPI/HAT displays and a local Chromium interface for the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
+The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. Touchscreen cameras run either connected to a Muse Cam server or standalone, calling the image model directly with the owner's API key. It has two interchangeable front ends: the proven native framebuffer app for SPI/HAT displays and a local Chromium interface for the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
 
 ## Local development
 
@@ -84,7 +107,7 @@ See [docs/API.md](docs/API.md) for the complete flow.
 
 ## Raspberry Pi installation
 
-The public installer supports the current Camera Module 3 / Pi 3B+ / DSI build and the alternate hardware profiles:
+To build a camera that works on its own, use `--standalone` as shown in [Build your own](#build-your-own). To connect a camera to a Muse Cam server and its event galleries instead, register it with a setup code from `/admin`. The public installer supports the current Camera Module 3 / Pi 3B+ / DSI build and the alternate hardware profiles:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
