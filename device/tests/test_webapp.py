@@ -784,8 +784,8 @@ def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
         def generate(self, image, capture_id, preset_id):
             assert preset_id == "surprise"
             return Generation(
-                "generation-surprise", capture_id, "complete", "event-style-3",
-                "https://camera.example/image", None, None, preset_name="Event Style 3",
+                "generation-surprise", capture_id, "complete", "party-hats",
+                "https://camera.example/image", None, None, preset_name="Party Hats",
             )
 
         def download_result(self, url, output):
@@ -800,14 +800,14 @@ def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
     controller._client = SurpriseClient()
     try:
         outcome = controller._process_job(controller._store.get("capture-surprise"))
-        assert (outcome.job.preset_id, outcome.job.preset_name) == ("event-style-3", "Event Style 3")
+        assert (outcome.job.preset_id, outcome.job.preset_name) == ("party-hats", "Party Hats")
         item = controller.gallery()["items"][0]
-        assert (item["presetId"], item["presetName"]) == ("event-style-3", "Event Style 3")
+        assert (item["presetId"], item["presetName"]) == ("party-hats", "Party Hats")
         finished = Future()
         finished.set_result(outcome)
         controller._future, controller._processing_id = finished, "capture-surprise"
         controller._poll_future()
-        assert controller.state()["notifications"][-1]["message"] == "Event Style 3"
+        assert controller.state()["notifications"][-1]["message"] == "Party Hats"
     finally:
         controller.close()
 

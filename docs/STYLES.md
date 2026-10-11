@@ -24,12 +24,18 @@ for **Gallery → Restyle**, which creates a separate entry from a saved origina
 | Neon Rain | Cinematic futuristic night lighting and reflected neon |
 | Stained in Light | Jewel-colored stained glass with slender lead contours |
 
-## September 29: Event-only styles
+## Event-only styles
 
-Events can now choose their own style list in `/admin` (see
-[ADMIN.md](ADMIN.md#event-styles)), including event-only styles made for a
-private event. Those styles are private configuration and not part of this
-repository.
+Events can choose their own style list in `/admin` (see
+[ADMIN.md](ADMIN.md#event-styles)), including **event-only** styles. They are
+not in the default catalog or the camera's bundled list, and the server
+generates them only for cameras at an event that turns them on.
+
+Event-only styles are private configuration, not part of this repository. Each
+installation loads its own into the database, with any reference images in the
+private Blob store (see [ADMIN.md](ADMIN.md#private-event-only-styles)).
+`web/event-styles.example` holds one generic example, **Party Hats**, which
+sends a reference drawing of the hat after the photo.
 
 ## September 28: Found in 1997 v2
 
@@ -83,15 +89,11 @@ shared links, and retries. Any saved test-mode capture selection moves to
 its prompt does not alter existing images. Pulling back from a close-up can invent
 unseen clothing and poses. Gallery → Restyle still creates a separate photo.
 
-For retries of the retired **Disc 2 · Reference** mode, the provider sends the
-original photo first and a bundled rendering reference second. Its prompt limits
-the second image to rendering technique,
-preserving the first image's subjects and scene. The reference is the user-supplied
-1710×900 game screenshot, normalized with the standard input pipeline to JPEG and
-stored as base64 in `web/src/lib/model/references/disc-2.json`. Static import keeps
-it inside the server deployment; it is not a public asset or device catalog field.
-All active styles send one image. The retired **1996** variant uses text guidance
-only.
+The retired **Disc 2 · Reference** mode sent a third-party game screenshot after
+the photo as a rendering reference. That image is no longer in the repository, so
+the style keeps only its name for its one saved test photo. Built-in styles send
+only the photo; reference images belong to event-only styles. The retired
+**1996** variant uses text guidance only.
 
 Animation styles describe visual techniques and original character designs.
 Fantasy replaces modern clothing and accessories, adapts hair, and reinterprets
@@ -99,7 +101,7 @@ the setting while preserving facial identity, age, expression, and pose. Scenes
 use peaceful everyday activity, original costumes, architecture, and heraldry.
 Output fidelity varies by input and generation.
 
-Prompts live in `web/src/config/presets.ts`. Provider safeguards and single-attempt
+Built-in prompts live in `web/src/config/presets.ts`. Provider safeguards and single-attempt
 error handling remain in place. Compare future outcomes by both style ID and
 prompt version as described in `PRESET_RELIABILITY.md`.
 

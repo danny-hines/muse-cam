@@ -114,10 +114,10 @@ def test_surprise_photos_keep_the_style_the_server_used(tmp_path: Path) -> None:
         store.enqueue("surprise", "surprise", tmp_path / "capture.jpg")
         store.mark_complete(
             "surprise", "generation_1", tmp_path / "result.jpg",
-            preset_id="event-style-3", preset_name="Event Style 3",
+            preset_id="party-hats", preset_name="Party Hats",
         )
         job = store.get("surprise")
-        assert (job.preset_id, job.preset_name) == ("event-style-3", "Event Style 3")  # type: ignore[union-attr]
+        assert (job.preset_id, job.preset_name) == ("party-hats", "Party Hats")  # type: ignore[union-attr]
         store.enqueue("plain", "storybook", tmp_path / "plain.jpg")
         store.mark_complete("plain", "generation_2", tmp_path / "plain-result.jpg")
         assert store.get("plain").preset_id == "storybook"  # type: ignore[union-attr]

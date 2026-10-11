@@ -34,11 +34,24 @@ Deployment requires applying the database migration with `pnpm --dir web db:migr
 
 Each event has a **Camera styles** list under its settings. By default an event uses the default catalog, and it picks up new default styles as they are added. Check or uncheck styles and select **Save settings** to give the event its own list. Checking exactly the default catalog returns the event to the default. An event needs at least one style.
 
-**Event-only** styles, such as a private event's, never appear in the default catalog. They are available only at events that check them, and the server refuses them from cameras at any other event with a non-retryable `403` (`preset_unavailable`). The camera marks that photo as failed and keeps the original for **Restyle**. Default styles an event has unchecked are still accepted, so a camera with an out-of-date list, or photos queued offline, never fail.
+**Event-only** styles never appear in the default catalog. They are available only at events that check them, and the server refuses them from cameras at any other event with a non-retryable `403` (`preset_unavailable`). The camera marks that photo as failed and keeps the original for **Restyle**. Default styles an event has unchecked are still accepted, so a camera with an out-of-date list, or photos queued offline, never fail.
 
 **Who picks the style** chooses between guests and the server. With **Surprise: the server picks for each photo**, cameras list a single **Surprise** style. Cameras updated after September 29 then hide the style picker, and gallery **Restyle** makes a new surprise photo without asking for a style. Older cameras also show their own **Random**, which resolves to Surprise too. Each camera works through the event's whole list in a random order before it repeats a style, then continues with the styles it used longest ago. For each photo, the server tries up to three styles in that order. It moves on to the next one only when Muse Image filters a style for that photo, and it records the style that worked on the photo. Galleries and captions use the real style. Cameras updated after September 29 also label the photo with it; older cameras label it "Surprise". A camera that hasn't restarted still sends the style a guest chose, and the server honors it.
 
 Cameras load their style list when the camera service starts, so **restart the camera after changing an event's styles or who picks them** or moving a camera to an event with different styles. No camera update is needed: cameras have always sent their credential with the style request. A camera that can't reach the server when it starts keeps the last list it loaded.
+
+### Private event-only styles
+
+Event-only styles are each installation's own configuration, so they live in the database rather than the repository. Keep them in a folder outside the repository: a `styles.json` file plus any reference images. `web/event-styles.example` shows the format with one style. Each style has the same fields as a built-in one (`id`, `version`, `name`, `description`, `accent`, `hue`, and `prompt`) and an optional `referenceImages` list of JPEG files in the same folder, at most 2048 pixels on the longest side. The model receives the photo as image 1 and the references as images 2 onward, so the prompt should describe each one.
+
+Check a folder, then load it:
+
+```sh
+pnpm --dir web event-styles:load <folder> --dry-run
+pnpm --dir web event-styles:load <folder>
+```
+
+Like `db:migrate`, loading uses `web/.env.local`, so it writes to the database and private Blob store configured there. It adds new styles and replaces ones with the same ID; increase `version` when you change a prompt, since each photo records the version it used. Styles missing from the folder are kept, and a style can't reuse a built-in style's ID. Reference images are stored privately and uploaded again on each load. New styles appear under **Event-only** in each event's **Camera styles**. As with any change to an event's list, restart its cameras after checking them.
 
 ## Live gallery and slideshow
 
