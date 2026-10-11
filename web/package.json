@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
     "event-styles:load": "dotenv -e .env.local -- tsx scripts/load-event-styles.ts",
+    "styles:export": "tsx scripts/export-device-styles.ts",
     "token:hash": "node scripts/hash-device-token.mjs",
     "admin:credentials": "node scripts/generate-admin-credentials.mjs",
     "model:build": "node scripts/build-camera-model.mjs",

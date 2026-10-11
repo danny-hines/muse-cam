@@ -11,6 +11,7 @@ import {
   surpriseCandidates,
   surprisePreset,
 } from "./presets";
+import { deviceStyles } from "./device-styles";
 import { GET } from "@/app/api/device/presets/route";
 import { loadExampleEventStyle } from "@/test/example-event-style";
 
@@ -74,6 +75,17 @@ describe("preset catalog", () => {
       expect(Object.keys(preset).sort()).toEqual(["accent", "description", "id", "name", "version"]);
       expect(getPreset(preset.id)).toBeDefined();
     }
+  });
+
+  it("bundles the public prompts for standalone cameras", () => {
+    const bundled = JSON.parse(
+      readFileSync(new URL("../../../device/src/musecam/standalone-presets.json", import.meta.url), "utf8"),
+    );
+
+    // Out of date? Run `pnpm --dir web styles:export`.
+    expect(bundled).toEqual(deviceStyles());
+    expect(bundled.map(({ id }: { id: string }) => id)).toEqual(presets.map(({ id }) => id));
+    expect(bundled.every(({ prompt }: { prompt: string }) => prompt.length > 0)).toBe(true);
   });
 
   it("versions the revised scene prompts independently of the unchanged styles", () => {

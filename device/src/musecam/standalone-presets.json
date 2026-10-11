@@ -1,0 +1,242 @@
+[
+  {
+    "id": "post-apocalypse",
+    "version": 3,
+    "name": "After the End",
+    "description": "A quiet world reclaimed by nature: weathered buildings, greenery, and amber light.",
+    "accent": "#ff6c51",
+    "prompt": "Restyle the supplied photograph as a peaceful, long-abandoned retro-future world reclaimed by nature. Age the existing buildings, furniture, and objects with faded paint, worn surfaces, a little dust, and creeping greenery. Use warm amber sunlight, muted earth tones, and cinematic film texture. Keep the scene calm and habitable. Keep any people and animals healthy and relaxed, with their appearance and clothing intact. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "kid-drawing",
+    "version": 1,
+    "name": "Fridge Masterpiece",
+    "description": "Wobbly crayons, joyful colors, and the confidence of a five-year-old artist.",
+    "accent": "#ffd84a",
+    "prompt": "Redraw the supplied photograph as an exuberant young child's crayon drawing on lightly lined off-white paper. Use wobbly outlines, uneven coloring, simplified shapes, cheerful colors, and charmingly imperfect proportions. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "alien-visitor",
+    "version": 2,
+    "name": "First Contact",
+    "description": "A friendly visitor, green-violet light, and a little everyday science-fiction wonder.",
+    "accent": "#d7ff42",
+    "prompt": "Restyle the supplied photograph as a warm, playful science-fiction movie scene about meeting a friendly visitor from another planet. Add one small, friendly robot-like alien companion in an open area of the background, soft green-violet accent lighting, and a few practical retro-futuristic details. Keep the existing people and animals unchanged, healthy, relaxed, and clearly separate from the new companion; keep their clothing intact. The mood is welcoming and curious. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "claymation",
+    "version": 1,
+    "name": "Tiny Clay World",
+    "description": "Hand-shaped characters, miniature sets, fingerprints, and stop-motion charm.",
+    "accent": "#f39b69",
+    "prompt": "Rebuild the supplied photograph as a handcrafted stop-motion clay animation frame. Everything should look sculpted from colorful modeling clay with tiny fingerprints, miniature practical sets, soft studio lighting, and shallow depth of field. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "disposable-90s",
+    "version": 2,
+    "name": "Found in 1997",
+    "description": "Direct flash, chunky grain, and a late-90s makeover for outfits, hair, and gadgets.",
+    "accent": "#5ac6c8",
+    "prompt": "Restage the supplied photograph as a candid snapshot taken in 1997 on a consumer disposable camera. Give it a late-1990s makeover that is noticeable at a glance but still believable as a real photo from that year, not a themed costume party. Dress people in everyday late-1990s clothes suited to their age and activity, such as flannel or plaid shirts, light-wash baggy jeans, denim jackets, overalls, oversized sweaters, windbreakers, ringer tees, cargo pants, slip dresses, and chunky sneakers. Give each person a plausible 1990s version of their own hair, such as curtain bangs, a center part, frosted or gelled spikes, butterfly clips, or a scrunchie. Replace modern devices and furnishings with late-1990s equivalents in the same places: CRT televisions and monitors, beige computers, corded or cordless phones, flip phones, portable CD players with wired headphones, boomboxes, VHS tapes, and period furniture and decor. Beyond those replacements, add at most two small period props and leave the rest of the scene as it was; do not pile up tapes, discs, or electronics. Keep labels on tapes, discs, and packaging plain or unreadable. Keep buildings, skylines, and landmarks exactly as photographed. Use direct on-camera flash, slightly missed focus, visible film grain, a modest warm or green color cast, and imperfect exposure. Do not add a border or date stamp. Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "storybook",
+    "version": 1,
+    "name": "Bedtime Legend",
+    "description": "A warm, richly painted page from an old and well-loved storybook.",
+    "accent": "#6657de",
+    "prompt": "Illustrate the supplied photograph as a richly painted page from a timeless children's storybook. Use expressive gouache and watercolor textures, warm pools of light, gentle whimsy, detailed natural forms, and a sense of quiet adventure. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "panel-one",
+    "version": 1,
+    "name": "Panel One",
+    "description": "Bold comic inks, halftone dots, and vintage printed color.",
+    "accent": "#ec765e",
+    "prompt": "Redraw the entire supplied photograph as a single full-bleed vintage color comic illustration. Use confident black brush outlines, expressive inked faces, simplified shadow shapes, saturated flat print colors, subtle Ben-Day halftone dots, and slightly imperfect ink registration on paper. Render all people, animals, objects, and surroundings in the same illustrated style. Keep the photographed everyday activity and give the scene lively visual energy. Use original character designs. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "after-school",
+    "version": 1,
+    "name": "Anime Cel",
+    "description": "A nostalgic cel-anime frame with painted backgrounds and expressive faces.",
+    "accent": "#f89db7",
+    "prompt": "Redraw the entire supplied photograph as a nostalgic late-1990s hand-drawn cel-anime frame. Use fine confident linework, expressive eyes and brows, angular locks of hair, two-tone cel shadows, restrained highlights, richly hand-painted backgrounds, and a delicate trace of analog film grain. Translate the subjects into original anime character designs while retaining their distinctive facial features, age, expression, hairstyle, and clothing. Keep the atmosphere natural and grounded in the photographed moment. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "prime-time",
+    "version": 1,
+    "name": "Prime Time",
+    "description": "Your everyday cast in a bright, flat-color animated sitcom.",
+    "accent": "#f2c94c",
+    "prompt": "Redraw the entire supplied photograph as a deliberately simple two-dimensional animated television sitcom cel. Use bold even dark outlines, large flat untextured color fills, small black-dot pupils in simple rounded eyes, chunky rounded noses, economical mouth lines, slightly ungainly comic proportions, and very minimal shadow shapes. Simplify faces into an original, gently satirical cartoon design that retains each photographed person's distinctive face shape, age, hair, and clothes. Keep all subjects and background objects equally graphic and flat, with a bright warm palette and ordinary everyday atmosphere. Use original character designs. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "big-screen",
+    "version": 1,
+    "name": "3D Toon",
+    "description": "Expressive sculpted characters and warm cinematic 3D animation.",
+    "accent": "#f7a85c",
+    "prompt": "Rebuild the entire supplied photograph as a polished frame from an original three-dimensional animated family feature. Translate people and animals into expressive sculpted characters with gently exaggerated eyes and brows, rounded but distinctive facial shapes, carefully groomed hair or fur, and tactile clothing. Give the whole scene dimensional modeled geometry, soft material shading, warm cinematic lighting, subtle depth of field, and rich color. Retain each subject's recognizable identity, age, expression, and characteristic details through the stylization. Use original character designs. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "pocket-arcade",
+    "version": 1,
+    "name": "Title Screen",
+    "description": "Detailed pixel illustration with the atmosphere of a retro title screen.",
+    "accent": "#75bdff",
+    "prompt": "Rebuild the entire supplied photograph as detailed 16-bit pixel art, as though drawn on a roughly 320-pixel-wide game canvas and enlarged with crisp nearest-neighbor pixels. Construct every subject and background object from deliberate square pixel clusters with a limited coordinated palette, stepped contours, simple sprite-like shading, and selective dithering. Preserve recognizable facial, hair, and clothing cues using carefully placed pixels. Apply the pixel-art construction throughout the scene. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "player-one",
+    "version": 1,
+    "name": "Player One",
+    "description": "Small playable sprites in a full 16-bit game scene built from your photo.",
+    "accent": "#8ac975",
+    "prompt": "Rebuild the photographed scene as an actual playable 16-bit pixel-art game screen. Translate each person or animal into a small full-body gameplay sprite, approximately 32-to-48 source pixels tall, within a roughly 256-by-224-pixel game scene enlarged with crisp nearest-neighbor pixels. Each character should occupy at most one third of the screen height, surrounded by a readable tile-based environment made from recognizable objects in the photograph. For a close-up portrait, pull the game camera back and reinterpret the person as a complete small sprite wearing a coherent outfit based on their visible clothing. Preserve distinctive hair, headwear, clothing colors, and recognizable character cues using very few pixels. Use simple sprite proportions, clear outlined silhouettes, economical three-tone shading, repeating environment tiles, and a limited coordinated palette. Adapt the pose and location into a coherent side-view or three-quarter-view game scene. Show the characters within their game environment rather than as large portrait artwork. Do not add a title, text, speech bubbles, HUD, menus, borders, logos, signatures, or watermarks."
+  },
+  {
+    "id": "memory-card",
+    "version": 3,
+    "name": "Insert Disc 2",
+    "description": "Chunky console characters, soft photographic textures, and a wider view of close-up portraits.",
+    "accent": "#a6b987",
+    "prompt": "Rebuild the photographed subjects and setting as an in-engine screenshot from a late-1990s 3D console adventure game. Use very simple chunky character meshes: broad torso slabs, thick box-shaped upper arms and forearms, angular elbows, blocky hands, and solid geometric hair. The coarse model should be most apparent in its outline and joints. Shade continuously across the mesh with smooth vertex shading so individual triangles do not become patches of different color. Map soft low-resolution photographic texture art onto these simple forms. Put recognizable facial features, skin shadows, eyebrows, lips, and facial hair into one blurry painted face texture; give the face a few broad contours and a simple nose. Paint clothing folds, seams, pockets, and material detail into small diffuse texture maps. Keep natural-looking blended color within these textures rather than a grid of colored blocks or a mosaic of triangles. Give the surroundings textured coarse geometry and baked lighting, with richly painted architectural surfaces where appropriate. Present the whole scene as a gently enlarged roughly 320-by-240-pixel game frame, with soft jagged edges, slightly muddy textures, muted colors, and simple lighting. Preserve the subjects' recognizable appearance, age, main clothing colors, and activity. Retain only the people and animals present in the photograph, including keeping empty spaces unoccupied. Do not add text, captions, game interfaces, borders, logos, or watermarks. For a close-up portrait, move the virtual game camera back to show the same person from the waist up with their shoulders, upper arms, and hands visible, so their chunky character model reads clearly. Infer a simple pose and the unseen parts of their outfit from the photograph. For an already wider photo, keep its framing and layout. Reuse the recognizable setting rather than replacing it with an unrelated game location."
+  },
+  {
+    "id": "age-of-legends",
+    "version": 2,
+    "name": "Age of Legends",
+    "description": "One fantasy world, many moods: woodland courts, dragon dynasties, and royal castles.",
+    "accent": "#cba564",
+    "prompt": "Reimagine the supplied photograph as a peaceful everyday moment in an original high-fantasy world, with the tangible realism of a live-action film set. Choose one coherent mood for this rendering: an elven woodland court with flowing sage fabrics, silver botanical ornaments, fine braids, and pale carved stone; a royal castle with embroidered velvet, elegant circlets, richly furnished halls, and candlelight; a dragon-themed palace with black-and-crimson tailoring, silver hair accents, elaborate braids, and dark stone; or a northern great hall with layered wool, worn leather, tied-back hair, timber, and cool daylight. Let the photo inspire the choice, and use that one mood throughout the people and surroundings. Repeated renderings may choose different moods. Use detailed practical costumes, natural materials, and original decorative designs. Preserve each person's recognizable facial identity, age, expression, and pose. Replace contemporary clothing and accessories with the requested fantasy designs. Replace modern headwear with a handcrafted period-style cloth cap or hood that keeps the face visible. Adapt hairstyles to the setting while retaining each person's facial identity. Preserve the composition, camera angle, and overall layout while reinterpreting surroundings as fantasy equivalents. Keep people comfortably clothed and the scene peaceful. Use original costumes, architecture, and heraldry. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "paper-universe",
+    "version": 1,
+    "name": "Paper Universe",
+    "description": "Folded paper, layered silhouettes, and tiny sculpted shadows.",
+    "accent": "#dfb996",
+    "prompt": "Rebuild the entire supplied photograph as an intricate handcrafted layered-paper diorama. Construct people, animals, objects, and scenery from carefully cut colored paper, folded planes, curled paper details, and stacked silhouettes with visible paper fibers and tiny cast shadows. Use thoughtfully simplified facial shapes that retain the subjects' recognizable features. Give the whole scene convincing miniature depth, soft studio lighting, and a coordinated warm paper palette. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "soft-spot",
+    "version": 1,
+    "name": "Soft Spot",
+    "description": "Padded felt figures, woolly scenery, and embroidered details.",
+    "accent": "#e4a4be",
+    "prompt": "Rebuild the entire supplied photograph as an unmistakably handmade scene of stuffed felt puppets and textile scenery. Make each face from clearly visible pieces of fuzzy colored felt with sewn edges, padded cheeks, a simple fabric nose, and embroidered eyes, brows, and mouth. Make hair or fur from wool yarn and clothing from stitched miniature fabric pieces. Retain the subjects' recognizable face shapes, hair, coloring, and characteristic clothing through this simplified puppet design. Construct every object and background surface from layered felt, knitted wool, or cloth, with visible seams, fibers, and handcrafted joins. Use soft warm studio light and convincing miniature depth. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "neon-rain",
+    "version": 1,
+    "name": "Neon Rain",
+    "description": "Neon reflections, cinematic color, and a quietly futuristic night.",
+    "accent": "#b29bff",
+    "prompt": "Restyle the supplied photograph as a cinematic near-future city night scene with luminous cyan, violet, and warm coral accent lighting. Reinterpret existing surroundings with subtle practical futuristic materials and abstract unlettered light panels. In exterior areas, add lightly rain-wet surfaces and reflected colored light; in interiors, keep the room dry and place any rain beyond existing windows. Keep faces naturally readable and clothing intact. Use atmospheric depth, gentle haze, rich shadows, and convincing photographic detail while keeping the scene calm and the subjects relaxed. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "stained-in-light",
+    "version": 1,
+    "name": "Stained in Light",
+    "description": "Luminous jewel-colored glass and carefully traced dark outlines.",
+    "accent": "#78bed8",
+    "prompt": "Reconstruct the entire supplied photograph as an intricate luminous stained-glass artwork. Divide the subjects, objects, and surroundings into thoughtfully shaped translucent glass pieces joined by slender dark lead lines. Use jewel colors, subtle rippled glass textures, and warm light glowing through the composition. Design the facial pieces carefully so photographed people remain recognizable and expressive. Apply the glass construction throughout the image and fill the frame with the artwork itself. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "brick-by-brick",
+    "version": 1,
+    "name": "Brick by Brick",
+    "description": "Plastic minifigures and a whole world built from glossy interlocking bricks.",
+    "accent": "#f4c542",
+    "prompt": "Rebuild the entire supplied photograph as a carefully photographed miniature constructed from interlocking plastic toy bricks. Translate each person into a small articulated minifigure with a cylindrical head, a block-shaped torso, simple hinged limbs, claw-shaped hands, molded plastic hair, and printed facial features. Preserve recognizable face, age, skin tone, hair, and clothing cues through the toy design. Rebuild animals, furniture, buildings, plants, and ground surfaces from matching bricks and shaped plastic pieces, with visible studs, seams, and glossy molded surfaces throughout. Use cheerful colors, soft studio lighting, and convincing miniature depth. Retain the original cast of subjects. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "museum-piece",
+    "version": 1,
+    "name": "Museum Piece",
+    "description": "Rich oil paint, velvet clothing, and an unnecessarily regal old-master portrait.",
+    "accent": "#bd955b",
+    "prompt": "Repaint the supplied photograph as a richly worked seventeenth-century oil painting worthy of a grand portrait gallery. Dress people in elegant velvet, brocade, linen collars, and restrained period jewelry. Reinterpret the existing setting with carved wood, heavy drapery, aged stone, and carefully arranged still-life details in the same positions as the photographed objects. Use a single dramatic source of window light, luminous natural faces emerging from deep warm shadows, layered translucent glazes, tactile brushwork, and subtle canvas grain. Give even an ordinary everyday activity a dignified, slightly over-the-top royal atmosphere. Fill the image with the painting itself without a picture frame. Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "mall-portrait-1988",
+    "version": 1,
+    "name": "Mall Portrait, 1988",
+    "description": "Feathered hair, pastel sweaters, and gloriously soft-focus shopping-mall glamour.",
+    "accent": "#d4a6d5",
+    "prompt": "Restage the photographed subjects as an earnest 1988 shopping-mall studio portrait. Preserve every person's recognizable facial identity, age, skin tone, expression, and relative position, with the same people and pets as the source. Give people plausible feathered or softly permed versions of their own hair, pastel knit sweaters, satin blouses, denim, or gently oversized jackets appropriate to their age. Replace the background with a mottled cloudy blue-and-lavender muslin studio backdrop; reinterpret any essential furniture as simple studio seating while keeping the original pose and activity recognizable. Use broad softbox light, a gentle hair light, gauzy diffusion, soft photographic grain, and slightly faded pastel print colors. The result should feel affectionately awkward and completely sincere. For a scene without people or pets, photograph the original main objects as an equally earnest studio still life. Do not add text, dates, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "midnight-matinee",
+    "version": 1,
+    "name": "Midnight Matinee",
+    "description": "Silver-screen noir, hard shadows, and an everyday moment full of mystery.",
+    "accent": "#aab4c7",
+    "prompt": "Restyle the supplied photograph as a beautifully photographed black-and-white 1940s film-noir still. Use deep silver blacks, luminous highlights, hard side lighting, subtle atmospheric haze, and fine monochrome film grain. Let existing windows or fixtures motivate dramatic bands of light and long cast shadows while keeping faces readable. Dress people in tailored period coats, suits, blouses, or modest day dresses suited to their original activity, and translate modern furnishings into understated period equivalents. Keep the photographed everyday moment intact, with a quietly mysterious cinematic mood. Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "rubber-hose",
+    "version": 1,
+    "name": "Rubber Hose",
+    "description": "Bendy limbs, pie-cut eyes, and the mischievous bounce of a 1930s cartoon.",
+    "accent": "#d8cbb0",
+    "prompt": "Redraw the entire supplied photograph as a black-and-white early-1930s rubber-hose animation cel. Give the photographed subjects original cartoon designs with fluid noodle-like limbs, rounded bodies, pie-cut pupils, expressive brows and smiles, and oversized shoes and white gloves where appropriate. Retain distinctive face shapes, ages, hair silhouettes, and characteristic clothing details so each person remains recognizable. Use bold flowing ink contours, solid black fills, simple gray washes, and hand-painted grayscale scenery. Suggest buoyant animated movement through curved poses that follow the photographed activity, with subtle cel dust, analog grain, and a warm aged-film tint. Keep the same people and animals. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "velvet-fever",
+    "version": 1,
+    "name": "Velvet Fever",
+    "description": "Fluorescent color, flowing patterns, and the glow of a psychedelic blacklight poster.",
+    "accent": "#dc79ef",
+    "prompt": "Redraw the entire supplied photograph as a vivid 1970s psychedelic blacklight poster printed on matte black flocked paper. Build recognizable faces, clothing, objects, and scenery from flowing graphic contours and bold fluorescent color shapes in electric purple, hot pink, acid yellow, cyan, and orange. Use velvety light-absorbing black negative space, glowing colored outlines, and rhythmic swirling patterns that follow the existing surfaces. Keep facial features coherent and expressions readable while allowing hair, fabrics, and background forms to become elegantly undulating. Make the fluorescent ink and fuzzy black paper visibly tactile. Fill the frame with the artwork itself and retain the same cast of subjects. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "dream-logic",
+    "version": 1,
+    "name": "Dream Logic",
+    "description": "Ordinary people, floating furniture, and a photoreal world with impossible rules.",
+    "accent": "#9bbde5",
+    "prompt": "Transform the supplied photograph into a calm, photoreal surrealist tableau. Preserve the same people and animals, their recognizable identities, ages, expressions, clothing, poses, and everyday activity. Keep the original camera angle, main setting, and spatial relationships recognizable, then introduce two or three deliberate impossibilities derived from objects already in the scene: a chair hovering with a convincing shadow, a doorway opening onto a distant sky, or a small everyday object made monumentally large. Choose changes that fit the photographed setting and place them away from faces. Render the impossible elements with the same believable materials, perspective, reflections, and soft natural lighting as everything else. Keep bodies anatomically coherent and faces undistorted. The mood should be quietly wondrous, as if the subjects consider this perfectly normal. Do not add people, captions, lettering, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "wish-you-were-here",
+    "version": 1,
+    "name": "Wish You Were Here",
+    "description": "A glamorous vintage travel illustration starring wherever you happen to be.",
+    "accent": "#ebaa74",
+    "prompt": "Redraw the supplied photograph as the full-bleed artwork of a beautifully crafted mid-century travel poster. Turn the actual photographed location, however ordinary, into an inviting destination through elegant simplified geometry, confident sweeping shapes, long sunlit shadows, subtle airbrushed color gradients, and a warm palette of ochre, terracotta, cream, sea green, and deep blue. Render people as carefully illustrated travelers with recognizable faces, clothing, and poses. Keep the original landmarks, furniture, and small everyday details recognizable while giving them the romantic grandeur usually reserved for a celebrated holiday destination. Use smooth lithographic ink and a faint paper texture. Create image-only poster artwork with no title, destination name, typography, or blank text panel. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "snow-globe",
+    "version": 1,
+    "name": "Snow Globe",
+    "description": "Your scene in a tiny glass globe, with drifting snow and curved reflections.",
+    "accent": "#a8d8e6",
+    "prompt": "Rebuild the photographed subjects and location as a finely crafted miniature scene enclosed inside one clear glass snow globe on a simple unlettered base. Translate the same people and animals into hand-painted miniature figurines with recognizable facial features, ages, hair, clothing colors, expressions, and poses. Reconstruct the important surroundings and objects as a small detailed diorama arranged like the original scene. Pull the outer camera back just enough to show the complete globe and base, with the miniature subjects large and readable inside. Use convincing curved glass reflections and refraction at the edges, tiny suspended snowflakes, a light dusting of snow on surfaces, and warm light within the miniature against a softly blurred studio background. Keep the central glass optically clear and snowflakes away from faces. Do not add people, text, labels, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "deep-blue",
+    "version": 1,
+    "name": "Deep Blue",
+    "description": "An enchanted underwater world with rippling sunlight, bubbles, and passing fish.",
+    "accent": "#57bfd1",
+    "prompt": "Reimagine the entire supplied photograph as a serene, enchanted underwater world with convincing photographic detail. Keep the original people and animals recognizable, comfortably at ease, and in the same poses and clothing as though this were an ordinary everyday moment. Submerge the recognizable setting in clear turquoise-blue water, with rippling sunlight caustics across faces, clothing, furniture, and architecture, gentle suspended particles, and soft underwater depth. Let loose hair and fabric float subtly. Add a few small colorful fish and delicate trails of bubbles in open background areas, away from faces, and restrained coral or aquatic plants around the edges of existing surfaces. Preserve the photographed activity and keep faces clear, naturally colored, and expressive. Preserve the main subject, recognizable identity, pose, composition, camera angle, and important scene geometry. Apply the requested aesthetic consistently across the image. Do not add captions, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "high-seas",
+    "version": 1,
+    "name": "High Seas",
+    "description": "Tricorn hats, weathered coats, and a sunlit pirate adventure on the high seas.",
+    "accent": "#58b7af",
+    "prompt": "Reimagine the supplied photograph as a cinematic live-action pirate adventure during a cheerful, peaceful moment. Dress people in weathered long coats, loose linen shirts, woven waistcoats, colorful waist sashes, practical leather boots, and tricorn hats or tied bandannas that keep faces visible. Replace modern accessories with handcrafted nautical equivalents. Translate the existing scene into a sailing ship, captain's cabin, or bustling island harbor as best fits the photographed layout: wooden planks, coiled rope, brass lanterns, canvas sails, and glimpses of turquoise water in appropriate open areas. Preserve recognizable object placement and the original activity. Use warm salt-air sunlight, rich maritime colors, and detailed practical costumes and materials. Convey adventure through the setting and clothing, with relaxed subjects and no battle scene. Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks."
+  },
+  {
+    "id": "high-noon",
+    "version": 1,
+    "name": "High Noon",
+    "description": "Cowboy hats, worn leather, and the dusty golden light of a classic Western.",
+    "accent": "#d79861",
+    "prompt": "Reimagine the supplied photograph as a cinematic live-action Western during a relaxed everyday moment in a frontier town or ranch. Dress people in broad-brimmed cowboy hats, woven work shirts, denim, worn leather vests, neckerchiefs, practical boots, and long dusters as appropriate to their pose and activity. Keep hat brims lifted enough to see every face clearly. Translate the photographed surroundings into weathered timber storefronts, ranch buildings, hitching rails, rustic furniture, and dusty paths while preserving the original layout. For interiors, use warm window light, aged wood, and simple brass lamps; for exteriors, use golden sunlight, long shadows, and a little dust in the air. Use warm earth colors, tactile fabrics, and subtle widescreen-era film grain without changing the image aspect ratio. Keep the mood friendly and unhurried, with no showdown. Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks."
+  }
+]
