@@ -41,7 +41,7 @@ describe("Neon HTTP camera registration", () => {
   });
 
   beforeEach(async () => {
-    await postgres.exec("TRUNCATE devices, device_claims, events CASCADE");
+    await postgres.exec("TRUNCATE devices, device_claims, events, event_styles CASCADE");
   });
 
   afterAll(async () => {
@@ -142,17 +142,36 @@ describe("Neon HTTP camera registration", () => {
 
   it("stores an event's style list and keeps existing events on the default catalog", async () => {
     const event = await repository.createEvent({
-      id: randomUUID(), slug: "meta", name: "Meta", publishOriginals: false,
+      id: randomUUID(), slug: "summit", name: "Summit", publishOriginals: false,
     });
     expect(event).toMatchObject({ presetIds: null, surpriseStyles: false });
     await repository.updateEventSettings(event.id, {
-      autoShare: true, publishOriginals: false, presetIds: ["event-style-1", "kid-drawing"], surpriseStyles: true,
+      autoShare: true, publishOriginals: false, presetIds: ["party-hats", "kid-drawing"], surpriseStyles: true,
     });
     expect(await repository.findEventById(event.id))
-      .toMatchObject({ autoShare: true, presetIds: ["event-style-1", "kid-drawing"], surpriseStyles: true });
+      .toMatchObject({ autoShare: true, presetIds: ["party-hats", "kid-drawing"], surpriseStyles: true });
     await repository.updateEventSettings(event.id, { autoShare: true, publishOriginals: false });
-    expect((await repository.findEventById(event.id))?.presetIds).toEqual(["event-style-1", "kid-drawing"]);
+    expect((await repository.findEventById(event.id))?.presetIds).toEqual(["party-hats", "kid-drawing"]);
     await repository.updateEventSettings(event.id, { autoShare: true, publishOriginals: false, presetIds: null });
     expect((await repository.findEventById(event.id))?.presetIds).toBeNull();
+  });
+
+  it("stores private event-only styles and replaces one with the same ID", async () => {
+    const style = {
+      id: "party-hats", version: 1, name: "Party Hats", description: "Hats for everyone.",
+      accent: "#ff8fb1", hue: 340, prompt: "Put a striped party hat on every person.",
+      referenceImageRefs: ["https://store.test/references/party-hats-1.jpg"],
+    };
+    const plain = {
+      id: "plain", version: 1, name: "Plain", description: "No hats.",
+      accent: "#ffffff", hue: 0, prompt: "Keep the supplied photograph exactly as it is.",
+    };
+    await repository.saveEventStyle(style);
+    await repository.saveEventStyle(plain);
+    expect(await repository.listEventStyles()).toEqual([style, plain]);
+
+    const revised = { ...style, version: 2, referenceImageRefs: ["https://store.test/references/party-hats-2.jpg"] };
+    await repository.saveEventStyle(revised);
+    expect(await repository.listEventStyles()).toEqual([revised, plain]);
   });
 });

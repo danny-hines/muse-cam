@@ -14,11 +14,11 @@ import { CreateClaimForm } from "@/components/create-claim-form";
 import { DeletePhotoForm } from "@/components/delete-photo-form";
 import { DeviceEventForm, DeviceNameForm } from "@/components/device-event-form";
 import { EventSettingsForm } from "@/components/event-settings-form";
-import { getPreset, selectablePresets } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { syncConfiguredDevice } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
+import { getStyleCatalog } from "@/lib/styles";
 import { fullTimestamp } from "@/lib/time";
 
 type AdminPageProps = { searchParams: Promise<{ notice?: string }> };
@@ -28,17 +28,18 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
   await syncConfiguredDevice();
-  const [{ notice }, photos, devices, events, claims] = await Promise.all([
+  const [{ notice }, photos, devices, events, claims, catalog] = await Promise.all([
     searchParams,
     getPhotoRepository().listAll(100),
     getFleetRepository().listDevices(),
     getFleetRepository().listEvents(),
     getFleetRepository().listClaims(),
+    getStyleCatalog(),
   ]);
   const eventOptions = events.map(({ id, name }) => ({ id, name }));
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
   const eventNames = new Map(events.map((event) => [event.id, event.name]));
-  const styleOptions = selectablePresets.map(({ id, name, eventOnly }) => ({
+  const styleOptions = catalog.selectable.map(({ id, name, eventOnly }) => ({
     id, name, eventOnly: Boolean(eventOnly),
   }));
 
@@ -190,7 +191,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
         <div className="admin-photo-list">
           {photos.map((photo) => {
-            const preset = getPreset(photo.presetId);
+            const preset = catalog.get(photo.presetId);
             const preview = photo.resultPrivateRef
               ? `/api/admin/photos/${photo.id}/image`
               : null;

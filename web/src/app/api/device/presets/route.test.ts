@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { eventPresets, presets, surprisePreset } from "@/config/presets";
+import { presets, surprisePreset } from "@/config/presets";
 import { sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
+import { loadExampleEventStyle } from "@/test/example-event-style";
 import { GET } from "./route";
 
 vi.mock("@/lib/fleet", async () => {
@@ -12,6 +13,8 @@ vi.mock("@/lib/fleet", async () => {
   return { getFleetRepository: () => repository };
 });
 vi.mock("@/lib/repository", () => ({ hasPersistentDatabase: () => false }));
+
+const special = await loadExampleEventStyle();
 
 beforeEach(() => {
   vi.stubEnv("DEVICE_API_TOKEN", "");
@@ -55,22 +58,25 @@ describe("camera style list", () => {
   });
 
   it("gives a camera its event's styles", async () => {
-    const token = await camera(["kid-drawing", eventPresets[0].id]);
-    expect((await list(token)).ids).toEqual([eventPresets[0].id, "kid-drawing"]);
+    const token = await camera(["kid-drawing", special.id]);
+    expect((await list(token)).ids).toEqual([special.id, "kid-drawing"]);
   });
 
   it("lists only Surprise when the server picks styles", async () => {
-    const token = await camera([eventPresets[0].id], true);
+    const token = await camera([special.id], true);
     const response = await GET(new Request("https://camera.test/api/device/presets", {
       headers: { Authorization: `Bearer ${token}` },
     }));
     expect((await response.json()).presets).toEqual([surprisePreset]);
   });
 
-  it("fails rather than replace the camera's cached list when events can't load", async () => {
-    const token = await camera([eventPresets[0].id]);
-    vi.spyOn(getFleetRepository(), "findEventById").mockRejectedValueOnce(new Error("database down"));
+  it("fails rather than replace the camera's cached list when events or styles can't load", async () => {
+    const token = await camera([special.id]);
     vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(getFleetRepository(), "findEventById").mockRejectedValueOnce(new Error("database down"));
     expect((await list(token)).response.status).toBe(503);
+    vi.spyOn(getFleetRepository(), "listEventStyles").mockRejectedValueOnce(new Error("database down"));
+    expect((await list(token)).response.status).toBe(503);
+    expect((await list(token)).ids).toEqual([special.id]);
   });
 });

@@ -5,6 +5,7 @@ import type {
   CreateClaimInput,
   CreateEventInput,
   EventSettings,
+  EventStyle,
   FleetRepository,
 } from "./types";
 
@@ -12,6 +13,7 @@ type MemoryFleet = {
   events: Map<string, EventRecord>;
   devices: Map<string, DeviceRecord>;
   claims: Map<string, DeviceClaimRecord>;
+  eventStyles: Map<string, EventStyle>;
 };
 
 const globalMemory = globalThis as typeof globalThis & { __museCamFleet?: MemoryFleet };
@@ -21,6 +23,7 @@ function state(): MemoryFleet {
     events: new Map(),
     devices: new Map(),
     claims: new Map(),
+    eventStyles: new Map(),
   };
   return globalMemory.__museCamFleet;
 }
@@ -70,6 +73,14 @@ export class MemoryFleetRepository implements FleetRepository {
     const updated = { ...event, ...settings, updatedAt: new Date() };
     state().events.set(id, updated);
     return updated;
+  }
+
+  async listEventStyles(): Promise<EventStyle[]> {
+    return [...state().eventStyles.values()];
+  }
+
+  async saveEventStyle(style: EventStyle): Promise<void> {
+    state().eventStyles.set(style.id, style);
   }
 
   async listClaims(limit = 30): Promise<DeviceClaimRecord[]> {

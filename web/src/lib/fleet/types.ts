@@ -1,3 +1,4 @@
+import type { Preset } from "@/config/presets";
 import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 
 export type CreateEventInput = Pick<
@@ -22,6 +23,9 @@ export type ClaimDeviceInput = {
   tokenHash: string;
 };
 
+// A private event-only style as stored. The catalog marks it event-only.
+export type EventStyle = Omit<Preset, "eventOnly">;
+
 export type ConfiguredDeviceInput = Pick<DeviceRecord, "id" | "tokenHash">;
 
 export interface FleetRepository {
@@ -30,6 +34,9 @@ export interface FleetRepository {
   findEventById(id: string): Promise<EventRecord | null>;
   findEventBySlug(slug: string): Promise<EventRecord | null>;
   updateEventSettings(id: string, settings: EventSettings): Promise<EventRecord>;
+  listEventStyles(): Promise<EventStyle[]>;
+  // Adds the style, or replaces the one with the same ID.
+  saveEventStyle(style: EventStyle): Promise<void>;
   createClaim(input: CreateClaimInput): Promise<DeviceClaimRecord>;
   listClaims(limit?: number): Promise<DeviceClaimRecord[]>;
   claimDevice(input: ClaimDeviceInput): Promise<DeviceRecord | null>;

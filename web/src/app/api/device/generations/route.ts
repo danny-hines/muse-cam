@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
-  getPreset,
   type Preset,
   presetAllowedForEvent,
   presetsForEvent,
@@ -19,6 +18,7 @@ import { InvalidImageError, MAX_IMAGE_BYTES, normalizeInputImage } from "@/lib/m
 import { getPhotoRepository } from "@/lib/repository";
 import { deviceApiIsAvailable } from "@/lib/runtime-config";
 import { CaptureRetractedError, publishPhoto } from "@/lib/sharing";
+import { getStyleCatalog } from "@/lib/styles";
 import type { PhotoRecord } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -42,7 +42,7 @@ async function generationResponse(photo: PhotoRecord, request: Request, status: 
       return apiError("Photo is ready, but sharing is temporarily unavailable. Retry this upload.", 503);
     }
   }
-  return Response.json(photoApiResponse(photo, request), { status });
+  return Response.json(await photoApiResponse(photo, request), { status });
 }
 
 // Tries each style in turn. Only a filtered style falls through to the next, since
@@ -106,8 +106,9 @@ export async function POST(request: Request) {
     return apiError("The image field is required", 400);
   }
 
+  const catalog = await getStyleCatalog();
   const surprise = parsed.data.presetId === surprisePreset.id;
-  const requested = surprise ? null : getPreset(parsed.data.presetId);
+  const requested = surprise ? null : catalog.get(parsed.data.presetId);
   if (!surprise && !requested) {
     return apiError("Unknown preset", 400);
   }
@@ -127,8 +128,9 @@ export async function POST(request: Request) {
   const candidates = requested
     ? [requested]
     : surpriseCandidates(
+      catalog,
       event,
-      await repository.listRecentPresetIds(deviceId, presetsForEvent(event).length),
+      await repository.listRecentPresetIds(deviceId, presetsForEvent(catalog, event).length),
     ).slice(0, SURPRISE_ATTEMPTS);
   if (requested && !presetAllowedForEvent(requested, event)) {
     // Not retryable: the camera keeps the original so a guest can restyle it.

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import { retiredPresets } from "@/config/presets";
+import type { EventStyle } from "@/lib/fleet/types";
 import type { EventRecord, PhotoRecord } from "@/lib/types";
 
 const repository = vi.hoisted(() => ({
@@ -17,6 +18,7 @@ const event = vi.hoisted((): EventRecord => ({
 const fleet = vi.hoisted(() => ({
   findEventById: vi.fn(async (): Promise<EventRecord | null> => event),
   findEventBySlug: vi.fn(),
+  listEventStyles: vi.fn(async (): Promise<EventStyle[]> => []),
 }));
 
 vi.mock("@/lib/repository", () => ({
@@ -92,6 +94,23 @@ it("does not serve demo frames or the demo event when a database is connected", 
   repository.findByPublicSlug.mockResolvedValue(null);
   expect(await getEventBySlug("demo")).toBeNull();
   expect(await getPublishedPhotoBySlug("after-the-end")).toBeNull();
+});
+
+it("names a photo's private event style, and keeps the photo up if that style is removed", async () => {
+  const date = new Date();
+  repository.findByPublicSlug.mockResolvedValue({
+    id: "event-style", deviceId: "camera", eventId: event.id, status: "complete",
+    presetId: "party-hats", publicSlug: "event-style", resultPublicUrl: "https://example.test/hats.jpg",
+    sharedAt: date, createdAt: date,
+  });
+  fleet.listEventStyles.mockResolvedValueOnce([{
+    id: "party-hats", version: 1, name: "Party Hats", description: "Hats for everyone.",
+    accent: "#ff8fb1", hue: 340, prompt: "Put a striped party hat on every person.",
+  }]);
+  expect(await getPublishedPhotoBySlug("event-style"))
+    .toMatchObject({ presetId: "party-hats", presetName: "Party Hats", presetDescription: "Hats for everyone." });
+  expect(await getPublishedPhotoBySlug("event-style"))
+    .toMatchObject({ presetId: "party-hats", presetName: "Muse Cam", presetDescription: "" });
 });
 
 it("does not render a photo whose event cannot be found", async () => {

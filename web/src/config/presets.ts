@@ -2,21 +2,20 @@ import { z } from "zod";
 
 import type { EventRecord } from "@/lib/types";
 
-export const referenceImageNames = ["disc-2", "muse", "event-style-2"] as const;
-export type ReferenceImageName = (typeof referenceImageNames)[number];
-
-const presetSchema = z.object({
+export const presetSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   version: z.number().int().positive(),
   name: z.string().min(1),
   description: z.string().min(1),
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  hue: z.number().min(0).max(360),
+  hue: z.number().int().min(0).max(360),
   prompt: z.string().min(24),
-  // Named images sent to the model after the photo; the prompt describes each one.
-  referenceImages: z.array(z.enum(referenceImageNames)).min(1).optional(),
+  // Private media refs of images sent to the model after the photo, in order; the
+  // prompt describes each one.
+  referenceImageRefs: z.array(z.string().min(1)).min(1).optional(),
   // Event-only styles are hidden from the default catalog and the camera's bundled
-  // list, and generate only for events that turn them on.
+  // list, and generate only for events that turn them on. They are private
+  // configuration stored with the events (see lib/styles.ts), so none are built in.
   eventOnly: z.literal(true).optional(),
 });
 
@@ -30,9 +29,6 @@ const fantasyPreservationPrompt =
 
 const costumePreservationPrompt =
   "Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks.";
-
-const editPreservationPrompt =
-  "Keep each person's recognizable facial identity, age, skin tone, body proportions, expression, and pose, and keep the composition, camera angle, lighting, and background as photographed. Change only what the request describes. Do not add captions, lettering, logos, borders, signatures, or watermarks.";
 
 const presetCatalog: Preset[] = z.array(presetSchema).parse([
   {
@@ -205,7 +201,6 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
     accent: "#8ebf96",
     hue: 130,
     prompt: "Image 1 is the photograph to transform. Image 2 is a visual rendering reference only. Rebuild the people, animals, and location from image 1 using the precise old-game rendering aesthetic visible in image 2: large blocky segmented limbs and torsos, simple chunky heads, realistic human proportions, blurry photographic faces and clothing textures, smooth shading across broad surfaces, and detailed low-resolution scenery. Match the relationship between coarse geometry and soft photographic texture in image 2. Preserve the recognizable appearances, ages, expressions, clothing colors, poses, subject count, and composition from image 1. Keep the original photographed activity peaceful. Use image 2 only to guide rendering technique; do not copy its people, outfits, props, setting, or text. Do not add text, interfaces, borders, logos, or watermarks.",
-    referenceImages: ["disc-2"],
   },
   {
     id: "cartridge-world",
@@ -405,7 +400,6 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
     hue: 28,
     prompt: `Reimagine the supplied photograph as a cinematic live-action Western during a relaxed everyday moment in a frontier town or ranch. Dress people in broad-brimmed cowboy hats, woven work shirts, denim, worn leather vests, neckerchiefs, practical boots, and long dusters as appropriate to their pose and activity. Keep hat brims lifted enough to see every face clearly. Translate the photographed surroundings into weathered timber storefronts, ranch buildings, hitching rails, rustic furniture, and dusty paths while preserving the original layout. For interiors, use warm window light, aged wood, and simple brass lamps; for exteriors, use golden sunlight, long shadows, and a little dust in the air. Use warm earth colors, tactile fabrics, and subtle widescreen-era film grain without changing the image aspect ratio. Keep the mood friendly and unhurried, with no showdown. ${costumePreservationPrompt}`,
   },
-  // Event-only styles are private configuration and not part of this repository.
 ]);
 
 // Retired styles remain resolvable for existing photos, shared links, and queued jobs.
@@ -424,17 +418,27 @@ const retiredIds = new Set([
   "blueprint-universe",
 ]);
 
-const activePresets = presetCatalog.filter((preset) => !retiredIds.has(preset.id));
-
 // The default catalog, which every camera shows unless its event chooses its own styles.
-export const presets = activePresets.filter((preset) => !preset.eventOnly);
-export const eventPresets = activePresets.filter((preset) => preset.eventOnly);
+export const presets = presetCatalog.filter((preset) => !retiredIds.has(preset.id));
 export const retiredPresets = presetCatalog.filter((preset) => retiredIds.has(preset.id));
-// Event-only styles come first so they lead an event's camera picker.
-export const selectablePresets = [...eventPresets, ...presets];
 
-export function getPreset(id: string): Preset | undefined {
-  return presetCatalog.find((preset) => preset.id === id);
+// The built-in styles plus an installation's private event-only styles.
+export type StyleCatalog = {
+  // Event-only styles come first so they lead an event's camera picker.
+  selectable: Preset[];
+  get(id: string): Preset | undefined;
+};
+
+export function styleCatalog(eventStyles: readonly Preset[]): StyleCatalog {
+  // A built-in ID always means the built-in style.
+  const eventOnly = eventStyles
+    .filter((style) => !presetCatalog.some(({ id }) => id === style.id))
+    .map((style) => ({ ...style, eventOnly: true as const }));
+  const all = [...presetCatalog, ...eventOnly];
+  return {
+    selectable: [...eventOnly, ...presets],
+    get: (id) => all.find((preset) => preset.id === id),
+  };
 }
 
 // Cameras at a surprise event list only this entry, so every photo sends it and the
@@ -449,10 +453,10 @@ export const surprisePreset = {
 
 type EventStyles = Pick<EventRecord, "presetIds"> | null;
 
-export function presetsForEvent(event: EventStyles): Preset[] {
+export function presetsForEvent(catalog: StyleCatalog, event: EventStyles): Preset[] {
   const ids = event?.presetIds;
   if (!ids) return presets;
-  const chosen = selectablePresets.filter((preset) => ids.includes(preset.id));
+  const chosen = catalog.selectable.filter((preset) => ids.includes(preset.id));
   return chosen.length > 0 ? chosen : presets;
 }
 
@@ -461,11 +465,12 @@ export function presetsForEvent(event: EventStyles): Preset[] {
 // first, so it works through the whole list before repeating one. `recentIds` is the
 // camera's styles, most recent first.
 export function surpriseCandidates(
+  catalog: StyleCatalog,
   event: EventStyles,
   recentIds: readonly string[] = [],
   random = Math.random,
 ): Preset[] {
-  const pool = [...presetsForEvent(event)];
+  const pool = [...presetsForEvent(catalog, event)];
   for (let i = pool.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -486,8 +491,8 @@ export function presetAllowedForEvent(preset: Preset, event: EventStyles): boole
 
 // Choosing exactly the default catalog stores null, so the event keeps receiving
 // new default styles as they are added.
-export function eventPresetIds(selectedIds: readonly string[]): string[] | null {
-  const chosen = selectablePresets.filter((preset) => selectedIds.includes(preset.id));
+export function eventPresetIds(catalog: StyleCatalog, selectedIds: readonly string[]): string[] | null {
+  const chosen = catalog.selectable.filter((preset) => selectedIds.includes(preset.id));
   const isDefault =
     chosen.length === presets.length && chosen.every((preset) => !preset.eventOnly);
   return isDefault ? null : chosen.map((preset) => preset.id);

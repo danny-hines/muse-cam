@@ -18,5 +18,5 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!photo) return apiError("Generation not found", 404);
   if (photo.deviceId !== deviceId) return apiError("Generation not found", 404);
 
-  return Response.json(photoApiResponse(photo, request));
+  return Response.json(await photoApiResponse(photo, request));
 }

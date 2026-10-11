@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -30,6 +31,21 @@ export const events = pgTable(
   },
   (table) => [uniqueIndex("events_slug_unique").on(table.slug)],
 );
+
+// Private event-only styles; see `pnpm event-styles:load`. Events list them by ID.
+export const eventStyles = pgTable("event_styles", {
+  id: text("id").primaryKey(),
+  version: integer("version").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  accent: text("accent").notNull(),
+  hue: integer("hue").notNull(),
+  prompt: text("prompt").notNull(),
+  // Private media refs of images sent to the model after the photo, in order.
+  referenceImageRefs: text("reference_image_refs").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});
 
 export const devices = pgTable(
   "devices",

@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-import { referenceImages } from "./references";
+import { getMediaStore } from "@/lib/media";
 import { ImageModelError, type ImageModelErrorCode } from "./errors";
 import type { ImageModelProvider, TransformInput, TransformResult } from "./types";
 
@@ -94,9 +94,10 @@ export class MetaMuseProvider implements ImageModelProvider {
 
     const imageDataUrl = `data:${contentType};base64,${bytes.toString("base64")}`;
     const images = [{ image_url: imageDataUrl }];
-    for (const name of preset.referenceImages ?? []) {
+    for (const ref of preset.referenceImageRefs ?? []) {
       // The prompt identifies image 1 as the user's photo and describes each later image.
-      images.push({ image_url: `data:image/jpeg;base64,${referenceImages[name].base64}` });
+      const reference = await getMediaStore().readPrivate(ref);
+      images.push({ image_url: `data:${reference.contentType};base64,${reference.bytes.toString("base64")}` });
     }
     const deviceId = process.env.DEVICE_ID;
     const response = await fetch(endpoint, {

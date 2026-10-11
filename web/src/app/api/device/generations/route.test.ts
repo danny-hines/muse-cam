@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { eventPresets, getPreset, type Preset } from "@/config/presets";
+import type { Preset } from "@/config/presets";
 import { ImageModelError } from "@/lib/model/errors";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
+import { getStyleCatalog } from "@/lib/styles";
+import { loadExampleEventStyle } from "@/test/example-event-style";
 import { POST } from "./route";
 
 const auth = vi.hoisted(() => ({ deviceId: "", eventId: null as string | null }));
@@ -35,7 +37,8 @@ vi.mock("@/lib/media", async () => {
   return { getMediaStore: () => media };
 });
 
-const special = eventPresets[0];
+const special = await loadExampleEventStyle();
+const getPreset = async (id: string) => (await getStyleCatalog()).get(id);
 
 beforeEach(() => {
   auth.deviceId = randomUUID();
@@ -110,7 +113,7 @@ describe("surprise styles", () => {
     expect(response.status).toBe(201);
     const { presetId, presetName } = await response.json();
     expect(pool).toContain(presetId);
-    expect(presetName).toBe(getPreset(presetId)?.name);
+    expect(presetName).toBe((await getPreset(presetId))?.name);
     expect(triedIds()).toEqual([presetId]);
   });
 
@@ -135,7 +138,7 @@ describe("surprise styles", () => {
     const [first, second] = triedIds();
     expect(first).not.toBe(second);
     expect(await getPhotoRepository().findByCaptureId(captureId))
-      .toMatchObject({ presetId: second, presetVersion: getPreset(second)?.version, status: "complete" });
+      .toMatchObject({ presetId: second, presetVersion: (await getPreset(second))?.version, status: "complete" });
   });
 
   it("gives up after three filtered styles", async () => {

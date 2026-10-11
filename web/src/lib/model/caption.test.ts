@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPreset } from "@/config/presets";
+import { presets } from "@/config/presets";
 
 import {
   captionInstructions,
@@ -39,7 +39,7 @@ describe("caption cleanup", () => {
 });
 
 describe("MetaSparkCaptioner", () => {
-  const preset = getPreset("kid-drawing")!;
+  const preset = presets.find(({ id }) => id === "kid-drawing")!;
 
   async function photo(width = 2_048, height = 1_536) {
     return sharp({ create: { width, height, channels: 3, background: "#e26f55" } }).jpeg().toBuffer();

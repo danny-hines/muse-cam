@@ -1,11 +1,12 @@
-import { getPreset } from "@/config/presets";
+import { getStyleCatalog } from "@/lib/styles";
 import type { PhotoRecord } from "@/lib/types";
 
 export function apiError(error: string, status: number, details?: unknown) {
   return Response.json({ error, details }, { status });
 }
 
-export function photoApiResponse(photo: PhotoRecord, request: Request) {
+export async function photoApiResponse(photo: PhotoRecord, request: Request) {
+  const catalog = await getStyleCatalog();
   const origin = new URL(request.url).origin;
   return {
     id: photo.id,
@@ -13,7 +14,7 @@ export function photoApiResponse(photo: PhotoRecord, request: Request) {
     status: photo.status,
     presetId: photo.presetId,
     // Surprise photos use a style the camera may not know, so it needs the name.
-    presetName: getPreset(photo.presetId)?.name ?? null,
+    presetName: catalog.get(photo.presetId)?.name ?? null,
     presetVersion: photo.presetVersion,
     createdAt: photo.createdAt.toISOString(),
     completedAt: photo.completedAt?.toISOString() ?? null,

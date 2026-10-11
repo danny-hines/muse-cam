@@ -1,10 +1,11 @@
 import { cache } from "react";
 
-import { getPreset } from "@/config/presets";
+import type { StyleCatalog } from "@/config/presets";
 import { demoEvent, demoPhotos } from "@/lib/demo-photos";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository, hasPersistentDatabase } from "@/lib/repository";
 import type { PhotoNeighbors } from "@/lib/repository/types";
+import { getStyleCatalog } from "@/lib/styles";
 import type { EventRecord, PhotoRecord, PublishedPhoto } from "@/lib/types";
 
 function isDemoMode(): boolean {
@@ -15,21 +16,23 @@ function toPublishedPhoto(
   photo: PhotoRecord,
   deviceName: string,
   event: Pick<EventRecord, "name" | "slug"> | null,
+  catalog: StyleCatalog,
 ): PublishedPhoto | null {
-  const preset = getPreset(photo.presetId);
   if (
-    !preset || !event || photo.status !== "complete" || !photo.publicSlug || !photo.resultPublicUrl
+    !event || photo.status !== "complete" || !photo.publicSlug || !photo.resultPublicUrl
     || !photo.sharedAt
   ) {
     return null;
   }
 
+  // A shared photo stays up even if its event-only style has since been removed.
+  const preset = catalog.get(photo.presetId);
   return {
     id: photo.id,
     publicSlug: photo.publicSlug,
-    presetId: preset.id,
-    presetName: preset.name,
-    presetDescription: preset.description,
+    presetId: photo.presetId,
+    presetName: preset?.name ?? "Muse Cam",
+    presetDescription: preset?.description ?? "",
     caption: photo.caption,
     imageUrl: photo.resultPublicUrl,
     originalImageUrl: photo.originalPublicUrl,
@@ -44,13 +47,14 @@ function toPublishedPhoto(
 }
 
 export async function listPublishedPhotos(event: EventRecord): Promise<PublishedPhoto[]> {
-  const [records, devices] = await Promise.all([
+  const [records, devices, catalog] = await Promise.all([
     getPhotoRepository().listShared(event.id, 60),
     getFleetRepository().listDevices(),
+    getStyleCatalog(),
   ]);
   const deviceNames = new Map(devices.map((device) => [device.id, device.name]));
   const published = records.flatMap((record) => {
-    const photo = toPublishedPhoto(record, deviceNames.get(record.deviceId) ?? "Muse Cam", event);
+    const photo = toPublishedPhoto(record, deviceNames.get(record.deviceId) ?? "Muse Cam", event, catalog);
     return photo ? [photo] : [];
   });
 
@@ -78,11 +82,12 @@ export async function getPublishedPhotoNeighbors(slug: string): Promise<PhotoNei
 export const getPublishedPhotoBySlug = cache(async (slug: string) => {
   const record = await getPhotoRepository().findByPublicSlug(slug);
   if (record) {
-    const [device, event] = await Promise.all([
+    const [device, event, catalog] = await Promise.all([
       getFleetRepository().findDeviceById(record.deviceId),
       getFleetRepository().findEventById(record.eventId),
+      getStyleCatalog(),
     ]);
-    return toPublishedPhoto(record, device?.name ?? "Muse Cam", event);
+    return toPublishedPhoto(record, device?.name ?? "Muse Cam", event, catalog);
   }
 
   return isDemoMode() ? demoPhotos.find((photo) => photo.publicSlug === slug) ?? null : null;

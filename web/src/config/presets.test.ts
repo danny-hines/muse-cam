@@ -3,20 +3,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   eventPresetIds,
-  eventPresets,
-  getPreset,
   presetAllowedForEvent,
   presets,
   presetsForEvent,
   retiredPresets,
+  styleCatalog,
   surpriseCandidates,
   surprisePreset,
 } from "./presets";
 import { GET } from "@/app/api/device/presets/route";
+import { loadExampleEventStyle } from "@/test/example-event-style";
+
+const builtIn = styleCatalog([]);
+const getPreset = (id: string) => builtIn.get(id);
 
 describe("preset catalog", () => {
   it("contains unique ids", () => {
-    const all = [...presets, ...eventPresets, ...retiredPresets];
+    const all = [...presets, ...retiredPresets];
     expect(new Set(all.map(({ id }) => id)).size).toBe(all.length);
   });
 
@@ -54,8 +57,8 @@ describe("preset catalog", () => {
     }
     expect(presets.find(({ id }) => id === "memory-card"))
       .toMatchObject({ name: "Insert Disc 2", version: 3, prompt: getPreset("disc-2-smooth-wide")?.prompt });
-    expect(presets.some(({ referenceImages }) => referenceImages)).toBe(false);
-    expect(getPreset("disc-2-reference")?.referenceImages).toEqual(["disc-2"]);
+    // Reference images belong to private event styles; no built-in style sends one.
+    expect([...presets, ...retiredPresets].some(({ referenceImageRefs }) => referenceImageRefs)).toBe(false);
   });
 
   it("ships the same public catalog to the API and the offline device", async () => {
@@ -67,7 +70,6 @@ describe("preset catalog", () => {
 
     expect(bundled).toEqual(publicPresets);
     expect(publicPresets).toHaveLength(presets.length);
-    expect(publicPresets.some(({ id }: { id: string }) => getPreset(id)?.eventOnly)).toBe(false);
     for (const preset of publicPresets) {
       expect(Object.keys(preset).sort()).toEqual(["accent", "description", "id", "name", "version"]);
       expect(getPreset(preset.id)).toBeDefined();
@@ -86,25 +88,31 @@ describe("preset catalog", () => {
   });
 });
 
-describe("event styles", () => {
-  const special = eventPresets[0];
+const special = await loadExampleEventStyle();
+const catalog = styleCatalog([special]);
 
+describe("event styles", () => {
   it("keeps event-only styles out of the default catalog", () => {
-    expect(eventPresets.length).toBeGreaterThan(0);
-    for (const preset of eventPresets) {
-      expect(presets).not.toContain(preset);
-      expect(getPreset(preset.id)).toBe(preset);
-    }
+    expect(special).toMatchObject({ id: "party-hats", eventOnly: true });
+    expect(presets.some(({ id }) => id === special.id)).toBe(false);
+    expect(catalog.get(special.id)).toEqual(special);
+    expect(builtIn.get(special.id)).toBeUndefined();
+  });
+
+  it("never lets a private style replace a built-in one", () => {
+    const imposter = styleCatalog([{ ...special, id: "kid-drawing", name: "Imposter" }]);
+    expect(imposter.get("kid-drawing")).toEqual(getPreset("kid-drawing"));
+    expect(imposter.selectable.filter(({ id }) => id === "kid-drawing")).toHaveLength(1);
   });
 
   it("gives events without a choice the default catalog", () => {
-    expect(presetsForEvent(null)).toBe(presets);
-    expect(presetsForEvent({ presetIds: null })).toBe(presets);
-    expect(presetsForEvent({ presetIds: ["retired-or-removed"] })).toBe(presets);
+    expect(presetsForEvent(catalog, null)).toBe(presets);
+    expect(presetsForEvent(catalog, { presetIds: null })).toBe(presets);
+    expect(presetsForEvent(catalog, { presetIds: ["retired-or-removed"] })).toBe(presets);
   });
 
   it("lists an event's styles with event-only styles first", () => {
-    expect(presetsForEvent({ presetIds: ["kid-drawing", special.id, "cartridge-world"] }).map(({ id }) => id))
+    expect(presetsForEvent(catalog, { presetIds: ["kid-drawing", special.id, "cartridge-world"] }).map(({ id }) => id))
       .toEqual([special.id, "kid-drawing"]);
   });
 
@@ -119,26 +127,26 @@ describe("event styles", () => {
   });
 
   it("stores the default selection as null so new default styles still appear", () => {
-    expect(eventPresetIds(presets.map(({ id }) => id))).toBeNull();
-    expect(eventPresetIds([])).toEqual([]);
-    expect(eventPresetIds([...presets.map(({ id }) => id), special.id])).toHaveLength(presets.length + 1);
-    expect(eventPresetIds(presets.slice(1).map(({ id }) => id))).toHaveLength(presets.length - 1);
+    expect(eventPresetIds(catalog, presets.map(({ id }) => id))).toBeNull();
+    expect(eventPresetIds(catalog, [])).toEqual([]);
+    expect(eventPresetIds(catalog, [...presets.map(({ id }) => id), special.id])).toHaveLength(presets.length + 1);
+    expect(eventPresetIds(catalog, presets.slice(1).map(({ id }) => id))).toHaveLength(presets.length - 1);
   });
 
   it("shuffles an event's styles for a surprise photo", () => {
     const presetIds = ["kid-drawing", special.id, "claymation"];
-    const ids = (random: () => number) => surpriseCandidates({ presetIds }, [], random).map(({ id }) => id);
+    const ids = (random: () => number) => surpriseCandidates(catalog, { presetIds }, [], random).map(({ id }) => id);
     expect(ids(() => 0).sort()).toEqual([...presetIds].sort());
     expect(ids(() => 0)).not.toEqual(ids(() => 0.99));
-    expect(surpriseCandidates(null)).toHaveLength(presets.length);
-    expect(getPreset(surprisePreset.id)).toBeUndefined();
+    expect(surpriseCandidates(catalog, null)).toHaveLength(presets.length);
+    expect(catalog.get(surprisePreset.id)).toBeUndefined();
   });
 
   it("puts a camera's unused styles first, then the ones it used longest ago", () => {
     const presetIds = ["kid-drawing", special.id, "claymation", "storybook"];
     const recent = ["claymation", "kid-drawing"];
     for (const random of [() => 0, () => 0.5, () => 0.99]) {
-      const ids = surpriseCandidates({ presetIds }, recent, random).map(({ id }) => id);
+      const ids = surpriseCandidates(catalog, { presetIds }, recent, random).map(({ id }) => id);
       expect(ids.slice(0, 2).sort()).toEqual([special.id, "storybook"].sort());
       expect(ids.slice(2)).toEqual(["kid-drawing", "claymation"]);
     }

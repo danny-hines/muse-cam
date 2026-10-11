@@ -1,0 +1,14 @@
+{
+  "styles": [
+    {
+      "id": "party-hats",
+      "version": 1,
+      "name": "Party Hats",
+      "description": "A striped paper party hat on every guest, pets included.",
+      "accent": "#ff8fb1",
+      "hue": 340,
+      "prompt": "Image 1 is the photograph to edit. Image 2 is a reference drawing of a party hat: a tall paper cone with diagonal pink and yellow stripes, small blue dots, a fluffy pink pompom on top, a pink rim, and a thin elastic chin strap. Put a party hat of this design on every person in image 1, sized to their head and tilted to match their head angle, with the elastic under the chin. Give any animals a small matching hat. Render the hats as real paper with the photograph's lighting, shadows, perspective, color, and grain so they look captured in camera. Use image 2 only for the hat design, not for its framing or white background. Keep each person's recognizable facial identity, age, skin tone, body proportions, expression, and pose, and keep the composition, camera angle, lighting, and background as photographed. Change only what the request describes. Do not add captions, lettering, logos, borders, signatures, or watermarks.",
+      "referenceImages": ["party-hat.jpg"]
+    }
+  ]
+}

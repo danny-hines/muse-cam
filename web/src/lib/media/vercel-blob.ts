@@ -18,7 +18,7 @@ function extensionFor(contentType: string): string {
 
 export class VercelBlobMediaStore implements MediaStore {
   async storePrivate(
-    kind: "originals" | "results",
+    kind: "originals" | "results" | "references",
     id: string,
     bytes: Buffer,
     contentType: string,

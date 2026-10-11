@@ -186,7 +186,7 @@ describe("Neon event galleries", () => {
       ["camera", "kid-drawing", "2026-10-01T10:00:00Z"],
       ["other-camera", "storybook", "2026-10-01T10:01:00Z"],
       ["camera", "claymation", "2026-10-01T10:02:00Z"],
-      ["camera", "event-style-1", "2026-10-01T10:03:00Z"],
+      ["camera", "party-hats", "2026-10-01T10:03:00Z"],
     ];
     for (const [deviceId, presetId, createdAt] of photos) {
       const id = randomUUID();
@@ -195,7 +195,7 @@ describe("Neon event galleries", () => {
       });
       await postgres.query("UPDATE photos SET created_at = $2 WHERE id = $1", [id, createdAt]);
     }
-    expect(await repository.listRecentPresetIds("camera", 2)).toEqual(["event-style-1", "claymation"]);
-    expect(await repository.listRecentPresetIds("camera", 10)).toEqual(["event-style-1", "claymation", "kid-drawing"]);
+    expect(await repository.listRecentPresetIds("camera", 2)).toEqual(["party-hats", "claymation"]);
+    expect(await repository.listRecentPresetIds("camera", 10)).toEqual(["party-hats", "claymation", "kid-drawing"]);
   });
 });

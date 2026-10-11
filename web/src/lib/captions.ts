@@ -1,13 +1,13 @@
 import { after } from "next/server";
 
-import { getPreset } from "@/config/presets";
 import { getMediaStore } from "@/lib/media";
 import { getCaptionProvider } from "@/lib/model";
 import { getPhotoRepository } from "@/lib/repository";
+import { getStyleCatalog } from "@/lib/styles";
 import type { PhotoRecord } from "@/lib/types";
 
 export async function writeCaption(photo: PhotoRecord): Promise<string> {
-  const preset = getPreset(photo.presetId);
+  const preset = (await getStyleCatalog()).get(photo.presetId);
   if (!preset || !photo.resultPrivateRef) throw new Error("Photo has no result to caption");
   const { bytes } = await getMediaStore().readPrivate(photo.resultPrivateRef);
   const caption = await getCaptionProvider().caption({ bytes, preset });

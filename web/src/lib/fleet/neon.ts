@@ -1,7 +1,7 @@
-import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
-import { deviceClaims, devices, events } from "@/db/schema";
+import { deviceClaims, devices, events, eventStyles } from "@/db/schema";
 import type { DeviceClaimRecord, DeviceRecord, EventRecord } from "@/lib/types";
 import type {
   ClaimDeviceInput,
@@ -9,6 +9,7 @@ import type {
   CreateClaimInput,
   CreateEventInput,
   EventSettings,
+  EventStyle,
   FleetRepository,
 } from "./types";
 
@@ -16,6 +17,12 @@ function firstOrThrow<T>(rows: T[], kind: string, id: string): T {
   const row = rows[0];
   if (!row) throw new Error(`${kind} ${id} was not found`);
   return row;
+}
+
+function toEventStyle(row: typeof eventStyles.$inferSelect): EventStyle {
+  const { id, version, name, description, accent, hue, prompt, referenceImageRefs } = row;
+  const style = { id, version, name, description, accent, hue, prompt };
+  return referenceImageRefs.length > 0 ? { ...style, referenceImageRefs } : style;
 }
 
 export class NeonFleetRepository implements FleetRepository {
@@ -55,6 +62,21 @@ export class NeonFleetRepository implements FleetRepository {
       .set({ ...settings, updatedAt: new Date() })
       .where(eq(events.id, id)).returning();
     return firstOrThrow(rows, "Event", id);
+  }
+
+  async listEventStyles(): Promise<EventStyle[]> {
+    const rows = await getDb().select().from(eventStyles).orderBy(asc(eventStyles.createdAt), asc(eventStyles.id));
+    return rows.map(toEventStyle);
+  }
+
+  async saveEventStyle({ referenceImageRefs = [], ...style }: EventStyle): Promise<void> {
+    const now = new Date();
+    await getDb().insert(eventStyles)
+      .values({ ...style, referenceImageRefs, createdAt: now, updatedAt: now })
+      .onConflictDoUpdate({
+        target: eventStyles.id,
+        set: { ...style, referenceImageRefs, updatedAt: now },
+      });
   }
 
   async listClaims(limit = 30): Promise<DeviceClaimRecord[]> {

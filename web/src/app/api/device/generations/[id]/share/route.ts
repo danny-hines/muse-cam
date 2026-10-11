@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     return apiError("Generation is not ready to share", 409);
   }
   try {
-    return Response.json(photoApiResponse(await publishPhoto(photo), request));
+    return Response.json(await photoApiResponse(await publishPhoto(photo), request));
   } catch (error) {
     if (error instanceof CaptureRetractedError) return apiError(error.message, 410);
     console.error("Unable to share image", { photoId: photo.id, error });
@@ -39,7 +39,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   const photo = await getPhotoRepository().findById(id);
   if (!photo || photo.deviceId !== auth.deviceId) return apiError("Generation not found", 404);
   try {
-    return Response.json(photoApiResponse(await unpublishPhoto(photo), request));
+    return Response.json(await photoApiResponse(await unpublishPhoto(photo), request));
   } catch (error) {
     console.error("Unable to unshare image", { photoId: photo.id, error });
     return apiError("Unable to remove public image", 502);

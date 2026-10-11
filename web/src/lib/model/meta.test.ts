@@ -1,7 +1,10 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPreset, presets, referenceImageNames } from "@/config/presets";
+import { presets } from "@/config/presets";
+import { exampleEventStylesFolder, loadExampleEventStyle } from "@/test/example-event-style";
 
 import {
   DEFAULT_META_IMAGE_EDIT_URL,
@@ -10,7 +13,6 @@ import {
   MetaMuseProvider,
 } from "./meta";
 import { ImageModelError } from "./errors";
-import { referenceImages } from "./references";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -102,7 +104,9 @@ describe("MetaMuseProvider", () => {
     expect(body.images[0].image_url).toBe(`data:image/jpeg;base64,${input.toString("base64")}`);
   });
 
-  it("sends the bundled rendering reference after the original photo for the reference preset", async () => {
+  it("sends an event style's reference images after the photo", async () => {
+    const preset = await loadExampleEventStyle();
+    const reference = await readFile(path.join(exampleEventStylesFolder, "party-hat.jpg"));
     vi.stubEnv("META_API_KEY", "test-meta-key");
     const original = await sharp({
       create: { width: 3, height: 2, channels: 3, background: "#e26f55" },
@@ -117,45 +121,14 @@ describe("MetaMuseProvider", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const preset = getPreset("disc-2-reference")!;
     await new MetaMuseProvider().transform({ bytes: original, contentType: "image/jpeg", preset });
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body.prompt).toBe(preset.prompt);
-    expect(body.images).toHaveLength(2);
-    expect(body.images[0].image_url).toBe(`data:image/jpeg;base64,${original.toString("base64")}`);
-    expect(body.images[1].image_url).toMatch(/^data:image\/jpeg;base64,/);
-    const reference = Buffer.from(body.images[1].image_url.split(",")[1], "base64");
-    expect(await sharp(reference).metadata()).toMatchObject({
-      format: "jpeg", width: 1710, height: 900,
-    });
-    expect(reference.equals(original)).toBe(false);
-  });
-
-  it.each(referenceImageNames)("bundles the %s reference as a JPEG", async (name) => {
-    const metadata = await sharp(Buffer.from(referenceImages[name].base64, "base64")).metadata();
-    expect(metadata.format).toBe("jpeg");
-    expect(Math.max(metadata.width!, metadata.height!)).toBeLessThanOrEqual(2048);
-  });
-
-  it("sends the reference image after the photo for Event Style 3", async () => {
-    vi.stubEnv("META_API_KEY", "test-meta-key");
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      void input;
-      void init;
-      return Response.json({ data: [{ b64_json: "a".repeat(120) }], output_format: "jpeg" });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await new MetaMuseProvider().transform({
-      bytes: Buffer.from("photo"), contentType: "image/jpeg", preset: getPreset("event-style-3")!,
-    }).catch(() => {});
-
-    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body.images.map(({ image_url }: { image_url: string }) => image_url)).toEqual([
-      `data:image/jpeg;base64,${Buffer.from("photo").toString("base64")}`,
-      `data:image/jpeg;base64,${referenceImages.muse.base64}`,
+      `data:image/jpeg;base64,${original.toString("base64")}`,
+      `data:image/jpeg;base64,${reference.toString("base64")}`,
     ]);
   });
 

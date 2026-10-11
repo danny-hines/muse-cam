@@ -5,7 +5,7 @@ export type MediaObject = {
 
 export interface MediaStore {
   storePrivate(
-    kind: "originals" | "results",
+    kind: "originals" | "results" | "references",
     id: string,
     bytes: Buffer,
     contentType: string,

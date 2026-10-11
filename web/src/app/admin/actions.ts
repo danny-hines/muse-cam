@@ -17,6 +17,7 @@ import { toEventSlug } from "@/lib/event-slug";
 import { getFleetRepository } from "@/lib/fleet";
 import { getMediaStore } from "@/lib/media";
 import { getPhotoRepository } from "@/lib/repository";
+import { getStyleCatalog } from "@/lib/styles";
 
 async function requireAdmin(): Promise<void> {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
@@ -65,7 +66,7 @@ export async function updateEventSettings(formData: FormData): Promise<void> {
   const repository = getFleetRepository();
   const event = await repository.findEventById(id);
   if (!event) redirect(destination("Event not found"));
-  const presetIds = eventPresetIds(formData.getAll("presetIds").map(String));
+  const presetIds = eventPresetIds(await getStyleCatalog(), formData.getAll("presetIds").map(String));
   if (presetIds?.length === 0) redirect(destination(`Choose at least one style for ${event.name}`));
   await repository.updateEventSettings(id, {
     autoShare: formData.get("autoShare") === "on",

@@ -3,12 +3,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { eventPresets, presets } from "@/config/presets";
+import { presets } from "@/config/presets";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { writeCaption } from "@/lib/captions";
 import { authenticateDevice, sha256 } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getPhotoRepository } from "@/lib/repository";
+import { loadExampleEventStyle } from "@/test/example-event-style";
 import {
   captionPhoto, createClaim, createEvent, renameDevice, updateDeviceEvent, updateEventSettings,
 } from "./actions";
@@ -29,6 +30,8 @@ vi.mock("@/lib/repository", async () => {
   const repository = new MemoryPhotoRepository();
   return { getPhotoRepository: () => repository, hasPersistentDatabase: () => false };
 });
+
+const special = await loadExampleEventStyle();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -257,12 +260,12 @@ describe("event sharing settings", () => {
     const form = new FormData();
     form.set("id", events[0].id);
     form.append("presetIds", "kid-drawing");
-    form.append("presetIds", eventPresets[0].id);
+    form.append("presetIds", special.id);
     form.append("presetIds", "not-a-style");
     await expect(updateEventSettings(form)).rejects.toThrow("Redirect:");
     // Event-only styles lead the list whatever order the form sends.
     expect((await repository.findEventById(events[0].id))?.presetIds)
-      .toEqual([eventPresets[0].id, "kid-drawing"]);
+      .toEqual([special.id, "kid-drawing"]);
 
     form.delete("presetIds");
     for (const { id } of presets) form.append("presetIds", id);
