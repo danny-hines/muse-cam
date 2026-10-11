@@ -11,6 +11,9 @@ RECONFIGURE=0
 START_SERVICE=1
 TOKEN_STDIN=0
 CLAIM_CODE=""
+STANDALONE=0
+PROVIDER=""
+API_KEY_STDIN=0
 REBOOT_REQUIRED=0
 
 MPI3501_DRIVER_REPOSITORY=https://github.com/goodtft/LCD-show.git
@@ -23,6 +26,7 @@ Install or update Muse Cam on Raspberry Pi OS.
 
 Usage:
   sudo bash install-device.sh --profile PROFILE [options]
+  sudo bash install-device.sh --profile PROFILE --standalone [--provider openai]
 
 Profiles:
   pi3bplus-imx415-tft35
@@ -37,6 +41,10 @@ Options:
   --reconfigure       Prompt for the server URL and device token again
   --token-stdin       Read the device token from standard input
   --claim CODE        Register with a one-time code instead of entering a token
+  --standalone        Run without a Muse Cam server: the camera calls the image
+                      model itself with your API key (touchscreen profiles only)
+  --provider NAME     Standalone image model: meta (Muse Image, default) or openai
+  --api-key-stdin     Read the standalone API key from standard input
   --no-start          Install without enabling/starting the camera or rebooting
 EOF
 }
@@ -158,6 +166,18 @@ while [[ $# -gt 0 ]]; do
       CLAIM_CODE="$2"
       shift 2
       ;;
+    --standalone)
+      STANDALONE=1
+      shift
+      ;;
+    --provider)
+      PROVIDER="$2"
+      shift 2
+      ;;
+    --api-key-stdin)
+      API_KEY_STDIN=1
+      shift
+      ;;
     --no-start)
       START_SERVICE=0
       shift
@@ -196,6 +216,43 @@ case "${PROFILE}" in
     exit 2
     ;;
 esac
+
+# Connected cameras use a Muse Cam server; standalone cameras call the image model
+# directly. A rerun keeps the camera's current mode unless a flag changes it.
+EXISTING_MODE=""
+if [[ -f ${CONFIG_DIR}/device.env ]]; then
+  EXISTING_MODE=$(sed -n 's/^MUSECAM_MODE=//p' "${CONFIG_DIR}/device.env" | tail -1)
+fi
+if [[ ${STANDALONE} -eq 1 ]]; then
+  if [[ -n ${CLAIM_CODE} || ${TOKEN_STDIN} -eq 1 ]]; then
+    echo "--standalone does not use a claim code or device token." >&2
+    exit 2
+  fi
+  MODE=standalone
+elif [[ -n ${CLAIM_CODE} || ${TOKEN_STDIN} -eq 1 ]]; then
+  MODE=connected
+elif [[ ${EXISTING_MODE} == standalone ]]; then
+  MODE=standalone
+else
+  MODE=connected
+fi
+if [[ ${MODE} == standalone ]]; then
+  if [[ ${PROFILE} != pi3bplus-*-dsi43 ]]; then
+    echo "Standalone mode needs a touchscreen profile: pi3bplus-cam3-dsi43," >&2
+    echo "pi3bplus-imx415-dsi43, or pi3bplus-imx519-dsi43." >&2
+    exit 2
+  fi
+  case "${PROVIDER}" in
+    ""|meta|openai) ;;
+    *)
+      echo "Unknown --provider: ${PROVIDER} (use meta or openai)" >&2
+      exit 2
+      ;;
+  esac
+elif [[ -n ${PROVIDER} || ${API_KEY_STDIN} -eq 1 ]]; then
+  echo "--provider and --api-key-stdin need --standalone." >&2
+  exit 2
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -299,7 +356,38 @@ fi
 install -d -o root -g musecam -m 0750 "${CONFIG_DIR}"
 CONFIG_FILE="${CONFIG_DIR}/device.env"
 DEVICE_ID=""
-if [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 ]]; then
+if [[ ${MODE} == standalone ]]; then
+  if [[ -z ${PROVIDER} && -f ${CONFIG_FILE} ]]; then
+    PROVIDER=$(sed -n 's/^MUSECAM_MODEL_PROVIDER=//p' "${CONFIG_FILE}" | tail -1)
+  fi
+  PROVIDER=${PROVIDER:-meta}
+  if [[ ${PROVIDER} == openai ]]; then
+    API_KEY_NAME=OPENAI_API_KEY
+    API_KEY_LABEL="OpenAI API key"
+  else
+    API_KEY_NAME=META_API_KEY
+    API_KEY_LABEL="Meta Model API key"
+  fi
+  API_KEY=""
+  if [[ -f ${CONFIG_FILE} && ${RECONFIGURE} -eq 0 ]]; then
+    API_KEY=$(sed -n "s/^${API_KEY_NAME}=//p" "${CONFIG_FILE}" | tail -1)
+  fi
+  if [[ ${API_KEY_STDIN} -eq 1 ]]; then
+    IFS= read -r API_KEY
+  elif [[ -z ${API_KEY} ]]; then
+    if [[ -t 0 || -r /dev/tty ]]; then
+      read -r -s -p "${API_KEY_LABEL}: " API_KEY </dev/tty
+      echo >/dev/tty
+    else
+      echo "A terminal is required to enter the API key securely." >&2
+      exit 1
+    fi
+  fi
+  if [[ -z ${API_KEY} ]]; then
+    echo "The API key cannot be empty." >&2
+    exit 2
+  fi
+elif [[ ! -f ${CONFIG_FILE} || ${RECONFIGURE} -eq 1 || ${EXISTING_MODE} == standalone ]]; then
   if [[ -n ${CLAIM_CODE} ]]; then
     CLAIM_CONFIG=$(mktemp)
     "${INSTALL_DIR}/.venv/bin/musecam" --config "${CLAIM_CONFIG}" claim \
@@ -335,20 +423,40 @@ POWER_BACKEND=""
 if [[ -f ${CONFIG_FILE} ]]; then
   POWER_BACKEND=$(sed -n 's/^MUSECAM_POWER_BACKEND=//p' "${CONFIG_FILE}" | tail -1)
 fi
-{
-  printf 'MUSECAM_SERVER_URL=%s\n' "${SERVER_URL%/}"
-  printf 'MUSECAM_DEVICE_TOKEN=%s\n' "${DEVICE_TOKEN}"
-  if [[ -n ${DEVICE_ID} ]]; then
-    printf 'MUSECAM_DEVICE_ID=%s\n' "${DEVICE_ID}"
-  fi
-  printf 'MUSECAM_PROFILE=%s\n' "${PROFILE}"
-  if [[ -n ${POWER_BACKEND} ]]; then
-    printf 'MUSECAM_POWER_BACKEND=%s\n' "${POWER_BACKEND}"
-  fi
-  printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
-  printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
-  printf 'MUSECAM_LOG_LEVEL=INFO\n'
-} >"${TEMP_CONFIG}"
+if [[ ${MODE} == standalone ]]; then
+  # Keep settings added by hand, such as MUSECAM_POWER_BACKEND or another
+  # provider's key; replace the ones this installer manages.
+  MANAGED="MUSECAM_MODE|MUSECAM_MODEL_PROVIDER|${API_KEY_NAME}|MUSECAM_SERVER_URL"
+  MANAGED="${MANAGED}|MUSECAM_DEVICE_TOKEN|MUSECAM_DEVICE_ID|MUSECAM_PROFILE"
+  MANAGED="${MANAGED}|MUSECAM_PROFILES_DIR|MUSECAM_DATA_DIR|MUSECAM_LOG_LEVEL"
+  {
+    printf 'MUSECAM_MODE=standalone\n'
+    printf 'MUSECAM_MODEL_PROVIDER=%s\n' "${PROVIDER}"
+    printf '%s=%s\n' "${API_KEY_NAME}" "${API_KEY}"
+    if [[ -f ${CONFIG_FILE} ]]; then
+      grep -vE "^(${MANAGED})=" "${CONFIG_FILE}" || true
+    fi
+    printf 'MUSECAM_PROFILE=%s\n' "${PROFILE}"
+    printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
+    printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
+    printf 'MUSECAM_LOG_LEVEL=INFO\n'
+  } >"${TEMP_CONFIG}"
+else
+  {
+    printf 'MUSECAM_SERVER_URL=%s\n' "${SERVER_URL%/}"
+    printf 'MUSECAM_DEVICE_TOKEN=%s\n' "${DEVICE_TOKEN}"
+    if [[ -n ${DEVICE_ID} ]]; then
+      printf 'MUSECAM_DEVICE_ID=%s\n' "${DEVICE_ID}"
+    fi
+    printf 'MUSECAM_PROFILE=%s\n' "${PROFILE}"
+    if [[ -n ${POWER_BACKEND} ]]; then
+      printf 'MUSECAM_POWER_BACKEND=%s\n' "${POWER_BACKEND}"
+    fi
+    printf 'MUSECAM_PROFILES_DIR=%s/device/profiles\n' "${INSTALL_DIR}"
+    printf 'MUSECAM_DATA_DIR=%s\n' "${DATA_DIR}"
+    printf 'MUSECAM_LOG_LEVEL=INFO\n'
+  } >"${TEMP_CONFIG}"
+fi
 install -o root -g musecam -m 0640 "${TEMP_CONFIG}" "${CONFIG_FILE}"
 
 if [[ ${PROFILE} == pi3bplus-*-dsi43 ]]; then
@@ -400,6 +508,9 @@ if [[ ${START_SERVICE} -eq 1 ]]; then
     echo "Muse Cam is installed and will start after the required reboot."
   else
     echo "Muse Cam is installed and running."
+  fi
+  if [[ ${MODE} == standalone ]]; then
+    echo "Standalone mode: photos stay on this camera and go straight to ${PROVIDER}."
   fi
   echo "Run: sudo -u musecam ${INSTALL_DIR}/.venv/bin/musecam --config ${CONFIG_FILE} doctor"
   echo "Logs: journalctl -u musecam -f"
