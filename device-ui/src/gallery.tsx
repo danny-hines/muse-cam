@@ -365,7 +365,7 @@ export function PhotoDetail({
               <Icon name="spark" />
               Restyle
             </button>
-            {photo.resultUrl && (
+            {photo.resultUrl && state.canShare && (
               <button
                 className="glass-button"
                 disabled={pending || !!photo.shareUrl || state.sharingId === id}
@@ -404,6 +404,7 @@ export function PhotoDetail({
           photo={photo}
           pending={deleting}
           busy={busy}
+          canShare={state.canShare}
           error={deleteError}
           onCancel={() => setConfirmDelete(false)}
           onDelete={() => void remove()}
@@ -462,6 +463,7 @@ function DeletePhotoDialog({
   photo,
   pending,
   busy,
+  canShare,
   error,
   onCancel,
   onDelete,
@@ -469,6 +471,7 @@ function DeletePhotoDialog({
   photo: Photo;
   pending: boolean;
   busy: boolean;
+  canShare: boolean;
   error: string;
   onCancel: () => void;
   onDelete: () => void;
@@ -508,10 +511,12 @@ function DeletePhotoDialog({
             : ""}
         </p>
         <p>Other style versions are kept. This can’t be undone.</p>
-        <p>
-          Any public share will also be removed. If offline, the link stays online until
-          this camera reconnects and syncs the deletion.
-        </p>
+        {canShare && (
+          <p>
+            Any public share will also be removed. If offline, the link stays online until
+            this camera reconnects and syncs the deletion.
+          </p>
+        )}
       </div>
       {busy && <p role="status">Wait for processing or sharing to finish.</p>}
       {error && <p role="alert">{error}</p>}

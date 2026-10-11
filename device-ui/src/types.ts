@@ -36,6 +36,8 @@ export type CameraState = {
   volume: number;
   processingSound: boolean;
   maintenance: boolean;
+  // False on standalone cameras, which have no server to share to.
+  canShare: boolean;
   simulate: boolean;
   revision: number;
   sessionId: string;

@@ -32,6 +32,7 @@ const FALLBACK: CameraState = {
   volume: 35,
   processingSound: true,
   maintenance: false,
+  canShare: true,
   simulate: false,
   revision: 0,
   sessionId: "",
