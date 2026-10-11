@@ -1,0 +1,15 @@
+Muse Cam hardware files
+Copyright (c) 2026 Danny Hines
+
+The enclosure designs (STL exports and source CAD), build guide, parts list,
+wiring reference, and build photos in this `hardware/` directory are licensed
+under the Creative Commons Attribution 4.0 International License (CC BY 4.0).
+
+You may print, share, remix, and build on these files for any purpose, including
+commercially, as long as you give appropriate credit, link to the license, and
+indicate whether changes were made.
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Software elsewhere in this repository is licensed under the MIT License; see
+the LICENSE file in the repository root.

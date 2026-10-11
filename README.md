@@ -102,3 +102,8 @@ The [parts list](hardware/BOM.md), [illustrated build guide](hardware/BUILD.md),
 - A result is copied to the public Blob store only after the share endpoint is called.
 - Event galleries never expose the source photograph unless an operator explicitly enables originals for that photo or event.
 - Hiding a photo deletes both public copies but retains private media; permanent deletion removes the database record and all stored media.
+
+## License
+
+- Software (`web/`, `device/`, `device-ui/`, `scripts/`): [MIT](LICENSE).
+- Hardware (`hardware/`: enclosure STLs and CAD, build guide, parts list, wiring, and photos): [CC BY 4.0](hardware/LICENSE).
