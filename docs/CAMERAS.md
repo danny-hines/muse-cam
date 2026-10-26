@@ -245,7 +245,7 @@ the earlier fixed-focus backend behavior for custom profiles. The installer
 accepts the five profiles listed in [DEVICE.md](DEVICE.md); new board/display
 combinations need their own profile, installer handling, and hardware validation.
 
-The six enclosure STLs supplied on September 16, 2026 are now in
+The six enclosure STLs are in
 [`hardware/stl/`](../hardware/stl/README.md), with a [parts list](../hardware/BOM.md),
 [build guide](../hardware/BUILD.md), and [wiring reference](../hardware/WIRING.md)
 for Camera Module 3 / Pi 3B+ / DSI / PiSugar 3 Plus. The guide includes ten

@@ -48,7 +48,8 @@ on September 13; see [camera results](../docs/CAMERAS.md) and
 The guide includes **ten assembly photos and four completed-camera views**
 showing the four-magnet layout, door stops, display, Pi/PiSugar stack, lens mount,
 speaker placement, and side-door access to USB and Ethernet. The six
-supplied STLs are unchanged, with file-integrity and dimension checks. Print
+STLs match Danny's current v3 exports, with file-integrity and dimension checks;
+see their [revisions](stl/README.md#revisions). Print
 settings, exact screw-head dimensions and M2.5 lengths, cable lengths, and some
 connector details still need to be recorded. Camera Module 3 autofocus remains
 unresolved in the existing test record, so check lens clearance and near/far

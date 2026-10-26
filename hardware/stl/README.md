@@ -1,9 +1,16 @@
 # Printable Muse Cam enclosure
 
-Six original binary STL exports supplied by Danny on **2026-09-16**. Print one
+Six original binary STL exports from Danny's **MuseCam-v3** package. Print one
 of each for the Camera Module 3 / Pi 3B+ / Waveshare DSI / PiSugar 3 Plus build.
 The filenames and mesh bytes are unchanged from the supplied files. See the
 [parts list](../BOM.md) and [assembly guide](../BUILD.md).
+
+## Revisions
+
+| Supplied | Change |
+| --- | --- |
+| 2026-09-16 | First set of six exports. |
+| 2026-10-25 | `body_main`: the four Pi/PiSugar mounting holes (58 × 49 mm pattern) widen from a 2.00 to a 2.25 mm bore, with the entry chamfer from 3.00 to 3.25 mm, so the M2.5 screws thread more easily. No other geometry changed. `body_front`: re-exported with identical geometry; only the exporter header and face-colour bytes differ. |
 
 ## Scale and dimensions
 
@@ -47,7 +54,7 @@ print. The export orientation alone is not a printing recommendation.
 | Material / filament used | Pending |
 | Nozzle and layer height | Pending |
 | Walls, top/bottom layers, and infill | Pending |
-| Orientation for each of the six parts | Pending slicer screenshots |
+| Orientation for each of the six parts | `body_main` printed display face down, open front up (builder); others pending slicer screenshots |
 | Supports, brim, and support interfaces | Pending slicer screenshots |
 | Magnet-hole fit and door clearances | Pending printed-part measurements |
 | Camera locating-pin and lens-actuator clearance | Pending fit/focus checks |
@@ -63,8 +70,8 @@ manifoldness, slicer compatibility, print quality, or mechanical fit.
 Run `shasum -a 256 *.stl` from this directory to compare with:
 
 ```text
-3075b1e9511f5c1362fa5aead421a088b1111550b8816501f8101e1d849f2379  body_front.stl
-7a8fc0d1022d8f4f8952f85d7305699d252f83a94111bdef06fb895fa9331fbe  body_main.stl
+9d345b0387dbf8f56dcb6d7fa190d3f4bc9c8778b55be0bd4d84ee912bca7574  body_front.stl
+be60f77b0ac1f33bb052d617d939f42e643dc3dffa667fc2c109a09b32745681  body_main.stl
 97ea211a343902a7f8289fae1af1e4723ec2c2171823ff44b7fcac900dadf849  door_side.stl
 5e7b3fde61a35fad9752df0e19703d1eb8fb2210e5cd830ee7748e5cc2bbcd77  door_top.stl
 3f474c973b71d8891eedef6b5391fd0790f6d16bde4b0bd29b184232bd79de4a  lens_back.stl

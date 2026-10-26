@@ -1,6 +1,6 @@
 # Muse Cam parts list
 
-Quantities are for **one camera** using the six September 16, 2026 STL exports.
+Quantities are for **one camera** using the six [enclosure STLs](stl/README.md).
 Purchased parts and fastener counts follow Danny's build notes and
 [assembly photos](photos/README.md). Supplier links identify the selected items;
 pack sizes may exceed the quantities needed.
