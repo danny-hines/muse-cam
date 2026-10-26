@@ -48,7 +48,7 @@ and check clearance before substituting screws.
 | 4 | M2.5 display screws | Attach display to `body_main` | Display kit, per builder; exact length pending |
 | 4 | M2.5 Pi/PiSugar screws | Through PiSugar and Pi mounting holes into `body_main` | PiSugar kit, per builder; exact length pending |
 | 1 | Switch mounting nut | Secures shutter from inside housing | Switch |
-| 4 | 8 mm diameter × 2 mm thick round magnets | Two in `body_main`, one in `door_side`, one in `door_top` | [Selected magnets](https://www.amazon.com/dp/B0CDH2HCV9) |
+| 4 | 8 mm diameter × 1.5 mm thick round magnets | Two in `body_main`, one in `door_side`, one in `door_top` | [Selected magnets](https://www.amazon.com/dp/B0GRLW73RM). The printed pockets are 8.5 mm across and 1.8 mm deep, so 2 mm magnets stand proud of the surface |
 
 **Screw total: 23** — 15 M3 screws purchased separately, plus 8 supplied M2.5
 screws. No heat-set inserts are specified in the supplied assembly notes.

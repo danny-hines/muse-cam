@@ -17,7 +17,7 @@ and print settings are listed at the end.
 2. Remove supports and burrs from magnet recesses, door edges, mounting holes,
    and camera locating pins. Dry-fit the doors, front cover, and empty lens
    halves. Do not force tight printed pins through the camera PCB.
-3. Install **four 8×2 mm magnets total**: two in `body_main` (one at each door
+3. Install **four 8×1.5 mm magnets total**: two in `body_main` (one at each door
    opening), one in `door_side`, and one in `door_top`. The two U-shaped slots
    beside each body magnet are door-stop clearances, not extra magnet holes.
    Dry-pair each door magnet with its matching body magnet and mark orientation
