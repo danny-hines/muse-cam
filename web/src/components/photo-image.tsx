@@ -33,7 +33,8 @@ export function PhotoImage({ transformedUrl, originalUrl, presetName, sizes, pri
           alt="Original camera photo"
           aria-hidden={!showOriginal}
           fill sizes={sizes}
-          style={{ objectFit: "cover", opacity: showOriginal ? 1 : 0 }}
+          // While hidden, let clicks and "Save image as" reach the transformed photo underneath.
+          style={{ objectFit: "cover", opacity: showOriginal ? 1 : 0, pointerEvents: showOriginal ? undefined : "none" }}
           unoptimized={originalUrl.endsWith(".svg")}
         />
       ) : null}
