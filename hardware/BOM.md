@@ -77,10 +77,9 @@ for the switch nut, flush cutters, a deburring tool or fine file, calipers, and 
 multimeter for switch continuity. A soldering iron is needed only if the supplied
 leads/connectors require soldered terminations.
 
-## Other configurations
+## Other hardware
 
-The repo also supports IMX415 and IMX519 DSI profiles, an IMX415/SPI display
-profile, and a Pi Zero 2 W/Display HAT Mini profile. Their camera mounts, display
-fit, power parts, and wiring may differ; see [supported profiles](../docs/DEVICE.md#supported-profiles)
-and [camera options](../docs/CAMERAS.md). This shopping list and STL set describe
-the Camera Module 3 / Pi 3B+ / DSI build only.
+This list and the STLs cover only the Camera Module 3 / Pi 3B+ / Waveshare DSI
+build. The software also has profiles for
+[other cameras and screens tested during development](../docs/DEVICE.md#other-tested-hardware),
+but they don't fit this enclosure.

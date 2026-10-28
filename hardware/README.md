@@ -55,7 +55,6 @@ connector details still need to be recorded. Camera Module 3 autofocus remains
 unresolved in the existing test record, so check lens clearance and near/far
 focus before closing the housing.
 
-The assembly guide lists the remaining measurements and checks. Other
-software-supported cameras and displays are listed in
-[DEVICE.md](../docs/DEVICE.md); their mechanical fit is not established by this
-STL set.
+The assembly guide lists the remaining measurements and checks. The software
+also has profiles for [other cameras and screens tested during development](../docs/DEVICE.md#other-tested-hardware),
+but they don't fit this enclosure.

@@ -1,73 +1,69 @@
 # Raspberry Pi bring-up
 
-Muse Cam supports two display paths. The current SPI/HAT builds use the native Python/Pygame interface. The Waveshare DSI build uses a local Chromium interface backed by a Python camera service. In both cases, camera capture, buttons, credentials, persistence, and API calls remain in Python; the DSI browser only connects to `127.0.0.1`.
+Muse Cam is built and documented for one set of hardware: a Raspberry Pi 3B+, Raspberry Pi Camera Module 3, Waveshare 4.3-inch DSI touchscreen, and PiSugar 3 Plus battery in the printed enclosure. The touchscreen interface is a local Chromium app backed by a Python camera service. Camera capture, the shutter, credentials, persistence, and API calls remain in Python; the browser only connects to `127.0.0.1`.
 
 For the physical parts list, enclosure plan, printable assets, and exact amplifier/shutter pin table, see [the hardware guide](../hardware/README.md) and [wiring reference](../hardware/WIRING.md). This document remains the source of truth for software installation and device bring-up.
 
-## Supported profiles
+## Hardware profile
 
-| Profile | Board | Display/input | Camera | Battery |
-| --- | --- | --- | --- | --- |
-| `pi3bplus-imx415-tft35` | Pi 3B+ | MPI3501 ILI9486 480×320 framebuffer plus XPT2046 touch | IMX415 fixed focus, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `pi3bplus-imx415-dsi43` | Pi 3B+ | Waveshare 4.3-inch 800×480 DSI display plus capacitive touch | IMX415 fixed focus, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `pi3bplus-imx519-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | IMX519 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `pi3bplus-cam3-dsi43` | Pi 3B+ | Same Waveshare DSI display/touch | Camera Module 3 continuous autofocus, 1920×1280 still | PiSugar S Plus; no telemetry |
-| `zero2-cam3-displayhat` | Pi Zero 2 W | Pimoroni Display HAT Mini plus A/B/X/Y buttons | Camera Module 3 continuous autofocus, 2048×1536 still | PiSugar 2 telemetry when its manager is installed |
+Install with the `pi3bplus-cam3-dsi43` profile:
 
-The battery column shows profile defaults. For the current PiSugar 3 Plus build,
-follow [POWER.md](POWER.md) and set `MUSECAM_POWER_BACKEND=pisugar3`; this
-overrides the Camera Module 3 profile's PiSugar S Plus default.
+| Board | Display and input | Camera | Battery |
+| --- | --- | --- | --- |
+| Raspberry Pi 3B+ | Waveshare 4.3-inch 800×480 DSI display with capacitive touch, plus a GPIO shutter | Camera Module 3, continuous autofocus, 1920×1280 stills | PiSugar 3 Plus |
 
-The IMX519 DSI profile has passed initial physical focus and capture checks.
-Camera Module 3 Standard preview and capture have been checked, but lens movement
-and autofocus remain unresolved on the current unit. All cameras use Picamera2.
-See [Camera options and swaps](CAMERAS.md)
-for driver requirements, Standard/Wide variants, enclosure status, and the procedure
-for changing cameras without losing the local gallery.
+The profile's battery default is PiSugar S Plus, which has no telemetry. For the
+PiSugar 3 Plus, follow [POWER.md](POWER.md) and set
+`MUSECAM_POWER_BACKEND=pisugar3`.
 
-All profiles reserve BCM GPIO 20 (physical pin 38) for the shutter. Connect the button to ground (for example physical pin 39); the software enables the internal pull-up. The SPI and Zero profiles also use GPIO21 (physical pin 40) for a shutdown button held for 1.5 seconds. The enclosed DSI build uses GPIO21 exclusively for amplifier DIN, so its profiles omit the shutdown-button input. See the audio setup below before enabling I²S.
+Camera Module 3 preview and capture have been checked, but lens movement and
+autofocus remain unresolved on the current unit. See [Camera Module 3](CAMERAS.md)
+for variants, focusing, and the recorded hardware checks.
+
+The shutter uses BCM GPIO 20 (physical pin 38). Connect the button to ground (for example physical pin 39); the software enables the internal pull-up. GPIO21 (physical pin 40) carries amplifier DIN, so the profile has no shutdown-button input. See the audio setup below before enabling I²S.
+
+## Other tested hardware
+
+During development the software also ran on other cameras and screens. These
+profiles still install and work with the software, but **they do not fit the
+current enclosure**, and the parts list, STLs, and build guide do not cover them:
+
+| Profile | Hardware |
+| --- | --- |
+| `pi3bplus-imx415-dsi43` | Pi 3B+, Waveshare 4.3-inch DSI display, Arducam IMX415 (fixed focus) |
+| `pi3bplus-imx519-dsi43` | Pi 3B+, Waveshare 4.3-inch DSI display, Arducam IMX519 autofocus (needs Arducam's camera packages) |
+| `pi3bplus-imx415-tft35` | Pi 3B+, MPI3501 3.5-inch SPI touchscreen, Arducam IMX415 |
+| `zero2-cam3-displayhat` | Pi Zero 2 W, Pimoroni Display HAT Mini, Camera Module 3 |
+
+The SPI and Display HAT profiles use an older native Pygame interface instead of
+the touchscreen app, run only as connected cameras (not standalone), and can add
+a shutdown button on GPIO21. To change profiles, rerun the installer with a
+different `--profile`; it backs up `config.txt` before changing the camera overlay.
 
 ## Prepare Raspberry Pi OS
 
-Use **Raspberry Pi OS Lite (Legacy, 64-bit)** based on Debian Bookworm, with SSH and Wi-Fi configured in Raspberry Pi Imager. The DSI installer adds the minimal X server and Chromium packages, so the full desktop image is not required. Before installing:
+Use **Raspberry Pi OS Lite (Legacy, 64-bit)** based on Debian Bookworm, with SSH and Wi-Fi configured in Raspberry Pi Imager. The installer adds the minimal X server and Chromium packages, so the full desktop image is not required. Before installing:
 
 1. Connect the CSI camera with the Pi powered off.
-2. For the SPI profile, seat the MPI3501 directly on the GPIO header. For DSI, connect the Waveshare screen to the Pi 3B+ display connector with power disconnected and the contacts oriented for both sockets.
+2. Connect the Waveshare screen to the Pi 3B+ display connector with power disconnected and the contacts oriented for both sockets.
 3. Check the camera ribbon orientation at both ends before applying power.
-4. Connect the shutter to GPIO20. On the SPI/Zero profiles, an optional shutdown button uses GPIO21; on the enclosed DSI build, GPIO21 belongs to the amp. The MPI3501 uses GPIO17, 24, and 25 in addition to the SPI pins.
+4. Connect the shutter to GPIO20. GPIO21 belongs to the amplifier.
 
 ## One-command installation
 
-Pi 3B+ with the Waveshare DSI display and IMX415:
+To connect the camera to a Muse Cam server and its event galleries, use a setup
+code from `/admin`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim YOUR-SETUP-CODE
+  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --claim YOUR-SETUP-CODE
 ```
 
-Pi 3B+ with the current SPI display:
+The installer can exchange a 30-minute setup code from `/admin` for an individual device credential. Without `--claim`, it asks for the legacy plaintext token through `/dev/tty`. It creates a locked-down `musecam` system user, installs the selected display and camera configuration, installs the Python package, verifies the API, and enables `musecam.service`. It also installs and enables `musecam-kiosk.service` and `musecam-control.service` for the touchscreen, local Wi-Fi, and software updates. It reboots automatically when a hardware overlay changes. Rerunning performs a fast-forward update and preserves the secret; add `--reconfigure --claim CODE` to replace an existing credential.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-imx415-tft35
-```
+To run without a Muse Cam server, replace `--claim YOUR-SETUP-CODE` with `--standalone`. See [Standalone mode](#standalone-mode).
 
-Pi Zero 2 W:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile zero2-cam3-displayhat
-```
-
-For IMX519 or Camera Module 3, substitute the corresponding DSI profile from the
-table and follow the [camera-specific setup](CAMERAS.md) first. IMX519 autofocus
-requires Arducam's camera packages.
-
-The installer can exchange a 30-minute setup code from `/admin` for an individual device credential. Without `--claim`, it asks for the legacy plaintext token through `/dev/tty`. It creates a locked-down `musecam` system user, installs the selected display and camera configuration, installs the Python package, verifies the API, and enables `musecam.service`. The DSI profiles also install and enable `musecam-kiosk.service` and `musecam-control.service` for local Wi-Fi and software updates. It reboots automatically when a hardware overlay changes. Rerunning performs a fast-forward update and preserves the secret; add `--reconfigure --claim CODE` to replace an existing credential.
-
-To run without a Muse Cam server, replace `--claim YOUR-SETUP-CODE` with `--standalone` on a DSI profile. See [Standalone mode](#standalone-mode).
-
-The DSI installer follows Waveshare's current 800×480 setup: it enables full KMS and uses the dedicated Waveshare panel overlay when the OS provides it, otherwise the compatible 7-inch DSI overlay. The display is driven at its native refresh rate rather than copying frames over SPI.
+The installer follows Waveshare's current 800×480 setup: it enables full KMS and uses the dedicated Waveshare panel overlay when the OS provides it, otherwise the compatible 7-inch DSI overlay. The display is driven at its native refresh rate rather than copying frames over SPI.
 
 ## Standalone mode
 
@@ -77,7 +73,7 @@ camera: the style rail, Random, timer, gallery, Restyle, Retry, and Delete are
 the same, and photos queue and retry when the network or model is busy. Only
 **Share** is missing, since there is no event gallery to publish to.
 
-Install with `--standalone` on one of the DSI profiles. The installer asks for
+Install with `--standalone`. The installer asks for
 the key on the terminal without echoing it; `--api-key-stdin` reads it from
 standard input instead.
 
@@ -121,8 +117,7 @@ sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env
 
 `doctor` reports the provider, model, and whether the key is set. To connect a
 standalone camera to a Muse Cam server later, rerun the installer with
-`--claim YOUR-SETUP-CODE`. Standalone mode needs the touchscreen runtime; the
-native SPI and Display HAT profiles stay connected.
+`--claim YOUR-SETUP-CODE`.
 
 ## Validate before starting the enclosure
 
@@ -132,7 +127,7 @@ Stop the UI while diagnosing so it does not hold the camera or display:
 sudo systemctl stop musecam
 sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env doctor
 sudo systemctl start musecam
-# DSI builds: stopping musecam also stops its dependent touchscreen service.
+# Stopping musecam also stops its dependent touchscreen service.
 sudo systemctl start musecam-kiosk
 ```
 
@@ -146,19 +141,16 @@ Useful commands:
 ```bash
 systemctl status musecam
 journalctl -u musecam -f
-# DSI profile only
 journalctl -u musecam-kiosk -f
 sudo systemctl restart musecam
 sudo nano /etc/musecam/device.env
 ```
 
-The application automatically prefers `/dev/fb1` when HDMI owns `/dev/fb0`, then falls back to `/dev/fb0` when the MPI3501 is the only screen. Override this by adding `MUSECAM_FRAMEBUFFER` to `/etc/musecam/device.env` only when diagnostics show an unusual framebuffer assignment. Touch orientation can be corrected in the selected TOML profile with `touch_swap_xy`, `touch_invert_x`, and `touch_invert_y`.
-
-The SPI Pi 3 profile captures at 15 FPS and renders the newest frame at 6 FPS. Its framebuffer writes only changed scanlines and requests a conservative 20 MHz SPI clock. The DSI profile captures a 15 FPS preview and supplies up to 10 FPS local MJPEG to the 800×480 Chromium UI. Above 75°C, preview delivery slows to at most 5 FPS until the Pi cools to 68°C; still-photo resolution is unchanged. The display itself refreshes at native DSI speed.
+The camera captures a 15 FPS preview and supplies up to 10 FPS local MJPEG to the 800×480 Chromium UI. Above 75°C, preview delivery slows to at most 5 FPS until the Pi cools to 68°C; still-photo resolution is unchanged. The display itself refreshes at native DSI speed.
 
 The kiosk sets `TMPDIR=/dev/shm` for Chromium. Debian's Chromium adds `--disable-dev-shm-usage` whenever `/dev/shm` has less than 3.8 GB free, which is always true on a Pi. Chromium then keeps shared memory, including every preview frame, in `/tmp` on the SD card. On 2026-09-29 that meant about 38 MB/s of card writes and a 1–2 second preview freeze every few seconds. With RAM-backed `TMPDIR`, card writes drop to near zero. To check a camera, watch the `bo` column of `vmstat 1`; it should stay near zero while the preview runs.
 
-## DSI touchscreen controls (0.3)
+## Touchscreen controls (0.3)
 
 The viewfinder fills the 800×480 screen. Press the physical GPIO20 shutter to take a photo; there is no on-screen shutter. Choose a style from the scrollable translucent rail on the right, or hide it for an unobstructed view. **Random**, the first option, chooses an available style separately for each shot. The actual style is saved with the photo, so retries keep that choice. Random is also available when restyling an existing original.
 
@@ -166,11 +158,11 @@ Tap the top-right **Timer** control to cycle **Off → 5s → 10s → Off**. Wit
 
 The adjacent icons open the local gallery and settings. Pressing the shutter while browsing the gallery or a single photo returns to the camera without taking a photo or starting the timer. Press it again from the camera view to capture. Keyboard testing supports arrows to change style, Space/Enter for the same shutter behavior, and Escape to return to the camera. When a button has keyboard focus, Space/Enter activates that button instead.
 
-On autofocus camera profiles, tap the preview to focus on a subject. Amber
+Tap the preview to focus on a subject. Amber
 brackets indicate focusing; green means the camera reports focus achieved.
 The selected area stays active after a shot. **Auto area** restores default
 automatic metering. Style scrolling and gallery gestures do not change focus.
-See [tap-to-focus behavior](CAMERAS.md#tap-to-focus-on-the-dsi-touchscreen).
+See [tap-to-focus behavior](CAMERAS.md#tap-to-focus).
 
 Captures return to the viewfinder as soon as the original is saved. A single background worker processes the queue while you continue shooting. A quiet chirp accompanies processing; a tappable notice opens a completed or failed photo. Network interruptions retain the original and retry with the same capture ID and increasing delays. Newly captured photos take priority over repeated network retries. The queue survives restarts and pauses new captures at 30 pending photos or less than 150 MB free.
 
@@ -178,9 +170,9 @@ The Picamera2 backend keeps the full-size still and a small YUV preview stream
 running in one configuration, with no application raw stream. Each shutter press
 saves the existing main stream; it does not reallocate camera buffers. On the
 Pi 3, switching modes previously exhausted contiguous DMA/CMA memory while
-returning to preview, even with ordinary system RAM free. Resolution remains
-1920×1280 across the Pi 3 DSI camera profiles. The autofocus profiles keep
-continuous focus active; see [CAMERAS.md](CAMERAS.md) for capture settling behavior.
+returning to preview, even with ordinary system RAM free. Stills stay at
+1920×1280, and continuous autofocus stays active; see [CAMERAS.md](CAMERAS.md)
+for capture settling behavior.
 
 Frame requests time out after three seconds. The browser runtime clears stale
 preview state, closes the camera, and tries to reconnect. After three consecutive
@@ -190,7 +182,7 @@ only marked ready after delivering a frame, and restarting the service reconnect
 the browser's preview stream. See the [Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf)
 for the main/lores stream and camera-buffer model.
 
-**Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Photos in this DSI gallery are not automatically pruned. **Share** publishes a completed result to the camera's event gallery only when explicitly tapped.
+**Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Gallery photos are not automatically pruned. **Share** publishes a completed result to the camera's event gallery only when explicitly tapped.
 
 Swipe left for the next (older) gallery photo and right for the previous (newer)
 photo. Navigation follows the selected gallery filter, continues across loaded
@@ -229,34 +221,17 @@ systemctl status musecam-control
 journalctl -u musecam-control -f
 ```
 
-## Native SPI / Display HAT controls
-
-| Action | Touch | Keyboard/simulator | Display HAT Mini | External button |
-| --- | --- | --- | --- | --- |
-| Previous preset | `PREV` | Left / A | A | — |
-| Capture | `SNAP` or preview | Space / Enter | X | GPIO20 |
-| Next preset | `NEXT` | Right / D | B | — |
-| Share result | `SHARE` | S | Y | — |
-| Safe shutdown | — | P | — | Hold GPIO21 for 1.5 seconds |
-
-The native runtime retains its existing synchronous interface and latest-100 finished-photo retention. The enclosed DSI prototype has no separate GPIO shutdown button; GPIO21 belongs exclusively to the amp DIN wire.
-
 ## Desktop simulator
 
-The simulator exercises the same UI and state machine without Raspberry Pi modules:
+The simulator runs the 800×480 touchscreen interface and camera service without
+Raspberry Pi modules:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e './device[sim,test]'
-MUSECAM_DATA_DIR=./data .venv/bin/musecam run --simulate --offline
-```
-
-To exercise the 800×480 browser UI instead:
-
-```bash
 pnpm --dir device-ui build
 MUSECAM_DATA_DIR=./data .venv/bin/musecam serve \
-  --profile pi3bplus-imx415-dsi43 --simulate --offline --port 8080
+  --profile pi3bplus-cam3-dsi43 --simulate --offline --port 8080
 ```
 
 Add `MUSECAM_MODE=standalone` to simulate a standalone camera. With `--offline`,
@@ -269,7 +244,7 @@ MUSECAM_MODE=standalone MUSECAM_DATA_DIR=./data .venv/bin/musecam serve \
 
 Open `http://127.0.0.1:8080`. Arrow keys change presets, Space/Enter captures, and Escape returns to the live view. Gallery, restyling, sound controls, Wi-Fi keyboard, and update checks can be explored without hardware. Simulated results are local test images; sounds play only on the physical camera.
 
-Keyboard controls are shown in the table above. Remove `--offline` and pass `--config /path/to/device.env` to exercise the deployed API with the simulated camera.
+Remove `--offline` and pass `--config /path/to/device.env` to exercise the deployed API with the simulated camera.
 
 ## Amplifier and speaker bring-up
 
@@ -297,16 +272,14 @@ the audio error. A service restart or power cycle still interrupts the stream.
 The standard amp signals use GPIO18 for BCLK (physical pin 12), GPIO19 for LRCLK
 (pin 35), and GPIO21 for DIN (pin 40). See the
 [Adafruit wiring guide](https://learn.adafruit.com/adafruit-max98357-i2s-class-d-mono-amp/raspberry-pi-wiring).
-GPIO21 is connected only to amp DIN on this unit. The DSI profile omits
+GPIO21 is connected only to amp DIN on this unit. The profile omits
 `power_gpio`, so the camera does not claim the audio-data pin as a button input.
 Do not connect a shutdown button there. The default Pi 3 I²S pin group also claims
 GPIO20 (audio input), even though the amp only needs output. The supplied
 [`musecam-i2s-output.dts`](../device/overlays/musecam-i2s-output.dts) overlay selects
-only GPIO18, 19, and 21, preserving the shutter on GPIO20. This setup targets the
-Pi 3 DSI build; the SPI and Zero profiles have not been adapted for it.
+only GPIO18, 19, and 21, preserving the shutter on GPIO20.
 
-To reproduce the audio setup on a Pi 3 DSI build with this wiring and the updated
-profile, install the tools and compile the pin overlay:
+To set up audio with this wiring, install the tools and compile the pin overlay:
 
 ```bash
 sudo apt-get install -y alsa-utils device-tree-compiler
@@ -358,7 +331,3 @@ address and the Mac interface suffix (for example `%en0`) when IPv4 is unavailab
 
 The camera UI listens only on `127.0.0.1:8080` on the Pi. Access from a workstation
 requires an SSH tunnel; discovering its LAN address does not expose the UI there.
-
-## PiSugar 2 telemetry
-
-The Zero profile reads `get battery` from `/tmp/pisugar-server.sock`. Install PiSugar Power Manager if an on-screen percentage is desired. PiSugar S Plus does not provide equivalent telemetry, so the Pi 3 profiles omit it by default. For PiSugar 3 Plus, follow [POWER.md](POWER.md) and select `MUSECAM_POWER_BACKEND=pisugar3` to enable battery reporting.

@@ -82,7 +82,7 @@ For a fresh public-repository install, pass the code directly to the installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
-  | sudo bash -s -- --profile pi3bplus-imx415-dsi43 --claim XXXX-XXXX-XXXX-XXXX
+  | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --claim XXXX-XXXX-XXXX-XXXX
 ```
 
 If the installer stops with `Registration failed (500)`, package installation has

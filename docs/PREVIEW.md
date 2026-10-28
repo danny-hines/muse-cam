@@ -13,8 +13,7 @@ and encoding time in its frame interval. Still images remain 1920×1280 at JPEG
 quality 90. A 30 fps sensor cadence limits exposure to about 1/30 second; dim
 scenes may require more gain than the previous 15 fps configuration.
 
-Legacy screen backends can still request a PIL image. Other camera profiles keep
-their existing sensor and preview rates until verified on their hardware.
+Legacy screen backends can still request a PIL image.
 
 ## Kiosk rendering
 

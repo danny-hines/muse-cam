@@ -51,7 +51,7 @@ The web/API foundation is functional:
 - Muse Spark captions for shared photos, written after publishing.
 - In-memory development fallbacks and included demo frames.
 
-The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. Touchscreen cameras run either connected to a Muse Cam server or standalone, calling the image model directly with the owner's API key. It has two interchangeable front ends: the proven native framebuffer app for SPI/HAT displays and a local Chromium interface for the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
+The Raspberry Pi application includes Picamera2 capture, local SQLite queuing, offline retry, diagnostics, systemd startup, and desktop simulation. Touchscreen cameras run either connected to a Muse Cam server or standalone, calling the image model directly with the owner's API key. The touchscreen interface is a local Chromium app on the 800×480 Waveshare DSI display. The browser never receives the device credential; it talks only to the camera service on localhost.
 
 ## Local development
 
@@ -107,14 +107,14 @@ See [docs/API.md](docs/API.md) for the complete flow.
 
 ## Raspberry Pi installation
 
-To build a camera that works on its own, use `--standalone` as shown in [Build your own](#build-your-own). To connect a camera to a Muse Cam server and its event galleries instead, register it with a setup code from `/admin`. The public installer supports the current Camera Module 3 / Pi 3B+ / DSI build and the alternate hardware profiles:
+To build a camera that works on its own, use `--standalone` as shown in [Build your own](#build-your-own). To connect a camera to a Muse Cam server and its event galleries instead, register it with a setup code from `/admin`. The public installer sets up the Camera Module 3 / Pi 3B+ / DSI build:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/danny-hines/muse-cam/main/scripts/install-device.sh \
   | sudo bash -s -- --profile pi3bplus-cam3-dsi43 --claim YOUR-SETUP-CODE
 ```
 
-For the PiSugar 3 Plus, also complete [battery setup](docs/POWER.md) and set `MUSECAM_POWER_BACKEND=pisugar3`. Use `pi3bplus-imx415-tft35` for the SPI screen or `zero2-cam3-displayhat` for the Pi Zero 2 W version. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and hardware bring-up. See [docs/ADMIN.md](docs/ADMIN.md) for registration and moderation.
+For the PiSugar 3 Plus, also complete [battery setup](docs/POWER.md) and set `MUSECAM_POWER_BACKEND=pisugar3`. The software also has profiles for [other cameras and screens tested during development](docs/DEVICE.md#other-tested-hardware); they don't fit the enclosure. See [docs/DEVICE.md](docs/DEVICE.md) for wiring, diagnostics, simulator usage, and hardware bring-up. See [docs/ADMIN.md](docs/ADMIN.md) for registration and moderation.
 
 The [parts list](hardware/BOM.md), [illustrated build guide](hardware/BUILD.md), [GPIO wiring](hardware/WIRING.md), and [six enclosure STL files](hardware/stl/README.md) cover the Camera Module 3 / PiSugar 3 Plus build. The guide follows the September 16, 2026 assembly notes and includes ten [assembly photos](hardware/photos/README.md) plus four [completed-camera views](hardware/BUILD.md#completed-camera); print settings and a few measurements remain pending. The enclosed prototype processes photos over Wi-Fi and has working audio and battery reporting; Camera Module 3 autofocus remains unresolved in the [recorded hardware checks](docs/CAMERAS.md).
 

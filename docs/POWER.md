@@ -34,9 +34,8 @@ five seconds. If the sensor or manager is unavailable, MuseCam shows no
 percentage rather than a fabricated reading. Battery percentage is an estimate,
 not a precise remaining-runtime measurement.
 
-The power selection is independent of `MUSECAM_PROFILE`, so changing between
-IMX415, IMX519, and Camera Module 3 profiles preserves battery support. The device
-installer also preserves this setting. Other accepted values are `pisugar2`,
+The power selection is independent of `MUSECAM_PROFILE`, and the device
+installer preserves it. Other accepted values are `pisugar2`,
 `pisugar-s-plus`, and `none`; the last two disable telemetry. Omitting the setting
 uses the camera profile's original power defaults.
 
