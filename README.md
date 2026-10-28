@@ -7,7 +7,7 @@ Muse Cam is a physical AI camera that captures a photograph, applies a playful M
 Print it, build it, then make it do whatever you want. A camera you build needs no server: in **standalone mode** it sends each photo straight to the image model with your own API key and keeps every original and result in its gallery.
 
 1. **Get the parts.** The [parts list](hardware/BOM.md) covers a Raspberry Pi 3 Model B+, Camera Module 3, Waveshare 4.3-inch DSI touchscreen, PiSugar 3 Plus battery, MAX98357A amplifier and speaker, and a shutter button.
-2. **Print the enclosure.** Six parts: [STL files](hardware/stl/README.md), also on Printables and MakerWorld (links coming soon). <!-- TODO: add the Printables and MakerWorld links. -->
+2. **Print the enclosure.** Six parts: [STL files](hardware/stl/README.md), also on [Printables](https://www.printables.com/model/1891300-muse-cam-raspberry-pi-digital-camera) and MakerWorld (link coming soon). <!-- TODO: add the MakerWorld link. -->
 3. **Assemble it.** Follow the [build guide](hardware/BUILD.md) and [wiring reference](hardware/WIRING.md).
 4. **Install the software.** Flash Raspberry Pi OS Lite (Legacy, 64-bit) with Wi-Fi and SSH ([details](docs/DEVICE.md#prepare-raspberry-pi-os)), then run this on the Pi and paste your Meta Model API key when asked:
 
