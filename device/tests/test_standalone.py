@@ -79,19 +79,22 @@ def test_standalone_camera_calls_the_model_directly(tmp_path: Path) -> None:
         state = controller.state()
         assert state["canShare"] is False
         assert [p["id"] for p in state["presets"]] == [
+            "original",
             "random",
             *(p.id for p in FALLBACK_PRESETS),
         ]
+        assert state["preset"]["id"] == "random"
         wait_until(lambda: controller.state()["status"] == "live")
         controller.dispatch("select", {"presetId": "alien-visitor"})
         controller.dispatch("capture")
         wait_until(lambda: controller._store.counts().get("complete") == 1)
 
         [item] = controller.gallery()["items"]
-        assert item["presetId"] == "alien-visitor"
-        assert item["presetName"] == "First Contact"
-        assert item["shareUrl"] is None
-        assert controller.media_path(item["id"], "result").read_bytes() == result_jpeg()
+        cover = item["cover"]
+        assert cover["presetId"] == "alien-visitor"
+        assert cover["presetName"] == "First Contact"
+        assert cover["shareUrl"] is None
+        assert controller.version_path(cover["id"], "result").read_bytes() == result_jpeg()
         [request] = requests
         assert json.loads(request.content)["prompt"].startswith("Restyle the supplied photograph")
         assert request.headers["Authorization"] == f"Bearer {API_KEY}"
@@ -124,7 +127,7 @@ def test_busy_model_queues_and_filtered_photo_fails(tmp_path: Path) -> None:
         controller._retry_after.clear()
         wait_until(lambda: controller._store.counts().get("failed") == 1)
         [item] = controller.gallery(status="failed")["items"]
-        assert item["error"] == "Try another style or framing."
+        assert item["cover"]["error"] == "Try another style or framing."
     finally:
         controller.close()
 
@@ -142,7 +145,7 @@ def test_standalone_never_shares_or_queues_share_removals(tmp_path: Path) -> Non
         [item] = controller.gallery()["items"]
 
         with pytest.raises(ValueError, match="Sharing needs a Muse Cam server"):
-            controller._share(item["id"])
+            controller._share(item["cover"]["id"])
         controller.delete_photo(item["id"])
 
         assert controller._store.retraction_count() == 0
@@ -162,10 +165,63 @@ def test_offline_standalone_simulator_uses_the_mock_model(tmp_path: Path) -> Non
         controller.dispatch("capture")
         wait_until(lambda: controller._store.counts().get("complete") == 1)
         [item] = controller.gallery()["items"]
-        result = controller.media_path(item["id"], "result")
-        assert result.read_bytes() != controller.media_path(item["id"], "source").read_bytes()
+        result = controller.version_path(item["cover"]["id"], "result")
+        assert result.read_bytes() != controller.original_path(item["id"]).read_bytes()
         with Image.open(result) as image:
             assert image.format == "JPEG"
+    finally:
+        controller.close()
+
+
+def test_original_takes_a_plain_photo_that_can_be_styled_later(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return success(request)
+
+    controller = make_standalone(tmp_path)
+    controller._image_model = meta_api(handler)
+    controller.start()
+    try:
+        wait_until(lambda: controller.state()["status"] == "live")
+        controller.dispatch("select", {"presetId": "original"})
+        controller.dispatch("capture")
+        wait_until(lambda: controller.state()["galleryCount"] == 1)
+        [item] = controller.gallery()["items"]
+        assert (item["status"], item["cover"], item["versionCount"]) == ("original", None, 0)
+        assert controller._store.counts() == {}
+        notice = controller.state()["notifications"][-1]
+        assert (notice["captureId"], notice["photoId"]) == (None, item["id"])
+        assert notice["message"].startswith("Original")
+        assert requests == []
+        # Restarting keeps the choice.
+        controller._load_presets()
+        assert controller.state()["preset"]["id"] == "original"
+
+        with pytest.raises(ValueError, match="available style"):
+            controller._remix({"photoId": item["id"], "presetId": "original"}, retry=False)
+        controller.dispatch("remix", {"photoId": item["id"], "presetId": "claymation"})
+        wait_until(lambda: controller._store.counts().get("complete") == 1)
+        detail = controller.photo_detail(item["id"])
+        [version] = detail["versions"]
+        assert version["presetId"] == "claymation"
+        assert detail["cover"]["id"] == version["id"]
+        assert len(requests) == 1
+    finally:
+        controller.close()
+
+
+def test_random_never_picks_original(tmp_path: Path, monkeypatch) -> None:
+    controller = make_standalone(tmp_path, offline=True)
+    controller._load_presets()
+    seen = []
+    monkeypatch.setattr(
+        "musecam.webapp.random.choice", lambda options: seen.extend(options) or options[0]
+    )
+    try:
+        controller._resolve_preset(controller._presets[1])
+        assert seen and not {"original", "random"} & {p.id for p in seen}
     finally:
         controller.close()
 

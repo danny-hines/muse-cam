@@ -395,8 +395,8 @@ export function Settings({
                   </div>
                   <p className="muted-copy">
                     Originals and imagined photos stay on this camera. Restyling
-                    adds a new photo. Nothing in your roll is automatically
-                    deleted.
+                    adds a version to the same photo. Nothing in your roll is
+                    automatically deleted.
                   </p>
                 </>
               ) : (

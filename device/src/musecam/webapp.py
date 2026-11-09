@@ -5,7 +5,6 @@ import json
 import logging
 import math
 import random
-import shutil
 import subprocess
 import threading
 import time
@@ -36,7 +35,7 @@ from .camera import Camera, FocusState, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
 from .image_model import ImageModelError, create_image_model, style_prompt
-from .models import CaptureJob, Generation, Preset, ScreenState
+from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
 
@@ -68,6 +67,13 @@ RANDOM_PRESET = Preset(
     id="random", version=1, name="Random",
     description="A surprise style for every photo", accent="#d6b8ff",
 )
+# Takes the photo with no style. Only standalone cameras offer it; event cameras
+# exist to imagine every shot.
+ORIGINAL_PRESET = Preset(
+    id="original", version=1, name="Original",
+    description="No style, just the photo", accent="#e9e4d6",
+)
+PICKER_ONLY = {RANDOM_PRESET.id, ORIGINAL_PRESET.id}
 
 
 def gallery_error(message: str | None) -> str | None:
@@ -159,7 +165,9 @@ class CameraWebController:
         self._countdown_remaining = 0
         self._countdown_preset: Preset | None = None
         self._status = ScreenState.STARTING
-        self._view = {"screen": "camera", "photoId": None}
+        self._view: dict[str, str | None] = {
+            "screen": "camera", "photoId": None, "versionId": None,
+        }
         self._message = "Starting camera"
         self._network_online = not offline
         self._camera_available = False
@@ -218,7 +226,8 @@ class CameraWebController:
         styles = styles or FALLBACK_PRESETS
         # A single style, such as an event's server-picked Surprise, needs no Random
         # entry, and the interface hides the picker.
-        self._presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
+        presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
+        self._presets = [ORIGINAL_PRESET, *presets] if self._standalone else presets
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
             selected = "age-of-legends"
@@ -230,7 +239,11 @@ class CameraWebController:
             "disc-2-reference",
         }:
             selected = "memory-card"
-        self._preset_index = next((i for i, p in enumerate(self._presets) if p.id == selected), 0)
+        # With nothing saved, start on the first style rather than Original.
+        default = next(i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id)
+        self._preset_index = next(
+            (i for i, p in enumerate(self._presets) if p.id == selected), default
+        )
 
     def dispatch(self, action: str, values: dict | None = None) -> None:
         if action not in API_ACTIONS:
@@ -239,8 +252,15 @@ class CameraWebController:
         if action == "view":
             if values.get("screen") not in ("camera", "gallery", "photo", "settings"):
                 raise ValueError("Choose an available screen")
-            if values["screen"] == "photo" and self._store.get(str(values.get("photoId"))) is None:
-                raise ValueError("Photo was not found")
+            if values["screen"] == "photo":
+                photo_id = str(values.get("photoId"))
+                if self._store.get_photo(photo_id) is None:
+                    raise ValueError("Photo was not found")
+                version_id = values.get("versionId")
+                if version_id is not None:
+                    version = self._store.get(str(version_id))
+                    if version is None or version.photo_id != photo_id:
+                        raise ValueError("That version of the photo was not found")
         if action == "focus" and (
             set(values) != {"x", "y"}
             or any(
@@ -255,7 +275,9 @@ class CameraWebController:
             raise ValueError("Auto area does not take a focus point")
         if action == "select" and values.get("presetId") not in {p.id for p in self._presets}:
             raise ValueError("Choose an available style")
-        if action in {"remix", "retry", "share"}:
+        if action == "remix" and self._store.get_photo(str(values.get("photoId"))) is None:
+            raise ValueError("Photo was not found")
+        if action in {"retry", "share"}:
             if self._store.get(str(values.get("captureId", self._last_result_id))) is None:
                 raise ValueError("Photo was not found")
         with self._state_changed:
@@ -403,7 +425,7 @@ class CameraWebController:
         elif action == "view":
             if self._countdown_deadline is not None and values["screen"] != "camera":
                 return
-            self._set_view(values["screen"], values.get("photoId"))
+            self._set_view(values["screen"], values.get("photoId"), values.get("versionId"))
         elif action == "restart_camera":
             if not self._camera_available:
                 self._camera_start_attempts = 0
@@ -451,9 +473,16 @@ class CameraWebController:
         elif action == "share":
             self._share(str(values.get("captureId", self._last_result_id)))
 
-    def _set_view(self, screen: str, photo_id: str | None = None) -> None:
+    def _set_view(
+        self, screen: str, photo_id: str | None = None, version_id: str | None = None
+    ) -> None:
         with self._state_changed:
-            self._view = {"screen": screen, "photoId": photo_id if screen == "photo" else None}
+            on_photo = screen == "photo"
+            self._view = {
+                "screen": screen,
+                "photoId": photo_id if on_photo else None,
+                "versionId": version_id if on_photo else None,
+            }
             self._publish_locked()
 
     def _can_save(self) -> None:
@@ -463,13 +492,17 @@ class CameraWebController:
         if self._system.storage()["free"] < MIN_FREE_BYTES:
             raise ValueError("Storage is nearly full. Free space before taking more photos.")
 
+    @staticmethod
+    def _new_id() -> str:
+        return f"pi_{int(time.time())}_{uuid.uuid4().hex[:12]}"
+
     def _new_source(self) -> tuple[str, Path]:
-        capture_id = f"pi_{int(time.time())}_{uuid.uuid4().hex[:12]}"
+        capture_id = self._new_id()
         return capture_id, self._captures_dir / f"{capture_id}.jpg"
 
     def _resolve_preset(self, preset: Preset) -> Preset:
         if preset.id == "random":
-            return random.choice([p for p in self._presets if p.id != "random"])
+            return random.choice([p for p in self._presets if p.id not in PICKER_ONLY])
         return preset
 
     def _clear_countdown_locked(self) -> None:
@@ -531,7 +564,11 @@ class CameraWebController:
                 self._camera_failed()
                 raise
             prepare_capture(source_path)
-            self._store.enqueue(capture_id, preset.id, source_path)
+            if preset.id == ORIGINAL_PRESET.id:
+                self._store.add_photo(capture_id, source_path)
+            else:
+                # The first version of a new shot shares its photo's id.
+                self._store.enqueue(capture_id, preset.id, source_path)
         except Exception:
             source_path.unlink(missing_ok=True)
             raise
@@ -540,34 +577,49 @@ class CameraWebController:
             self._gallery_revision += 1
             self._status, self._message = ScreenState.LIVE, ""
             self._publish_locked()
-        self._notify("queued", "Photo saved", f"{preset.name} · keep shooting", capture_id)
+        self._notify(
+            "queued",
+            "Photo saved",
+            f"{preset.name} · keep shooting",
+            None if preset.id == ORIGINAL_PRESET.id else capture_id,
+            photo_id=capture_id,
+        )
 
     def _remix(self, values: dict, *, retry: bool) -> None:
+        """Add a version to a photo: a new style (Restyle) or another try (Retry)."""
         self._can_save()
-        original = self._store.get(values["captureId"])
-        if original is None or not original.source_path.is_file():
+        if retry:
+            failed = self._store.get(str(values.get("captureId")))
+            if failed is None:
+                raise ValueError("Photo was not found")
+            if failed.status != "failed":
+                raise ValueError("This photo is already complete or waiting to process")
+            photo = self._store.get_photo(failed.photo_id) if failed.photo_id else None
+            preset_id = failed.preset_id
+        else:
+            photo = self._store.get_photo(str(values.get("photoId")))
+            preset_id = values.get("presetId")
+        if photo is None or not photo.source_path.is_file():
             raise ValueError("The original photo is unavailable")
-        if retry and original.status != "failed":
-            raise ValueError("This photo is already complete or waiting to process")
-        preset_id = original.preset_id if retry else values.get("presetId")
-        if preset_id not in {p.id for p in self._presets} and not (
-            retry and preset_id in RETIRED_PRESETS
+        if preset_id == ORIGINAL_PRESET.id or (
+            preset_id not in {p.id for p in self._presets}
+            and not (retry and preset_id in RETIRED_PRESETS)
         ):
             raise ValueError("Choose an available style")
         if preset_id == "random":
             preset_id = self._resolve_preset(RANDOM_PRESET).id
-        capture_id, source_path = self._new_source()
-        # Each treatment owns its original, so future cleanup cannot break siblings.
-        shutil.copyfile(original.source_path, source_path)
-        try:
-            self._store.enqueue(capture_id, preset_id, source_path)
-        except Exception:
-            source_path.unlink(missing_ok=True)
-            raise
+        capture_id = self._new_id()
+        # Versions share their photo's original. Deleting a version never removes it.
+        self._store.enqueue(capture_id, preset_id, photo.source_path, photo_id=photo.photo_id)
         with self._state_changed:
             self._gallery_revision += 1
+            if self._view["screen"] == "photo" and self._view["photoId"] == photo.photo_id:
+                self._view = {**self._view, "versionId": capture_id}
             self._publish_locked()
-        self._notify("queued", "New treatment queued", "Your original photo is kept", capture_id)
+        self._notify(
+            "queued", "New version queued", "Your original photo is kept", capture_id,
+            photo_id=photo.photo_id,
+        )
 
     def _start_pending(self) -> None:
         if self._future is not None or self._maintenance:
@@ -842,7 +894,18 @@ class CameraWebController:
         if not self._simulate:
             subprocess.run(["sudo", "-n", "/usr/bin/systemctl", "poweroff"], check=True, timeout=10)
 
-    def _notify(self, kind: str, title: str, message: str, capture_id: str | None = None) -> None:
+    def _notify(
+        self,
+        kind: str,
+        title: str,
+        message: str,
+        capture_id: str | None = None,
+        *,
+        photo_id: str | None = None,
+    ) -> None:
+        if capture_id is not None and photo_id is None:
+            job = self._store.get(capture_id)
+            photo_id = job.photo_id if job else None
         with self._state_changed:
             self._notification_id += 1
             self._notifications.append(
@@ -852,6 +915,7 @@ class CameraWebController:
                     "title": title,
                     "message": message,
                     "captureId": capture_id,
+                    "photoId": photo_id,
                 }
             )
             self._publish_locked()
@@ -896,7 +960,7 @@ class CameraWebController:
                     "height": self._profile.display_height,
                 },
                 "galleryRevision": self._gallery_revision,
-                "galleryCount": sum(counts.values()),
+                "galleryCount": self._store.photo_counts()["all"],
                 "notifications": list(self._notifications),
                 "lastCaptureId": self._last_capture_id,
                 "volume": self._sound.volume,
@@ -917,89 +981,175 @@ class CameraWebController:
             "accent": preset.accent,
         }
 
-    def gallery_item(self, job: CaptureJob) -> dict:
+    @staticmethod
+    def _timestamp(value: str) -> str:
+        return value.replace(" ", "T") + "Z"
+
+    def version_json(self, job: CaptureJob) -> dict:
         thumbnail_kind = "result" if job.result_path else "source"
         return {
             "id": job.capture_id,
+            "photoId": job.photo_id,
             "presetId": job.preset_id,
             "presetName": self._job_preset_name(job),
             "status": job.status,
             "error": gallery_error(job.error),
             "shareUrl": job.share_url,
-            "createdAt": job.created_at.replace(" ", "T") + "Z",
+            "createdAt": self._timestamp(job.created_at),
             "attempts": job.attempts,
-            "sourceUrl": f"/api/gallery/{job.capture_id}/source",
-            "resultUrl": f"/api/gallery/{job.capture_id}/result" if job.result_path else None,
-            "thumbnailUrl": f"/api/gallery/{job.capture_id}/thumbnail?kind={thumbnail_kind}",
+            "resultUrl": f"/api/versions/{job.capture_id}/result" if job.result_path else None,
+            "thumbnailUrl": f"/api/versions/{job.capture_id}/thumbnail?kind={thumbnail_kind}",
+        }
+
+    @staticmethod
+    def _cover(versions: list[CaptureJob]) -> CaptureJob | None:
+        """The version a photo shows in the roll: its newest finished one, else its newest."""
+        finished = [job for job in versions if job.status == "complete"]
+        return (finished or versions or [None])[-1]
+
+    @staticmethod
+    def _photo_status(versions: list[CaptureJob], cover: CaptureJob | None) -> str:
+        statuses = {job.status for job in versions}
+        for status in ("uploading", "queued"):
+            if status in statuses:
+                return status
+        if cover is None:
+            return "original"
+        return cover.status
+
+    def photo_json(self, photo: Photo, versions: list[CaptureJob]) -> dict:
+        cover = self._cover(versions)
+        cover_json = self.version_json(cover) if cover else None
+        return {
+            "id": photo.photo_id,
+            "createdAt": self._timestamp(photo.created_at),
+            "status": self._photo_status(versions, cover),
+            "versionCount": len(versions),
+            "cover": cover_json,
+            "sourceUrl": f"/api/gallery/{photo.photo_id}/original",
+            "thumbnailUrl": cover_json["thumbnailUrl"] if cover_json
+            else f"/api/gallery/{photo.photo_id}/thumbnail",
         }
 
     def gallery(self, offset: int = 0, status: str = "all") -> dict:
-        jobs = self._store.gallery(limit=40, offset=offset, status=status)
+        photos = self._store.photos(limit=40, offset=offset, status=status)
+        versions = self._store.versions(photo.photo_id for photo in photos)
         return {
-            "items": [self.gallery_item(job) for job in jobs],
-            "counts": self._store.counts(),
-            "nextOffset": offset + 40 if len(jobs) == 40 else None,
+            "items": [self.photo_json(photo, versions[photo.photo_id]) for photo in photos],
+            "counts": self._store.photo_counts(),
+            "nextOffset": offset + 40 if len(photos) == 40 else None,
         }
 
-    def delete_photo(self, capture_id: str) -> None:
+    def photo_detail(self, photo_id: str, status: str = "all") -> dict | None:
+        photo = self._store.get_photo(photo_id)
+        if photo is None:
+            return None
+        versions = self._store.versions([photo_id])[photo_id]
+        return {
+            **self.photo_json(photo, versions),
+            "versions": [self.version_json(job) for job in versions],
+            **self._store.photo_neighbors(photo_id, status),
+        }
+
+    def _check_deletable(self, versions: list[CaptureJob]) -> None:
+        if self._maintenance or self._stop.is_set():
+            raise ValueError("Camera is restarting or updating. Try again shortly.")
+        busy = {self._processing_id, self._sharing_id}
+        if any(job.status == "uploading" or job.capture_id in busy for job in versions):
+            raise ValueError("Wait for this photo to finish processing or sharing before deleting.")
+
+    def _version_files(self, job: CaptureJob) -> list[tuple[Path, Path]]:
+        # A version made before photos existed has its own copy of the original.
+        files = [(job.source_path, self._captures_dir)]
+        files.append((job.result_path or self._results_dir / f"{job.capture_id}.jpg",
+                      self._results_dir))
+        files.append((self._results_dir / f"{job.capture_id}.download", self._results_dir))
+        return files
+
+    def _remove_files(
+        self, files: list[tuple[Path, Path]], *, capture_ids: set[str], photo_id: str | None
+    ) -> None:
+        # Validate every path before removing anything. A file that another photo
+        # or version still uses (such as a shared original) stays.
+        for path, directory in files:
+            if path.is_symlink() or path.resolve().parent != directory.resolve():
+                raise ValueError("Photo files are outside the camera gallery")
+        try:
+            for path, _ in files:
+                if not self._store.referenced_elsewhere(
+                    path, capture_ids=capture_ids, photo_id=photo_id
+                ):
+                    path.unlink(missing_ok=True)
+        except OSError as error:
+            raise ValueError("Could not remove the photo files. Please try again.") from error
+
+    def _needs_retraction(self, job: CaptureJob) -> bool:
+        # A standalone camera never uploads, so it has nothing to unshare.
+        return not self._standalone and bool(
+            (job.generation_id and not job.generation_id.startswith("offline-"))
+            or (job.attempts > 0 and not self._offline)
+        )
+
+    def _forget(self, capture_ids: set[str], photo_id: str | None = None) -> None:
+        self._retraction_check_at = 0
+        for capture_id in capture_ids:
+            self._retry_after.pop(capture_id, None)
+        self._notifications = deque(
+            (
+                notice for notice in self._notifications
+                if notice["captureId"] not in capture_ids
+                and (photo_id is None or notice["photoId"] != photo_id)
+            ),
+            maxlen=12,
+        )
+        if self._last_capture_id in capture_ids or self._last_capture_id == photo_id:
+            self._last_capture_id = None
+        if self._last_result_id in capture_ids:
+            self._last_result_id = None
+        if self._view["versionId"] in capture_ids:
+            self._view = {**self._view, "versionId": None}
+        self._gallery_revision += 1
+
+    def delete_version(self, capture_id: str) -> None:
+        """Remove one version of a photo. The original and other versions stay."""
         with self._photo_operations, self._state_changed:
-            if self._maintenance or self._stop.is_set():
-                raise ValueError("Camera is restarting or updating. Try again shortly.")
             job = self._store.get(capture_id)
             if job is None:
                 raise ValueError("Photo was not found")
-            if job.status == "uploading" or capture_id in {
-                self._processing_id,
-                self._sharing_id,
-            }:
-                raise ValueError(
-                    "Wait for this photo to finish processing or sharing before deleting."
-                )
-            # Validate every path before removing anything. Each restyle owns its
-            # own original, so removing one entry cannot break its other versions.
-            paths = [(job.source_path, self._captures_dir)]
-            if job.result_path is not None:
-                paths.append((job.result_path, self._results_dir))
-            else:
-                paths.append((self._results_dir / f"{capture_id}.jpg", self._results_dir))
-            paths.append((self._results_dir / f"{capture_id}.download", self._results_dir))
-            for path, directory in paths:
-                if path.is_symlink() or path.resolve().parent != directory.resolve():
-                    raise ValueError("Photo files are outside the camera gallery")
-            try:
-                for path, _ in paths:
-                    if not self._store.referenced_elsewhere(path, capture_id):
-                        path.unlink(missing_ok=True)
-            except OSError as error:
-                raise ValueError("Could not remove the photo files. Please try again.") from error
-            # A standalone camera never uploads, so it has nothing to unshare.
-            retract_share = not self._standalone and bool(
-                (job.generation_id and not job.generation_id.startswith("offline-"))
-                or (job.attempts > 0 and not self._offline)
+            self._check_deletable([job])
+            self._remove_files(self._version_files(job), capture_ids={capture_id}, photo_id=None)
+            retract = self._needs_retraction(job)
+            self._store.delete(capture_id, retract_share=retract)
+            self._forget({capture_id})
+            self._notify(
+                "deleted", "Version deleted",
+                "Public share removal is queued until connected" if retract
+                else "The original photo is kept",
             )
-            self._store.delete(capture_id, retract_share=retract_share)
-            self._retraction_check_at = 0
-            self._retry_after.pop(capture_id, None)
-            self._notifications = deque(
-                (notice for notice in self._notifications if notice["captureId"] != capture_id),
-                maxlen=12,
-            )
-            if self._last_capture_id == capture_id:
-                self._last_capture_id = None
-            if self._last_result_id == capture_id:
-                self._last_result_id = None
-            self._gallery_revision += 1
+
+    def delete_photo(self, photo_id: str) -> None:
+        """Remove a photo's original and every version of it."""
+        with self._photo_operations, self._state_changed:
+            photo = self._store.get_photo(photo_id)
+            if photo is None:
+                raise ValueError("Photo was not found")
+            versions = self._store.versions([photo_id])[photo_id]
+            self._check_deletable(versions)
+            files = [(photo.source_path, self._captures_dir)]
+            for job in versions:
+                files.extend(self._version_files(job))
+            capture_ids = {job.capture_id for job in versions}
+            self._remove_files(files, capture_ids=capture_ids, photo_id=photo_id)
+            retract = [job.capture_id for job in versions if self._needs_retraction(job)]
+            self._store.delete_photo(photo_id, retract=retract)
+            self._forget(capture_ids, photo_id)
             self._notify(
                 "deleted", "Photo deleted",
-                "Public share removal is queued until connected" if retract_share
+                "Public share removal is queued until connected" if retract
                 else "Removed from this camera",
             )
 
-    def media_path(self, capture_id: str, kind: str) -> Path:
-        job = self._store.get(capture_id)
-        if job is None or kind not in {"source", "result"}:
-            raise ValueError("Photo unavailable")
-        path = job.source_path if kind == "source" else job.result_path
+    def _media_file(self, path: Path | None) -> Path:
         if (
             path is None
             or not path.is_file()
@@ -1007,6 +1157,16 @@ class CameraWebController:
         ):
             raise ValueError("Photo unavailable")
         return path
+
+    def original_path(self, photo_id: str) -> Path:
+        photo = self._store.get_photo(photo_id)
+        return self._media_file(photo.source_path if photo else None)
+
+    def version_path(self, capture_id: str, kind: str) -> Path:
+        job = self._store.get(capture_id)
+        if job is None or kind not in {"source", "result"}:
+            raise ValueError("Photo unavailable")
+        return self._media_file(job.source_path if kind == "source" else job.result_path)
 
     def settings(self) -> dict:
         try:
@@ -1205,50 +1365,61 @@ async def _gallery(request: web.Request) -> web.Response:
 
 
 async def _gallery_detail(request: web.Request) -> web.Response:
-    controller = request.app["controller"]
-    job = controller._store.get(request.match_info["capture_id"])
-    if job is None:
-        raise web.HTTPNotFound()
-    return web.json_response(
-        {
-            **controller.gallery_item(job),
-            **controller._store.gallery_neighbors(
-                job.capture_id, request.query.get("filter", "all")
-            ),
-        },
-        headers={"Cache-Control": "no-store"},
+    detail = request.app["controller"].photo_detail(
+        request.match_info["photo_id"], request.query.get("filter", "all")
     )
+    if detail is None:
+        raise web.HTTPNotFound()
+    return web.json_response(detail, headers={"Cache-Control": "no-store"})
 
 
 async def _gallery_delete(request: web.Request) -> web.Response:
+    await asyncio.to_thread(request.app["controller"].delete_photo, request.match_info["photo_id"])
+    return web.json_response({"deleted": True})
+
+
+async def _version_delete(request: web.Request) -> web.Response:
     await asyncio.to_thread(
-        request.app["controller"].delete_photo, request.match_info["capture_id"]
+        request.app["controller"].delete_version, request.match_info["capture_id"]
     )
     return web.json_response({"deleted": True})
 
 
-async def _media(request: web.Request) -> web.StreamResponse:
+def _thumbnail(path: Path) -> bytes:
+    with Image.open(path) as original:
+        image = original.convert("RGB")
+        image.thumbnail((240, 180))
+        output = BytesIO()
+        image.save(output, "JPEG", quality=72)
+        return output.getvalue()
+
+
+async def _media_response(path: Path, thumbnail: bool) -> web.StreamResponse:
+    headers = {"Cache-Control": "private, max-age=86400"}
+    if thumbnail:
+        return web.Response(
+            body=await asyncio.to_thread(_thumbnail, path),
+            content_type="image/jpeg",
+            headers=headers,
+        )
+    return web.FileResponse(path, headers=headers)
+
+
+async def _photo_media(request: web.Request) -> web.StreamResponse:
+    kind = request.match_info["kind"]
+    if kind not in {"original", "thumbnail"}:
+        raise ValueError("Photo unavailable")
+    path = request.app["controller"].original_path(request.match_info["photo_id"])
+    return await _media_response(path, kind == "thumbnail")
+
+
+async def _version_media(request: web.Request) -> web.StreamResponse:
     controller = request.app["controller"]
     capture_id, kind = request.match_info["capture_id"], request.match_info["kind"]
     if kind == "thumbnail":
-        path = controller.media_path(capture_id, request.query.get("kind", "source"))
-
-        def thumbnail() -> bytes:
-            with Image.open(path) as original:
-                image = original.convert("RGB")
-                image.thumbnail((240, 180))
-                output = BytesIO()
-                image.save(output, "JPEG", quality=72)
-                return output.getvalue()
-
-        return web.Response(
-            body=await asyncio.to_thread(thumbnail),
-            content_type="image/jpeg",
-            headers={"Cache-Control": "private, max-age=86400"},
-        )
-    return web.FileResponse(
-        controller.media_path(capture_id, kind), headers={"Cache-Control": "private, max-age=86400"}
-    )
+        path = controller.version_path(capture_id, request.query.get("kind", "source"))
+        return await _media_response(path, True)
+    return await _media_response(controller.version_path(capture_id, kind), False)
 
 
 async def _settings(request: web.Request) -> web.Response:
@@ -1319,9 +1490,11 @@ def create_web_app(controller: CameraWebController) -> web.Application:
     app.router.add_post("/api/actions/{action}", _action)
     app.router.add_get("/preview.mjpg", _preview)
     app.router.add_get("/api/gallery", _gallery)
-    app.router.add_get("/api/gallery/{capture_id}", _gallery_detail)
-    app.router.add_post("/api/gallery/{capture_id}/delete", _gallery_delete)
-    app.router.add_get("/api/gallery/{capture_id}/{kind}", _media)
+    app.router.add_get("/api/gallery/{photo_id}", _gallery_detail)
+    app.router.add_post("/api/gallery/{photo_id}/delete", _gallery_delete)
+    app.router.add_get("/api/gallery/{photo_id}/{kind}", _photo_media)
+    app.router.add_post("/api/versions/{capture_id}/delete", _version_delete)
+    app.router.add_get("/api/versions/{capture_id}/{kind}", _version_media)
     app.router.add_get("/api/settings", _settings)
     app.router.add_post("/api/settings", _settings)
     app.router.add_post("/api/sound", _sound)

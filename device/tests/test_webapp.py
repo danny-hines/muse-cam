@@ -135,18 +135,19 @@ def test_retired_styles_leave_cached_picker_but_keep_gallery_and_retry(
         Image.new("RGB", (100, 80), "orange").save(source)
         controller._store.enqueue("retired", preset_id, source)
         controller._store.mark_failed("retired", "Generation failed")
-        assert controller.gallery()["items"][0]["presetName"] == RETIRED_PRESETS[preset_id].name
+        cover = controller.gallery()["items"][0]["cover"]
+        assert cover["presetName"] == RETIRED_PRESETS[preset_id].name
         with pytest.raises(ValueError, match="available style"):
             controller.dispatch("select", {"presetId": preset_id})
         with pytest.raises(ValueError, match="available style"):
-            controller._remix({"captureId": "retired", "presetId": preset_id}, retry=False)
+            controller._remix({"photoId": "retired", "presetId": preset_id}, retry=False)
 
         controller._remix({"captureId": "retired"}, retry=True)
         pending = controller._store.pending()
         assert len(pending) == 1
         assert pending[0].preset_id == preset_id
-        assert pending[0].source_path != source
-        assert pending[0].source_path.read_bytes() == source.read_bytes()
+        # A retry is another version of the same photo, sharing its original.
+        assert (pending[0].photo_id, pending[0].source_path) == ("retired", source)
         assert controller._store.get("retired").status == "failed"
     finally:
         controller.close()
@@ -250,7 +251,7 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         assert state["status"] == "live"
         assert state["processingId"] == first
         assert state["queued"] == 1
-        assert controller.gallery()["items"][0]["presetId"] == next_style
+        assert controller.gallery()["items"][0]["cover"]["presetId"] == next_style
         release.set()
         wait_until(lambda: controller._store.counts().get("complete") == 2)
         # The worker commits first; the camera loop then publishes its completion notice.
@@ -266,7 +267,7 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         controller.close()
 
 
-def test_gallery_retry_and_restyle_preserve_originals(tmp_path: Path) -> None:
+def test_gallery_retry_and_restyle_add_versions_to_one_photo(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     source = tmp_path / "captures" / "old.jpg"
     Image.new("RGB", (100, 80), "orange").save(source)
@@ -275,22 +276,30 @@ def test_gallery_retry_and_restyle_preserve_originals(tmp_path: Path) -> None:
     controller._store.mark_failed("old", "Generation failed")
     controller.start()
     try:
+        controller.dispatch("view", {"screen": "photo", "photoId": "old"})
         controller.dispatch("retry", {"captureId": "old"})
         wait_until(lambda: controller._store.counts().get("complete") == 1)
-        retried = controller.gallery()["items"][0]
-        assert retried["id"] != "old"
+        [photo] = controller.gallery()["items"]
+        retried = photo["cover"]
+        assert (photo["id"], photo["versionCount"], photo["status"]) == ("old", 2, "complete")
+        assert retried["id"] != "old" and retried["presetId"] == style
         assert controller._store.get("old").status == "failed"
-        assert controller.media_path(retried["id"], "source").read_bytes() == source.read_bytes()
-        assert controller.media_path(retried["id"], "source") != source
+        assert controller.version_path(retried["id"], "source") == source
+        # The camera shows the new version on the photo the guest is looking at.
+        assert controller.state()["view"]["versionId"] == retried["id"]
         controller.dispatch(
-            "remix", {"captureId": retried["id"], "presetId": controller._presets[2].id}
+            "remix", {"photoId": "old", "presetId": controller._presets[2].id}
         )
         wait_until(lambda: controller._store.counts().get("complete") == 2)
-        newest = controller.gallery()["items"][0]
-        assert newest["id"] != retried["id"]
-        assert newest["presetId"] == controller._presets[2].id
-        assert controller._store.get(retried["id"]).preset_id == style
-        assert controller.state()["galleryCount"] == 3
+        detail = controller.photo_detail("old")
+        assert [v["presetId"] for v in detail["versions"]] == [
+            style, style, controller._presets[2].id,
+        ]
+        assert detail["cover"]["presetId"] == controller._presets[2].id
+        assert controller.state()["galleryCount"] == 1
+        assert len(list((tmp_path / "captures").iterdir())) == 1
+        with pytest.raises(ValueError, match="Photo was not found"):
+            controller.dispatch("remix", {"captureId": "old", "presetId": style})
     finally:
         controller.close()
 
@@ -337,49 +346,142 @@ def test_settings_and_history_survive_restart(tmp_path: Path) -> None:
         assert reopened.state()["volume"] == 0
         assert reopened.state()["processingSound"] is False
         assert reopened.gallery()["items"][0]["status"] == "queued"
+        assert reopened.gallery()["items"][0]["cover"]["status"] == "queued"
         assert reopened.settings()["battery"]["percentage"] is None
         assert reopened.settings()["battery"]["supported"] is False
     finally:
         reopened.close()
 
 
-def test_delete_removes_one_photo_and_preserves_restyled_original(tmp_path: Path) -> None:
+def test_deleting_a_version_keeps_the_original_and_other_versions(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     source = tmp_path / "captures" / "old.jpg"
     result = tmp_path / "results" / "old.jpg"
     Image.new("RGB", (100, 80), "orange").save(source)
     Image.new("RGB", (100, 80), "blue").save(result)
-    style = controller._presets[0].id
+    style = controller._presets[1].id
     controller._store.enqueue("old", style, source)
     controller._store.mark_complete("old", "generation-old", result, "https://example.com/p/shared")
-    controller._remix({"captureId": "old", "presetId": style}, retry=False)
+    controller._remix({"photoId": "old", "presetId": style}, retry=False)
     sibling = controller._store.pending()[0]
-    source_bytes = source.read_bytes()
-    controller._last_capture_id = controller._last_result_id = "old"
+    controller._last_result_id = "old"
     controller._notify("success", "Ready", "", "old")
+    controller._set_view("photo", "old", "old")
     revision = controller.state()["galleryRevision"]
     try:
-        controller.delete_photo("old")
-        assert not source.exists() and not result.exists()
+        controller.delete_version("old")
+        assert source.exists() and not result.exists()
         assert controller._store.get("old") is None
-        assert sibling.source_path.read_bytes() == source_bytes
         assert controller._store.get(sibling.capture_id) is not None
         assert controller.state()["galleryCount"] == 1
         assert controller.state()["galleryRevision"] > revision
-        assert controller.state()["lastCaptureId"] is None
+        assert controller.state()["view"]["versionId"] is None
         assert controller._last_result_id is None
         assert not any(n["captureId"] == "old" for n in controller.state()["notifications"])
         assert controller.state()["notifications"][-1]["kind"] == "deleted"
+        assert controller._store.pending_retraction() == "old"
         with pytest.raises(ValueError, match="unavailable"):
-            controller.media_path("old", "source")
+            controller.version_path("old", "result")
+
+        controller.delete_version(sibling.capture_id)
+        assert source.exists()
+        [photo] = controller.gallery()["items"]
+        assert (photo["id"], photo["status"], photo["cover"]) == ("old", "original", None)
+    finally:
+        controller.close()
+
+
+def test_deleting_a_photo_removes_its_original_and_every_version(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    source = tmp_path / "captures" / "old.jpg"
+    result = tmp_path / "results" / "old.jpg"
+    Image.new("RGB", (100, 80), "orange").save(source)
+    Image.new("RGB", (100, 80), "blue").save(result)
+    style = controller._presets[1].id
+    controller._store.enqueue("old", style, source)
+    controller._store.mark_complete("old", "generation-old", result, "https://example.com/p/shared")
+    controller._remix({"photoId": "old", "presetId": style}, retry=False)
+    sibling = controller._store.pending()[0]
+    other = tmp_path / "captures" / "other.jpg"
+    Image.new("RGB", (100, 80), "green").save(other)
+    controller._store.add_photo("other", other)
+    controller._last_capture_id = controller._last_result_id = "old"
+    controller._notify("queued", "Saved", "", sibling.capture_id)
+    try:
+        controller.delete_photo("old")
+        assert not source.exists() and not result.exists()
+        assert controller._store.get_photo("old") is None
+        assert controller._store.get("old") is None
+        assert controller._store.get(sibling.capture_id) is None
+        assert other.exists()
+        assert [p["id"] for p in controller.gallery()["items"]] == ["other"]
+        assert controller.state()["lastCaptureId"] is None
+        assert controller._last_result_id is None
+        assert not any(n["photoId"] == "old" for n in controller.state()["notifications"])
+        assert controller._store.pending_retraction() == "old"
+        with pytest.raises(ValueError, match="unavailable"):
+            controller.original_path("old")
     finally:
         controller.close()
     reopened = make_controller(tmp_path)
     try:
-        assert reopened._store.get("old") is None
+        assert reopened._store.get_photo("old") is None
         assert reopened.state()["galleryCount"] == 1
     finally:
         reopened.close()
+
+
+def test_restyled_copies_from_before_photos_are_grouped_on_startup(tmp_path: Path) -> None:
+    import sqlite3
+
+    database = tmp_path / "musecam.sqlite3"
+    captures = tmp_path / "captures"
+    captures.mkdir()
+    Image.new("RGB", (100, 80), "orange").save(captures / "first.jpg")
+    # Restyle and Retry used to copy the original into each new entry.
+    for copy in ("retry", "restyle"):
+        (captures / f"{copy}.jpg").write_bytes((captures / "first.jpg").read_bytes())
+    Image.new("RGB", (100, 80), "purple").save(captures / "other.jpg")
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "CREATE TABLE captures (capture_id TEXT PRIMARY KEY, preset_id TEXT NOT NULL, "
+        "source_path TEXT NOT NULL, result_path TEXT, generation_id TEXT, status TEXT NOT NULL, "
+        "attempts INTEGER NOT NULL DEFAULT 0, error TEXT, share_url TEXT, "
+        "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+        "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, preset_name TEXT)"
+    )
+    for index, (capture_id, status) in enumerate(
+        [("first", "failed"), ("other", "complete"), ("retry", "complete"),
+         ("restyle", "queued"), ("missing", "failed")]
+    ):
+        connection.execute(
+            "INSERT INTO captures (capture_id, preset_id, source_path, status, created_at) "
+            "VALUES (?, 'kid-drawing', ?, ?, ?)",
+            (capture_id, str(captures / f"{capture_id}.jpg"), status,
+             f"2026-10-01 10:00:0{index}"),
+        )
+    connection.commit()
+    connection.close()
+
+    controller = make_controller(tmp_path)
+    try:
+        items = controller.gallery()["items"]
+        assert [p["id"] for p in items] == ["missing", "other", "first"]
+        assert [v["id"] for v in controller.photo_detail("first")["versions"]] == [
+            "first", "retry", "restyle",
+        ]
+        assert controller.photo_detail("first")["status"] == "queued"
+        assert controller.state()["galleryCount"] == 3
+        # Deleting the restyle removes its old copy but keeps the photo's original.
+        controller.delete_version("restyle")
+        assert not (captures / "restyle.jpg").exists()
+        assert (captures / "first.jpg").exists()
+        controller.delete_photo("first")
+        assert not (captures / "first.jpg").exists()
+        assert not (captures / "retry.jpg").exists()
+        assert (captures / "other.jpg").exists()
+    finally:
+        controller.close()
 
 
 @pytest.mark.parametrize("status", ["queued", "failed"])
@@ -564,8 +666,18 @@ def test_http_gallery_and_local_settings_boundary(tmp_path: Path) -> None:
             assert "do-not-expose" not in await (await client.get("/api/state")).text()
             assert (await client.get(item["sourceUrl"])).status == 200
             assert (await client.get(item["thumbnailUrl"])).content_type == "image/jpeg"
+            plain = await client.get("/api/gallery/private/thumbnail")
+            assert plain.content_type == "image/jpeg"
             assert (await client.get("/api/gallery/missing")).status == 404
             assert (await client.get("/api/gallery/private/result")).status == 400
+            assert (await client.get("/api/versions/private/result")).status == 400
+            assert (await client.get("/api/versions/private/original")).status == 400
+            version_delete = "/api/versions/private/delete"
+            assert (await client.post(version_delete, json={})).status == 403
+            response = await client.post(version_delete, json={}, headers=headers)
+            assert response.status == 200
+            assert source.exists()
+            assert (await client.get(item["sourceUrl"])).status == 200
             delete_url = "/api/gallery/private/delete"
             assert (await client.post(delete_url, json={})).status == 403
             assert (
@@ -704,7 +816,7 @@ def test_auto_shared_generation_is_recorded_in_camera_gallery(tmp_path):
     try:
         outcome = controller._process_job(controller._store.get("capture-auto"))
         assert outcome.job.share_url == "https://camera.example/p/auto"
-        assert controller.gallery()["items"][0]["shareUrl"] == outcome.job.share_url
+        assert controller.gallery()["items"][0]["cover"]["shareUrl"] == outcome.job.share_url
     finally:
         controller.close()
 
@@ -735,11 +847,12 @@ def test_random_style_resolves_each_shot_and_retry_keeps_the_choice(tmp_path, mo
         assert controller.state()["preset"]["id"] == "random"
         controller._store.mark_failed(first.capture_id, "Try again")
         controller._remix({"captureId": first.capture_id}, retry=True)
-        retry = controller.gallery()["items"][0]
+        retry = controller.photo_detail(first.photo_id)["versions"][-1]
         assert retry["presetId"] == first.preset_id
         assert len(choices) == 2
-        controller._remix({"captureId": first.capture_id, "presetId": "random"}, retry=False)
-        assert controller.gallery()["items"][0]["presetId"] == FALLBACK_PRESETS[2].id
+        controller._remix({"photoId": first.photo_id, "presetId": "random"}, retry=False)
+        newest = controller.photo_detail(first.photo_id)["versions"][-1]
+        assert newest["presetId"] == FALLBACK_PRESETS[2].id
         controller._load_presets()
         assert controller.state()["preset"]["id"] == "random"
     finally:
@@ -765,8 +878,8 @@ def test_a_single_server_style_has_no_random_entry(tmp_path):
         controller._handle_action("capture", {})
         shot = controller._store.get(controller.state()["lastCaptureId"])
         assert shot.preset_id == "surprise"
-        controller._remix({"captureId": shot.capture_id, "presetId": "surprise"}, retry=False)
-        assert controller.gallery()["items"][0]["presetName"] == "Surprise"
+        controller._remix({"photoId": shot.photo_id, "presetId": "surprise"}, retry=False)
+        assert controller.gallery()["items"][0]["cover"]["presetName"] == "Surprise"
     finally:
         controller.close()
 
@@ -801,7 +914,7 @@ def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
     try:
         outcome = controller._process_job(controller._store.get("capture-surprise"))
         assert (outcome.job.preset_id, outcome.job.preset_name) == ("party-hats", "Party Hats")
-        item = controller.gallery()["items"][0]
+        item = controller.gallery()["items"][0]["cover"]
         assert (item["presetId"], item["presetName"]) == ("party-hats", "Party Hats")
         finished = Future()
         finished.set_result(outcome)
@@ -854,7 +967,7 @@ def test_shutter_counts_down_beeps_once_per_second_and_captures_once(
         assert controller.state()["galleryCount"] == 1
         assert controller.state()["countdownRemaining"] == 0
         assert controller.state()["status"] == "live"
-        assert controller.gallery()["items"][0]["presetId"] == FALLBACK_PRESETS[0].id
+        assert controller.gallery()["items"][0]["cover"]["presetId"] == FALLBACK_PRESETS[0].id
     finally:
         controller.close()
 
@@ -924,7 +1037,9 @@ def test_gallery_shutter_returns_to_camera_before_capturing(tmp_path, monkeypatc
         # Exercise the GPIO action path, without relying on a browser key handler.
         controller.dispatch("capture")
         controller._poll_actions()
-        assert controller.state()["view"] == {"screen": "camera", "photoId": None}
+        assert controller.state()["view"] == {
+            "screen": "camera", "photoId": None, "versionId": None,
+        }
         assert controller.state()["galleryCount"] == 1
         assert controller.state()["lastCaptureId"] is None
         assert controller.state()["status"] == "live"
@@ -954,7 +1069,21 @@ def test_view_action_validates_screens_and_photos(tmp_path):
                 controller.dispatch("view", values)
         with pytest.raises(ValueError, match="Photo was not found"):
             controller.dispatch("view", {"screen": "photo", "photoId": "missing"})
-        assert controller.state()["view"] == {"screen": "camera", "photoId": None}
+        assert controller.state()["view"] == {
+            "screen": "camera", "photoId": None, "versionId": None,
+        }
+        controller._store.enqueue("one", "kid-drawing", tmp_path / "one.jpg")
+        controller._store.enqueue("two", "kid-drawing", tmp_path / "two.jpg")
+        for version in ("missing", "two"):
+            with pytest.raises(ValueError, match="version of the photo was not found"):
+                controller.dispatch(
+                    "view", {"screen": "photo", "photoId": "one", "versionId": version}
+                )
+        controller.dispatch("view", {"screen": "photo", "photoId": "one", "versionId": "one"})
+        controller._poll_actions()
+        assert controller.state()["view"] == {
+            "screen": "photo", "photoId": "one", "versionId": "one",
+        }
     finally:
         controller.close()
 

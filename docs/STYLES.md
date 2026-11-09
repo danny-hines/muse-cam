@@ -1,7 +1,7 @@
 # MuseCam styles
 
 The camera has 18 active styles. Every active style works for new captures and
-for **Gallery → Restyle**, which creates a separate entry from a saved original.
+for **Gallery → Restyle**, which adds a new version to a saved photo.
 
 | Style | Treatment |
 | --- | --- |
@@ -87,7 +87,7 @@ Their IDs, names, and version-1 prompts remain available for saved gallery photo
 shared links, and retries. Any saved test-mode capture selection moves to
 **Insert Disc 2**. The main style keeps ID `memory-card`, now at version 3; changing
 its prompt does not alter existing images. Pulling back from a close-up can invent
-unseen clothing and poses. Gallery → Restyle still creates a separate photo.
+unseen clothing and poses. Gallery → Restyle still adds a separate version.
 
 The retired **Disc 2 · Reference** mode sent a third-party game screenshot after
 the photo as a rendering reference. That image is no longer in the repository, so

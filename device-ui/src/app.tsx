@@ -8,7 +8,7 @@ import {
 import type { CameraState, Notice } from "./types";
 import { useCamera } from "./use-camera";
 import { Icon } from "./icons";
-import { Gallery, PhotoDetail } from "./gallery";
+import { Gallery, PhotoDetail, pickerOnly } from "./gallery";
 import { Settings } from "./settings";
 import { FocusTarget } from "./focus";
 
@@ -23,11 +23,15 @@ export function App() {
   const booted = useRef("");
   const selectedStyle = useRef<HTMLButtonElement | null>(null);
   const report = useCallback((message: string) => setError(message), []);
-  const navigate = useCallback((screen: CameraState["view"]["screen"], photoId?: string) => {
-    void act("view", { screen, photoId }).catch((error) => report(error.message));
+  const navigate = useCallback((
+    screen: CameraState["view"]["screen"],
+    photoId?: string,
+    versionId?: string | null,
+  ) => {
+    void act("view", { screen, photoId, versionId }).catch((error) => report(error.message));
   }, [act, report]);
-  const openPhoto = useCallback((id: string) => {
-    navigate("photo", id);
+  const openPhoto = useCallback((id: string, versionId?: string | null) => {
+    navigate("photo", id, versionId);
     setNotice(null);
   }, [navigate]);
   const camera = useCallback(() => navigate("camera"), [navigate]);
@@ -110,6 +114,11 @@ export function App() {
   const working = state.queued + (state.processingId ? 1 : 0);
   // An event can give the camera a single style, such as a server-picked Surprise.
   const choosesStyle = state.presets.length > 1;
+  // Random and Original get icons; styles are numbered from 01.
+  const styleNumbers = new Map<string, number>();
+  for (const preset of state.presets) {
+    if (!pickerOnly(preset.id)) styleNumbers.set(preset.id, styleNumbers.size + 1);
+  }
   const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
     <main
@@ -213,7 +222,7 @@ export function App() {
                 </button>
               </div>
               <div className="rail-scroll">
-                {state.presets.map((preset, index) => (
+                {state.presets.map((preset) => (
                   <button
                     ref={
                       preset.id === state.preset.id ? selectedStyle : undefined
@@ -236,7 +245,13 @@ export function App() {
                       className="style-number"
                       style={{ color: preset.accent }}
                     >
-                      {preset.id === "random" ? <Icon name="shuffle" size={17} /> : String(index).padStart(2, "0")}
+                      {preset.id === "random" ? (
+                        <Icon name="shuffle" size={17} />
+                      ) : preset.id === "original" ? (
+                        <Icon name="camera" size={17} />
+                      ) : (
+                        String(styleNumbers.get(preset.id)).padStart(2, "0")
+                      )}
                     </span>
                     <strong>{preset.name}</strong>
                     {preset.id === state.preset.id && (
@@ -249,7 +264,9 @@ export function App() {
           )}
           <footer className="camera-footer">
             <div className="current-style">
-              <span className="eyebrow">Your next imagination</span>
+              <span className="eyebrow">
+                {state.preset.id === "original" ? "Your next photo" : "Your next imagination"}
+              </span>
               <strong>{state.preset.name}</strong>
               <span className="shutter-hint">
                 {state.status === "countdown"
@@ -351,6 +368,7 @@ export function App() {
         <PhotoDetail
           key={photoId}
           id={photoId}
+          versionId={state.view.versionId}
           state={state}
           filter={galleryFilter}
           onOpen={openPhoto}
@@ -368,12 +386,18 @@ export function App() {
           <button
             className="notice-content"
             onClick={() =>
-              notice.captureId ? openPhoto(notice.captureId) : setNotice(null)
+              notice.photoId
+                ? openPhoto(notice.photoId, notice.captureId)
+                : setNotice(null)
             }
           >
-            {notice.captureId ? (
+            {notice.photoId ? (
               <img
-                src={`/api/gallery/${notice.captureId}/thumbnail?kind=${notice.kind === "success" ? "result" : "source"}`}
+                src={
+                  notice.captureId
+                    ? `/api/versions/${notice.captureId}/thumbnail?kind=${notice.kind === "success" ? "result" : "source"}`
+                    : `/api/gallery/${notice.photoId}/thumbnail`
+                }
                 alt=""
               />
             ) : (
@@ -382,7 +406,7 @@ export function App() {
             <span>
               <strong>{notice.title}</strong>
               <small>{notice.message}</small>
-              {notice.captureId && <em>Tap to view</em>}
+              {notice.photoId && <em>Tap to view</em>}
             </span>
           </button>
           <button

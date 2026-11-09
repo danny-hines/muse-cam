@@ -65,6 +65,17 @@ class CaptureJob:
     # The style the server used. A Surprise photo asks for "surprise" and gets a
     # style the camera may not have in its list.
     preset_name: str | None = None
+    # The original photo this job is a version of.
+    photo_id: str | None = None
+
+
+@dataclass(frozen=True)
+class Photo:
+    """An original shot. Each style applied to it is a CaptureJob version."""
+
+    photo_id: str
+    source_path: Path
+    created_at: str = ""
 
 
 class ScreenState(StrEnum):

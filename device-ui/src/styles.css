@@ -584,6 +584,28 @@ svg {
 .photo-status.uploading {
   color: #ffd09a;
 }
+.photo-status.original {
+  color: #d9d4c4;
+}
+/* A version count, with a second card peeking out behind it. */
+.photo-stack {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: #151a18df;
+  border: 1px solid #ffffff30;
+  color: #e5eae1;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 3px -3px 0 -1px #151a18b0, 3px -3px 0 0 #ffffff26;
+}
 .empty-state {
   min-height: 210px;
   display: flex;
@@ -683,6 +705,69 @@ svg {
   padding: 7px 13px;
   font-size: 11px;
   letter-spacing: 0.6px;
+}
+.version-strip {
+  pointer-events: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 10px;
+  display: flex;
+  gap: 5px;
+  padding: 3px;
+  overflow-x: auto;
+  border-radius: 13px;
+  background: #121b1bcb;
+  border: 1px solid #ffffff20;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+.version-strip::-webkit-scrollbar {
+  display: none;
+}
+.version-chip {
+  position: relative;
+  flex: none;
+  width: 58px;
+  height: 40px;
+  padding: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: #2a302c;
+}
+.version-chip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.version-chip.selected {
+  border-color: var(--accent);
+}
+.version-chip.original img {
+  filter: brightness(0.62);
+}
+.version-chip.original svg {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px #000c);
+}
+.version-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid #151a18;
+}
+.version-dot.waiting {
+  background: #ffd09a;
+}
+.version-dot.failed {
+  background: #ffb6a1;
 }
 .detail-footer {
   position: absolute;

@@ -124,3 +124,29 @@ def test_surprise_photos_keep_the_style_the_server_used(tmp_path: Path) -> None:
     finally:
         store.close()
 
+
+
+def test_photos_group_versions_and_prune_keeps_shared_originals(tmp_path: Path) -> None:
+    store = CaptureStore(tmp_path / "musecam.sqlite3")
+    source = tmp_path / "shot.jpg"
+    try:
+        store.add_photo("plain", tmp_path / "plain.jpg")
+        store.enqueue("shot", "storybook", source)
+        store.enqueue("restyle", "claymation", source, photo_id="shot")
+        assert store.get("restyle").photo_id == "shot"  # type: ignore[union-attr]
+        assert [job.capture_id for job in store.versions(["shot"])["shot"]] == ["shot", "restyle"]
+        assert store.versions(["plain"]) == {"plain": []}
+        store.mark_complete("shot", "generation_1", tmp_path / "result.jpg")
+        assert store.photo_counts() == {"all": 2, "complete": 1, "failed": 0, "waiting": 1}
+        assert [photo.photo_id for photo in store.photos(status="waiting")] == ["shot"]
+
+        # The native app prunes old versions; a version still using the original keeps it.
+        store.mark_complete("restyle", "generation_2", tmp_path / "result-2.jpg")
+        store.mark_complete("shot", "generation_1", tmp_path / "result.jpg")
+        assert store.prune_finished(keep=1) == [tmp_path / "result-2.jpg"]
+        assert store.get_photo("shot") is not None
+        assert store.prune_finished(keep=0) == [source, tmp_path / "result.jpg"]
+        assert store.get_photo("shot") is None
+        assert store.get_photo("plain") is not None
+    finally:
+        store.close()

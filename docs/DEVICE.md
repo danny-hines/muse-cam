@@ -73,6 +73,11 @@ camera: the style rail, Random, timer, gallery, Restyle, Retry, and Delete are
 the same, and photos queue and retry when the network or model is busy. Only
 **Share** is missing, since there is no event gallery to publish to.
 
+The style rail also starts with **Original**, which saves the photo with no
+style and makes no API call. Restyle it from the gallery later. A new camera
+starts on Random; the rail remembers the last choice. Connected cameras don't
+offer Original, since event photos are always imagined.
+
 Install with `--standalone`. The installer asks for
 the key on the terminal without echoing it; `--api-key-stdin` reads it from
 standard input instead.
@@ -182,7 +187,25 @@ only marked ready after delivering a frame, and restarting the service reconnect
 the browser's preview stream. See the [Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf)
 for the main/lores stream and camera-buffer model.
 
-**Your roll** contains every local original and imagined result, with filters for ready, waiting, and failed photos. Hold a result to compare its original; release to return. **Restyle** submits a copy of the original with the chosen style and adds a separate gallery entry. **Retry** creates a new attempt for a failed generation, retaining the failed entry for reference. Gallery photos are not automatically pruned. **Share** publishes a completed result to the camera's event gallery only when explicitly tapped.
+**Your roll** shows one tile per original photo. Each style applied to it is a
+**version** of that photo, and a tile with more than one version shows a count.
+The tile shows the newest ready version, and a waiting badge while any version
+is still processing. The Ready, Waiting, and Needs attention filters match a photo
+when any of its versions is in that state.
+
+Open a photo to see its versions along the top: **Original** first, then each
+style, oldest first, with a dot on versions that are waiting or failed. Tap one to
+view it. Hold a result to compare its original; release to return. **Restyle**
+adds a new version with the chosen style, which the viewer selects so you can
+watch it process. **Retry** adds another attempt at a failed version, keeping the
+failed one for reference. Versions share their photo's original file. Gallery
+photos are not automatically pruned. **Share** publishes the selected version to
+the camera's event gallery only when explicitly tapped.
+
+Rolls saved before versions existed are grouped on the first start after the
+update. Restyle and Retry used to copy the original into each new entry, so
+entries whose originals are identical files become versions of one photo. Only
+files that share a size are hashed, so the one-time pass is quick.
 
 Swipe left for the next (older) gallery photo and right for the previous (newer)
 photo. Navigation follows the selected gallery filter, continues across loaded
@@ -201,14 +224,17 @@ not saved or shared images.
 
 - Sounds: persistent master volume, mute, optional quiet processing chirps, and previews of the shutter click, processing, success, and failure cues. The default is a conservative 35%; zero silences every cue. Original synthesized sounds require no downloaded audio assets.
 - Wi-Fi: nearby networks, saved-network reconnection, hidden SSID entry, and a touchscreen password keyboard. A failed join removes its new profile and attempts to restore the previous connection. WPA personal and open networks are supported; enterprise certificates and captive-portal login are not configured here. Use a suitable office guest network or hotspot, or provision an enterprise profile separately.
-- Storage: free/used space and photo counts. Originals and every treatment remain on the camera.
+- Storage: free/used space and photo counts. Originals and every version remain on the camera.
 - Device: hostname, addresses, installed commit, battery capability, and update controls. PiSugar S Plus does not expose a percentage; the interface reports that limitation.
 
-Open a photo in **Your roll → Delete** to remove that entry, its original, and its
-imagined result from the camera. The confirmation defaults to **Keep photo**.
-Other restyled versions are preserved; shared copies remain online. Waiting
-photos can be deleted to cancel their queued processing. A photo being processed
-or shared must finish before deletion becomes available.
+Open a photo in **Your roll** and tap **Delete**. With a style version selected,
+**Delete version** removes just that version and keeps the original and the other
+versions; **Delete whole photo** removes everything. With Original selected,
+**Delete photo** removes the original and all of its versions. The confirmation
+defaults to **Keep**. Deleting a shared version also removes its public share,
+queued until the camera is connected. Waiting versions can be deleted to cancel
+their queued processing. A version being processed or shared must finish before
+it, or its whole photo, can be deleted.
 
 Updates fetch `origin/main` and accept only clean, fast-forward releases with prebuilt UI assets. Pending processing/sharing blocks installation. The update worker installs the Python package and control service, verifies the camera starts, and restores the previous commit/package if startup fails. Photos, sound settings, Wi-Fi profiles, and device credentials live outside the release checkout and are preserved. Keep power connected during an update. Local source edits block the release updater rather than being discarded.
 

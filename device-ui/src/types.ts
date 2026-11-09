@@ -9,10 +9,16 @@ export type Notice = {
   kind: string;
   title: string;
   message: string;
+  // The version a notice is about, and its photo. A plain shot has no version.
   captureId: string | null;
+  photoId: string | null;
 };
 export type CameraState = {
-  view: { screen: "camera" | "gallery" | "photo" | "settings"; photoId: string | null };
+  view: {
+    screen: "camera" | "gallery" | "photo" | "settings";
+    photoId: string | null;
+    versionId: string | null;
+  };
   focus: FocusState;
   previewSize: { width: number; height: number };
   status: string;
@@ -64,8 +70,10 @@ export type CameraAction =
   | "retry"
   | "restart_camera"
   | "power";
-export type Photo = {
+// One style applied to a photo's original.
+export type Version = {
   id: string;
+  photoId: string;
   presetId: string;
   presetName: string;
   status: string;
@@ -73,8 +81,19 @@ export type Photo = {
   shareUrl: string | null;
   createdAt: string;
   attempts: number;
-  sourceUrl: string;
   resultUrl: string | null;
+  thumbnailUrl: string;
+};
+// An original shot and the versions made from it.
+export type Photo = {
+  id: string;
+  createdAt: string;
+  // Waiting beats the cover's status; "original" means no versions yet.
+  status: string;
+  versionCount: number;
+  // The version the roll shows: the newest finished one, else the newest.
+  cover: Version | null;
+  sourceUrl: string;
   thumbnailUrl: string;
 };
 export type GalleryData = {
@@ -83,6 +102,7 @@ export type GalleryData = {
   nextOffset: number | null;
 };
 export type PhotoDetailData = Photo & {
+  versions: Version[];
   previousId: string | null;
   nextId: string | null;
 };
