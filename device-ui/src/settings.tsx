@@ -3,6 +3,7 @@ import type { CameraState, Network, SettingsData, UpdateInfo } from "./types";
 import { api } from "./use-camera";
 import { Icon } from "./icons";
 import { TouchKeyboard } from "./keyboard";
+import { updateStatus } from "./update-status";
 
 const formatBytes = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 export function Settings({
@@ -126,6 +127,8 @@ export function Settings({
     setInstalling(true);
     try {
       await api("/api/system/update-apply", {});
+      // The install's own messages take over from here.
+      setUpdate(null);
       setData(await api<SettingsData>("/api/settings"));
     } catch (error) {
       report((error as Error).message);
@@ -453,12 +456,7 @@ export function Settings({
               <div className="update-row">
                 <div>
                   <strong>Software updates</strong>
-                  <p>
-                    {job?.kind === "update" && job.phase !== "idle"
-                      ? job.message
-                      : update?.message ||
-                        "Check for the latest camera improvements."}
-                  </p>
+                  <p>{updateStatus(job, update)}</p>
                 </div>
                 <button
                   className="secondary-button"
@@ -468,7 +466,7 @@ export function Settings({
                   {checking ? "Checking…" : "Check for updates"}
                 </button>
               </div>
-              {update?.available && (
+              {(update?.available || (jobBusy && job?.kind === "update")) && (
                 <>
                   <button
                     className="primary-button"
