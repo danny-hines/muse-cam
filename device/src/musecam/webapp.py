@@ -40,6 +40,7 @@ from .image_model import (
     style_prompt,
     styles_unavailable,
 )
+from .looks import LOOK_PRESETS, apply_look, is_look
 from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
@@ -159,6 +160,8 @@ class CameraWebController:
         )
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-generate")
         self._share_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-share")
+        # Looks take a second or two on the camera, so they don't wait behind a model call.
+        self._look_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-look")
         self._actions: Queue[tuple[str, dict]] = Queue(maxsize=16)
         self._photo_operations = threading.Lock()
         self._stop = threading.Event()
@@ -185,6 +188,8 @@ class CameraWebController:
         self._camera_start_attempts = 0
         self._future: Future[CaptureOutcome] | None = None
         self._processing_id: str | None = None
+        self._look_future: Future[CaptureOutcome] | None = None
+        self._look_id: str | None = None
         self._share_future: Future[Generation] | None = None
         self._sharing_id: str | None = None
         self._retraction_future: Future[None] | None = None
@@ -239,7 +244,9 @@ class CameraWebController:
         # entry, and the interface hides the picker.
         presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
         if self._standalone:
-            presets = [ORIGINAL_PRESET] if self._styles_off else [ORIGINAL_PRESET, *presets]
+            # Original and looks need no model, so they stay when styles are off.
+            imagined = [] if self._styles_off else presets
+            presets = [ORIGINAL_PRESET, *LOOK_PRESETS, *imagined]
         self._presets = presets
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
@@ -252,9 +259,15 @@ class CameraWebController:
             "disc-2-reference",
         }:
             selected = "memory-card"
-        # With nothing saved, start on the first style rather than Original.
+        # With nothing saved, start on Random, else the first imagined style, else
+        # Original.
         default = next(
-            (i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id), 0
+            (
+                i
+                for i, p in enumerate(self._presets)
+                if p.id != ORIGINAL_PRESET.id and not is_look(p.id)
+            ),
+            0,
         )
         self._preset_index = next(
             (i for i, p in enumerate(self._presets) if p.id == selected), default
@@ -322,6 +335,7 @@ class CameraWebController:
                     self._poll_actions()
                     self._poll_countdown()
                     self._poll_future()
+                    self._poll_look()
                     self._poll_share()
                     self._sync_retractions()
                     self._start_pending()
@@ -461,9 +475,11 @@ class CameraWebController:
                     self._preset_index = (
                         self._preset_index + (-1 if action == "previous" else 1)
                     ) % len(self._presets)
-                # Keep the saved style while styles are off, so it returns with the key.
-                if not self._styles_off:
-                    self._store.set_setting("presetId", self._presets[self._preset_index].id)
+                chosen = self._presets[self._preset_index].id
+                # Original while styles are off is the fallback, not a choice: keep the
+                # saved style so it returns with the key. Looks chosen then do stick.
+                if not (self._styles_off and chosen == ORIGINAL_PRESET.id):
+                    self._store.set_setting("presetId", chosen)
                 self._publish_locked()
         elif action == "capture":
             # GPIO and keyboard shutter presses share this path. Consume the
@@ -519,7 +535,9 @@ class CameraWebController:
 
     def _resolve_preset(self, preset: Preset) -> Preset:
         if preset.id == "random":
-            return random.choice([p for p in self._presets if p.id not in PICKER_ONLY])
+            return random.choice(
+                [p for p in self._presets if p.id not in PICKER_ONLY and not is_look(p.id)]
+            )
         return preset
 
     def _clear_countdown_locked(self) -> None:
@@ -604,8 +622,6 @@ class CameraWebController:
 
     def _remix(self, values: dict, *, retry: bool) -> None:
         """Add a version to a photo: a new style (Restyle) or another try (Retry)."""
-        if self._styles_off:
-            raise ValueError(self._styles_off)
         self._can_save()
         if retry:
             failed = self._store.get(str(values.get("captureId")))
@@ -620,6 +636,8 @@ class CameraWebController:
             preset_id = values.get("presetId")
         if photo is None or not photo.source_path.is_file():
             raise ValueError("The original photo is unavailable")
+        if self._styles_off and not is_look(preset_id):
+            raise ValueError(self._styles_off)
         if preset_id == ORIGINAL_PRESET.id or (
             preset_id not in {p.id for p in self._presets}
             and not (retry and preset_id in RETIRED_PRESETS)
@@ -641,17 +659,25 @@ class CameraWebController:
         )
 
     def _start_pending(self) -> None:
-        if self._future is not None or self._maintenance:
+        if self._maintenance or (self._future is not None and self._look_future is not None):
             return
         now = time.monotonic()
-        pending = next(
-            (
-                job
-                for job in self._store.pending(MAX_PENDING)
-                if self._retry_after.get(job.capture_id, 0) <= now
-            ),
-            None,
-        )
+        ready = [
+            job
+            for job in self._store.pending(MAX_PENDING)
+            if self._retry_after.get(job.capture_id, 0) <= now
+        ]
+        look = next((job for job in ready if is_look(job.preset_id)), None)
+        if self._look_future is None and look is not None:
+            self._store.mark_uploading(look.capture_id)
+            with self._state_changed:
+                self._look_id = look.capture_id
+                self._look_future = self._look_executor.submit(self._process_job, look)
+                self._gallery_revision += 1
+                self._publish_locked()
+        if self._future is not None:
+            return
+        pending = next((job for job in ready if not is_look(job.preset_id)), None)
         if pending is None:
             return
         self._store.mark_uploading(pending.capture_id)
@@ -665,7 +691,13 @@ class CameraWebController:
     def _process_job(self, job: CaptureJob) -> CaptureOutcome:
         result_path = self._results_dir / f"{job.capture_id}.jpg"
         try:
-            if self._image_model is not None:
+            if is_look(job.preset_id):
+                apply_look(job.preset_id, job.source_path, result_path)
+                generation = Generation(
+                    f"look-{job.capture_id}", job.capture_id, "complete", job.preset_id,
+                    None, None, None,
+                )
+            elif self._image_model is not None:
                 generation = self._transform_locally(job, result_path)
             elif self._client is None:
                 # Simulated processing is intentionally visible for UX verification.
@@ -745,7 +777,7 @@ class CameraWebController:
 
     def _fail_queued(self, reason: str) -> None:
         """Fail waiting versions now rather than call a model that can't answer."""
-        jobs = self._store.pending(MAX_PENDING)
+        jobs = [job for job in self._store.pending(MAX_PENDING) if not is_look(job.preset_id)]
         for job in jobs:
             self._store.mark_failed(job.capture_id, reason)
         if jobs:
@@ -767,6 +799,38 @@ class CameraWebController:
         return Generation(
             f"local-{job.capture_id}", job.capture_id, "complete", job.preset_id, None, None, None
         )
+
+    def _poll_look(self) -> None:
+        if self._look_future is None or not self._look_future.done():
+            return
+        future, capture_id = self._look_future, self._look_id
+        self._look_future, self._look_id = None, None
+        try:
+            job = future.result().job
+        except Exception:
+            LOGGER.exception("Look worker failed")
+            if capture_id:
+                self._store.mark_failed(
+                    capture_id, "Couldn’t finish this photo. Your original is saved."
+                )
+            job = None
+        if job is not None and job.status == "complete":
+            self._last_result_id = job.capture_id
+            self._sound.play("success")
+            self._notify(
+                "success", "Your photo is ready", self._job_preset_name(job), job.capture_id
+            )
+        else:
+            self._sound.play("error")
+            self._notify(
+                "error",
+                "Photo needs attention",
+                (job.error if job else None) or "Use Retry or Restyle",
+                capture_id,
+            )
+        with self._state_changed:
+            self._gallery_revision += 1
+            self._publish_locked()
 
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
@@ -812,7 +876,7 @@ class CameraWebController:
                 self._notify(
                     "error",
                     "Styles are off",
-                    "New photos are saved without a style. See Settings › Device.",
+                    "Original and the looks still work. See Settings › Device.",
                     job.capture_id,
                 )
             else:
@@ -937,7 +1001,12 @@ class CameraWebController:
                 self._publish_locked()
 
     def _power_off(self) -> None:
-        if self._store.counts().get("uploading", 0) or self._future or self._share_future:
+        if (
+            self._store.counts().get("uploading", 0)
+            or self._future
+            or self._look_future
+            or self._share_future
+        ):
             raise ValueError("Wait for processing to finish before shutting down")
         with self._state_changed:
             self._clear_countdown_locked()
@@ -980,7 +1049,11 @@ class CameraWebController:
         retired = RETIRED_PRESETS.get(preset_id)
         # Bundled styles keep their names while styles are off and the rail is empty.
         return next(
-            (p.name for p in (*self._presets, *FALLBACK_PRESETS) if p.id == preset_id),
+            (
+                p.name
+                for p in (*self._presets, *LOOK_PRESETS, *FALLBACK_PRESETS)
+                if p.id == preset_id
+            ),
             retired.name if retired else preset_id,
         )
 
@@ -1030,8 +1103,14 @@ class CameraWebController:
 
     @staticmethod
     def _preset_json(preset: Preset) -> dict:
+        kind = (
+            preset.id
+            if preset.id in PICKER_ONLY
+            else "look" if is_look(preset.id) else "imagined"
+        )
         return {
             "id": preset.id,
+            "kind": kind,
             "name": preset.name,
             "description": preset.description,
             "accent": preset.accent,
@@ -1119,7 +1198,7 @@ class CameraWebController:
     def _check_deletable(self, versions: list[CaptureJob]) -> None:
         if self._maintenance or self._stop.is_set():
             raise ValueError("Camera is restarting or updating. Try again shortly.")
-        busy = {self._processing_id, self._sharing_id}
+        busy = {self._processing_id, self._look_id, self._sharing_id}
         if any(job.status == "uploading" or job.capture_id in busy for job in versions):
             raise ValueError("Wait for this photo to finish processing or sharing before deleting.")
 
@@ -1290,6 +1369,7 @@ class CameraWebController:
             if (
                 self._maintenance
                 or self._future
+                or self._look_future
                 or self._share_future
                 or not self._actions.empty()
                 or counts.get("queued", 0)
@@ -1335,6 +1415,7 @@ class CameraWebController:
         if self._thread is not None:
             self._thread.join(timeout=10)
         self._executor.shutdown(wait=True, cancel_futures=True)
+        self._look_executor.shutdown(wait=True, cancel_futures=True)
         self._share_executor.shutdown(wait=True, cancel_futures=True)
         self._sound.close()
         if self._client is not None:

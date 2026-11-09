@@ -21,9 +21,14 @@ export const photoStatus = (status: string) =>
     queued: "Waiting",
     original: "Original",
   })[status] || status;
-// Picker entries that are not a style a photo can be restyled with.
-export const pickerOnly = (presetId: string) =>
-  presetId === "random" || presetId === "original";
+export const presetIcon = (preset: Preset) =>
+  preset.kind === "random"
+    ? "shuffle"
+    : preset.kind === "original"
+      ? "camera"
+      : preset.kind === "look"
+        ? "look"
+        : "spark";
 const isWaiting = (status: string) => status === "queued" || status === "uploading";
 
 function StatusIcon({ status, shared }: { status: string; shared: boolean }) {
@@ -707,7 +712,7 @@ export function StyleOption({
       aria-pressed={selected}
     >
       <span className="style-swatch" style={{ background: preset.accent }}>
-        <Icon name="spark" size={19} />
+        <Icon name={presetIcon(preset)} size={19} />
       </span>
       <span>
         <strong>{preset.name}</strong>

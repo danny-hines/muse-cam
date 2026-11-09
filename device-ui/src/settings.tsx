@@ -438,8 +438,8 @@ export function Settings({
                   <div>
                     <strong>Styles are off</strong>
                     <p>
-                      {state.stylesOff} Until then, photos are saved without a
-                      style.
+                      {state.stylesOff} Until then, Original and the looks still
+                      work.
                     </p>
                   </div>
                 </div>

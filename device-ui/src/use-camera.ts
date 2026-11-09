@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { CameraAction, CameraState } from "./types";
+import type { CameraAction, CameraState, Preset } from "./types";
 
-const preset = {
+const preset: Preset = {
   id: "starting",
+  kind: "imagined",
   name: "Warming up",
   description: "Getting the camera ready",
   accent: "#ffac71",

@@ -78,14 +78,23 @@ style and makes no API call. Restyle it from the gallery later. A new camera
 starts on Random; the rail remembers the last choice. Connected cameras don't
 offer Original, since event photos are always imagined.
 
+Below Original come five **looks**: Black & White, Warm Film, Faded, Punchy, and
+Vintage. The camera makes these itself with no API call, usually within a few
+seconds, and they don't wait behind a photo the model is still working on. Each
+is a version like any style, so Restyle can add a look to an older photo too. A
+look is saved at about half the sensor's resolution, 2304 × 1296 on a Camera
+Module 3. Random picks only from the model-made styles, which follow the looks
+after a divider. The recipes are in `device/src/musecam/looks.py`.
+
 When no style can run, the camera falls back to Original. That happens when the
 key for the selected provider is missing from `/etc/musecam/device.env`, or when
 the model rejects the key or reports the account out of credit. The first photo
 that hits a rejected key or empty account shows **Styles are off**, and the
-camera makes no more model calls. The rail then offers only Original, Restyle
-and Retry are hidden, versions still waiting fail with the reason, and
-Settings › Device says how to fix it. Styles, and the last one chosen, come back
-when the camera restarts with a working key.
+camera makes no more model calls. The rail then offers only Original and the
+looks, Restyle offers only looks, Retry is hidden, versions still waiting for the
+model fail with the reason, and Settings › Device says how to fix it. Styles come
+back when the camera restarts with a working key, along with the last one chosen
+unless a look was picked since.
 
 Install with `--standalone`. The installer asks for
 the key on the terminal without echoing it; `--api-key-stdin` reads it from

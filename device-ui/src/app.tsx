@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -8,7 +9,7 @@ import {
 import type { CameraState, Notice } from "./types";
 import { useCamera } from "./use-camera";
 import { Icon } from "./icons";
-import { Gallery, PhotoDetail, pickerOnly } from "./gallery";
+import { Gallery, PhotoDetail, presetIcon } from "./gallery";
 import { Settings } from "./settings";
 import { FocusTarget } from "./focus";
 
@@ -114,10 +115,10 @@ export function App() {
   const working = state.queued + (state.processingId ? 1 : 0);
   // An event can give the camera a single style, such as a server-picked Surprise.
   const choosesStyle = state.presets.length > 1;
-  // Random and Original get icons; styles are numbered from 01.
+  // Imagined styles are numbered from 01; Original, looks, and Random get icons.
   const styleNumbers = new Map<string, number>();
   for (const preset of state.presets) {
-    if (!pickerOnly(preset.id)) styleNumbers.set(preset.id, styleNumbers.size + 1);
+    if (preset.kind === "imagined") styleNumbers.set(preset.id, styleNumbers.size + 1);
   }
   const canFocus = connected && state.status === "live" && !state.maintenance;
   return (
@@ -214,42 +215,45 @@ export function App() {
                 </button>
               </div>
               <div className="rail-scroll">
-                {state.presets.map((preset) => (
-                  <button
-                    ref={
-                      preset.id === state.preset.id ? selectedStyle : undefined
-                    }
-                    key={preset.id}
-                    className={
-                      preset.id === state.preset.id
-                        ? "rail-style selected"
-                        : "rail-style"
-                    }
-                    aria-pressed={preset.id === state.preset.id}
-                    disabled={state.status === "countdown" || state.status === "capturing"}
-                    onClick={() =>
-                      void act("select", { presetId: preset.id }).catch(
-                        (error) => report(error.message),
-                      )
-                    }
-                  >
-                    <span
-                      className="style-number"
-                      style={{ color: preset.accent }}
-                    >
-                      {preset.id === "random" ? (
-                        <Icon name="shuffle" size={17} />
-                      ) : preset.id === "original" ? (
-                        <Icon name="camera" size={17} />
-                      ) : (
-                        String(styleNumbers.get(preset.id)).padStart(2, "0")
-                      )}
-                    </span>
-                    <strong>{preset.name}</strong>
-                    {preset.id === state.preset.id && (
-                      <span className="selected-mark" />
+                {state.presets.map((preset, index) => (
+                  <Fragment key={preset.id}>
+                    {/* A line after the looks, where model-made styles begin. */}
+                    {state.presets[index - 1]?.kind === "look" && preset.kind !== "look" && (
+                      <div className="rail-divider" />
                     )}
-                  </button>
+                    <button
+                      ref={
+                        preset.id === state.preset.id ? selectedStyle : undefined
+                      }
+                      className={
+                        preset.id === state.preset.id
+                          ? "rail-style selected"
+                          : "rail-style"
+                      }
+                      aria-pressed={preset.id === state.preset.id}
+                      disabled={state.status === "countdown" || state.status === "capturing"}
+                      onClick={() =>
+                        void act("select", { presetId: preset.id }).catch(
+                          (error) => report(error.message),
+                        )
+                      }
+                    >
+                      <span
+                        className="style-number"
+                        style={{ color: preset.accent }}
+                      >
+                        {preset.kind === "imagined" ? (
+                          String(styleNumbers.get(preset.id)).padStart(2, "0")
+                        ) : (
+                          <Icon name={presetIcon(preset)} size={17} />
+                        )}
+                      </span>
+                      <strong>{preset.name}</strong>
+                      {preset.id === state.preset.id && (
+                        <span className="selected-mark" />
+                      )}
+                    </button>
+                  </Fragment>
                 ))}
               </div>
             </aside>
@@ -278,7 +282,9 @@ export function App() {
             </button>
             <div className="current-style">
               <span className="eyebrow">
-                {state.preset.id === "original" ? "Your next photo" : "Your next imagination"}
+                {state.preset.kind === "original" || state.preset.kind === "look"
+                  ? "Your next photo"
+                  : "Your next imagination"}
               </span>
               <strong>{state.preset.name}</strong>
               <span className="shutter-hint">

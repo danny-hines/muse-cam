@@ -1,5 +1,7 @@
 export type Preset = {
   id: string;
+  // Original and looks are made on the camera; Random picks an imagined style.
+  kind: "original" | "random" | "look" | "imagined";
   name: string;
   description: string;
   accent: string;

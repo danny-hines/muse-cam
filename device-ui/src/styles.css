@@ -383,6 +383,11 @@ svg {
   margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
+.rail-divider {
+  height: 1px;
+  margin: 5px 9px;
+  background: #ffffff1c;
+}
 .rail-style.selected {
   background: #ffffff16;
   border-color: #ffffff20;
