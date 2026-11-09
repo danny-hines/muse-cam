@@ -78,6 +78,15 @@ style and makes no API call. Restyle it from the gallery later. A new camera
 starts on Random; the rail remembers the last choice. Connected cameras don't
 offer Original, since event photos are always imagined.
 
+When no style can run, the camera falls back to Original. That happens when the
+key for the selected provider is missing from `/etc/musecam/device.env`, or when
+the model rejects the key or reports the account out of credit. The first photo
+that hits a rejected key or empty account shows **Styles are off**, and the
+camera makes no more model calls. The rail then offers only Original, Restyle
+and Retry are hidden, versions still waiting fail with the reason, and
+Settings › Device says how to fix it. Styles, and the last one chosen, come back
+when the camera restarts with a working key.
+
 Install with `--standalone`. The installer asks for
 the key on the terminal without echoing it; `--api-key-stdin` reads it from
 standard input instead.

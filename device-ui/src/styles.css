@@ -1287,6 +1287,19 @@ svg {
   font-size: 12px;
   font-weight: 500;
 }
+.styles-off-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-color: #e4b58e55;
+}
+.styles-off-card > svg {
+  flex-shrink: 0;
+  color: #e4b58e;
+}
+.styles-off-card strong {
+  font-size: 13px;
+}
 .battery-card {
   display: flex;
   align-items: center;

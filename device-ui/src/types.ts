@@ -37,6 +37,8 @@ export type CameraState = {
   battery: number | null;
   galleryRevision: number;
   galleryCount: number;
+  // Why a standalone camera can't style photos right now, such as a missing key.
+  stylesOff: string | null;
   latestPhoto: { id: string; thumbnailUrl: string } | null;
   notifications: Notice[];
   lastCaptureId: string | null;

@@ -30,7 +30,9 @@ def wait_until(predicate, timeout: float = 6):
     raise AssertionError("Timed out waiting for camera state")
 
 
-def make_standalone(tmp_path: Path, *, offline: bool = False) -> CameraWebController:
+def make_standalone(
+    tmp_path: Path, *, offline: bool = False, environment: dict[str, str] | None = None
+) -> CameraWebController:
     profiles = Path(__file__).parents[1] / "profiles"
     profile = load_profile("pi3bplus-cam3-dsi43", profiles)
     config = DeviceConfig(
@@ -40,7 +42,7 @@ def make_standalone(tmp_path: Path, *, offline: bool = False) -> CameraWebContro
         data_dir=tmp_path,
         profiles_dir=profiles,
         mode="standalone",
-        environment={"META_API_KEY": API_KEY},
+        environment={"META_API_KEY": API_KEY} if environment is None else environment,
     )
     return CameraWebController(config, profile, simulate=True, offline=offline)
 
@@ -217,6 +219,103 @@ def test_original_takes_a_plain_photo_that_can_be_styled_later(tmp_path: Path) -
             f"/api/versions/{version['id']}/thumbnail?kind=result"
         )
         assert len(requests) == 1
+    finally:
+        controller.close()
+
+
+def queue_versions(controller: CameraWebController, tmp_path: Path, count: int) -> list[str]:
+    ids = []
+    for index in range(count):
+        source = tmp_path / f"waiting-{index}.jpg"
+        source.write_bytes(result_jpeg("gray"))
+        controller._store.enqueue(f"waiting-{index}", "claymation", source)
+        ids.append(f"waiting-{index}")
+    return ids
+
+
+def test_a_camera_without_a_key_takes_plain_photos(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("A camera without a key never calls the model")
+
+    controller = make_standalone(tmp_path, environment={})
+    controller._image_model = meta_api(handler)
+    controller._store.set_setting("presetId", "claymation")
+    waiting = queue_versions(controller, tmp_path, 2)
+    controller.start()
+    try:
+        wait_until(lambda: controller.state()["status"] == "live")
+        state = controller.state()
+        assert [p["id"] for p in state["presets"]] == ["original"]
+        assert state["preset"]["id"] == "original"
+        assert state["stylesOff"].startswith("Add META_API_KEY to /etc/musecam/device.env")
+        # Versions queued before the key went missing fail now instead of waiting forever.
+        assert [controller._store.get(i).status for i in waiting] == ["failed", "failed"]
+        assert controller._store.get(waiting[0]).error == state["stylesOff"]
+        # Versions keep their style's name although the rail no longer lists it.
+        version = controller.version_json(controller._store.get(waiting[0]))
+        assert version["presetName"] == "Tiny Clay World"
+
+        controller.dispatch("capture")
+        wait_until(lambda: controller.state()["galleryCount"] == 3)
+        newest = controller.gallery()["items"][0]
+        assert (newest["status"], newest["versionCount"]) == ("original", 0)
+        with pytest.raises(ValueError, match="Add META_API_KEY"):
+            controller._remix({"photoId": newest["id"], "presetId": "claymation"}, retry=False)
+        with pytest.raises(ValueError, match="Add META_API_KEY"):
+            controller._remix({"captureId": waiting[0]}, retry=True)
+        # The saved style comes back once the camera restarts with a key.
+        controller.dispatch("next")
+        wait_until(lambda: controller._actions.empty())
+        assert controller._store.setting("presetId") == "claymation"
+    finally:
+        controller.close()
+
+    restarted = make_standalone(tmp_path)
+    restarted._load_presets()
+    assert restarted.state()["preset"]["id"] == "claymation"
+    assert restarted.state()["stylesOff"] is None
+
+
+@pytest.mark.parametrize(
+    ("status", "error", "reason"),
+    (
+        (401, {"code": "invalid_api_key", "message": "bad"}, "The API key was rejected"),
+        (429, {"code": "insufficient_quota", "message": "quota"}, "out of credit"),
+    ),
+)
+def test_a_broken_key_turns_styles_off_until_restart(
+    tmp_path: Path, status: int, error: dict, reason: str
+) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(status, json={"error": error})
+
+    controller = make_standalone(tmp_path)
+    controller._image_model = meta_api(handler)
+    controller._store.set_setting("presetId", "claymation")
+    waiting = queue_versions(controller, tmp_path, 3)
+    controller.start()
+    try:
+        wait_until(lambda: controller.state()["stylesOff"])
+        wait_until(lambda: not controller._store.pending())
+        state = controller.state()
+        assert reason in state["stylesOff"]
+        assert state["stylesOff"].endswith("then restart the camera.")
+        # One call finds the problem; the rest of the queue fails without calling.
+        assert len(requests) == 1
+        assert {controller._store.get(i).status for i in waiting} == {"failed"}
+        assert [p["id"] for p in state["presets"]] == ["original"]
+        wait_until(lambda: controller.state()["notifications"])
+        notice = controller.state()["notifications"][-1]
+        assert (notice["kind"], notice["title"]) == ("error", "Styles are off")
+
+        controller.dispatch("capture")
+        wait_until(lambda: controller.state()["galleryCount"] == 4)
+        assert controller.gallery()["items"][0]["versionCount"] == 0
+        assert len(requests) == 1
+        assert controller._store.setting("presetId") == "claymation"
     finally:
         controller.close()
 

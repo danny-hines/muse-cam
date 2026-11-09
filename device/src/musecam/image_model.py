@@ -47,12 +47,31 @@ STYLE_PROMPTS = {
 
 
 class ImageModelError(Exception):
-    """A gallery-ready message. ``retry`` keeps the photo queued for another attempt."""
+    """A gallery-ready message. ``retry`` keeps the photo queued for another attempt.
 
-    def __init__(self, message: str, *, retry: bool = False) -> None:
+    ``account`` means no style can work until the key or account is fixed: the key
+    is missing or rejected, or the account is out of credit.
+    """
+
+    def __init__(self, message: str, *, retry: bool = False, account: bool = False) -> None:
         super().__init__(message)
         self.message = message
         self.retry = retry
+        self.account = account
+
+
+def missing_key_message(provider: str) -> str:
+    return f"Add {API_KEY_NAMES[provider]} to /etc/musecam/device.env, then restart the camera."
+
+
+def styles_unavailable(config: DeviceConfig, *, offline: bool = False) -> str | None:
+    """Why a standalone camera can't style photos at all, known before any call."""
+    provider = "mock" if offline else config.model_provider
+    if not config.standalone or provider not in API_KEY_NAMES:
+        return None
+    if config.environment.get(API_KEY_NAMES[provider]):
+        return None
+    return missing_key_message(provider)
 
 
 class ImageModel(Protocol):
@@ -84,10 +103,15 @@ def _status_error(provider: str, status: int, payload: Any) -> ImageModelError:
     message, code = _error_message(payload)
     if status in {401, 403}:
         return ImageModelError(
-            f"The API key was rejected. Check {API_KEY_NAMES[provider]} in /etc/musecam/device.env."
+            f"The API key was rejected. Check {API_KEY_NAMES[provider]} in "
+            "/etc/musecam/device.env, then restart the camera.",
+            account=True,
         )
     if code == "insufficient_quota":
-        return ImageModelError("The API account is out of credit.")
+        return ImageModelError(
+            "The API account is out of credit. Add credit, then restart the camera.",
+            account=True,
+        )
     if status in {408, 409, 429} or status >= 500:
         return ImageModelError(BUSY_MESSAGE, retry=True)
     detail = (message or "").lower()
@@ -118,10 +142,7 @@ class _HttpImageModel:
 
     def _require_key(self) -> None:
         if not self._api_key:
-            name = API_KEY_NAMES[self.provider]
-            raise ImageModelError(
-                f"Add {name} to /etc/musecam/device.env, then restart the camera."
-            )
+            raise ImageModelError(missing_key_message(self.provider), account=True)
 
     def _image(self, response: httpx.Response) -> bytes:
         payload = _json(response)

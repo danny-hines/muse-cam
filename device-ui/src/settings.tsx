@@ -432,6 +432,18 @@ export function Settings({
                   </strong>
                 </div>
               </div>
+              {state.stylesOff && (
+                <div className="setting-card styles-off-card" role="status">
+                  <Icon name="spark" size={28} />
+                  <div>
+                    <strong>Styles are off</strong>
+                    <p>
+                      {state.stylesOff} Until then, photos are saved without a
+                      style.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="setting-card battery-card">
                 <Icon name="battery" size={28} />
                 <div>

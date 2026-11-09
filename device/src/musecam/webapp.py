@@ -34,7 +34,12 @@ from .battery import create_battery
 from .camera import Camera, FocusState, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
-from .image_model import ImageModelError, create_image_model, style_prompt
+from .image_model import (
+    ImageModelError,
+    create_image_model,
+    style_prompt,
+    styles_unavailable,
+)
 from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
@@ -141,6 +146,10 @@ class CameraWebController:
         self._image_model = (
             create_image_model(config, offline=offline) if self._standalone else None
         )
+        # Why no style can run, such as a missing or rejected key. The camera then
+        # saves plain photos until it restarts with a working key.
+        self._styles_off = styles_unavailable(config, offline=offline)
+        self._announce_styles_off = False
         self._camera: Camera = create_camera(profile, simulate=simulate)
         self._battery = create_battery(profile.battery_telemetry and not simulate)
         self._system = DeviceSystem(config.data_dir, simulate=simulate)
@@ -202,6 +211,8 @@ class CameraWebController:
 
     def start(self) -> None:
         self._load_presets()
+        if self._styles_off:
+            self._fail_queued(self._styles_off)
         self._thread = threading.Thread(target=self._run, name="musecam-camera", daemon=True)
         self._thread.start()
         self._buttons = HardwareButtons(self._profile, self.dispatch, simulate=self._simulate)
@@ -227,7 +238,9 @@ class CameraWebController:
         # A single style, such as an event's server-picked Surprise, needs no Random
         # entry, and the interface hides the picker.
         presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
-        self._presets = [ORIGINAL_PRESET, *presets] if self._standalone else presets
+        if self._standalone:
+            presets = [ORIGINAL_PRESET] if self._styles_off else [ORIGINAL_PRESET, *presets]
+        self._presets = presets
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
             selected = "age-of-legends"
@@ -240,7 +253,9 @@ class CameraWebController:
         }:
             selected = "memory-card"
         # With nothing saved, start on the first style rather than Original.
-        default = next(i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id)
+        default = next(
+            (i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id), 0
+        )
         self._preset_index = next(
             (i for i, p in enumerate(self._presets) if p.id == selected), default
         )
@@ -446,7 +461,9 @@ class CameraWebController:
                     self._preset_index = (
                         self._preset_index + (-1 if action == "previous" else 1)
                     ) % len(self._presets)
-                self._store.set_setting("presetId", self._presets[self._preset_index].id)
+                # Keep the saved style while styles are off, so it returns with the key.
+                if not self._styles_off:
+                    self._store.set_setting("presetId", self._presets[self._preset_index].id)
                 self._publish_locked()
         elif action == "capture":
             # GPIO and keyboard shutter presses share this path. Consume the
@@ -587,6 +604,8 @@ class CameraWebController:
 
     def _remix(self, values: dict, *, retry: bool) -> None:
         """Add a version to a photo: a new style (Restyle) or another try (Retry)."""
+        if self._styles_off:
+            raise ValueError(self._styles_off)
         self._can_save()
         if retry:
             failed = self._store.get(str(values.get("captureId")))
@@ -692,6 +711,8 @@ class CameraWebController:
                 self._store.mark_queued(job.capture_id, error.message)
                 return CaptureOutcome(self._store.get(job.capture_id) or job, None, queued=True)
             self._store.mark_failed(job.capture_id, error.message)
+            if error.account:
+                self._turn_styles_off(error.message)
         except httpx.TransportError:
             self._store.mark_queued(
                 job.capture_id, "Connection interrupted. Saved for automatic retry."
@@ -711,7 +732,30 @@ class CameraWebController:
             )
         return CaptureOutcome(self._store.get(job.capture_id) or job, None)
 
+    def _turn_styles_off(self, reason: str) -> None:
+        """The key or account can't make images: save plain photos until a restart."""
+        with self._state_changed:
+            if self._styles_off:
+                return
+            self._styles_off = reason
+            self._announce_styles_off = True
+            self._load_presets()
+            self._publish_locked()
+        self._fail_queued(reason)
+
+    def _fail_queued(self, reason: str) -> None:
+        """Fail waiting versions now rather than call a model that can't answer."""
+        jobs = self._store.pending(MAX_PENDING)
+        for job in jobs:
+            self._store.mark_failed(job.capture_id, reason)
+        if jobs:
+            with self._state_changed:
+                self._gallery_revision += 1
+                self._publish_locked()
+
     def _transform_locally(self, job: CaptureJob, result_path: Path) -> Generation:
+        if self._styles_off:
+            raise ImageModelError(self._styles_off, account=True)
         image = self._image_model.transform(
             job.source_path.read_bytes(), style_prompt(job.preset_id)
         )
@@ -762,6 +806,15 @@ class CameraWebController:
                         job.error or "Waiting for connection",
                         job.capture_id,
                     )
+            elif self._announce_styles_off:
+                self._announce_styles_off = False
+                self._sound.play("error")
+                self._notify(
+                    "error",
+                    "Styles are off",
+                    "New photos are saved without a style. See Settings › Device.",
+                    job.capture_id,
+                )
             else:
                 self._sound.play("error")
                 self._notify(
@@ -925,8 +978,9 @@ class CameraWebController:
 
     def _preset_name(self, preset_id: str) -> str:
         retired = RETIRED_PRESETS.get(preset_id)
+        # Bundled styles keep their names while styles are off and the rail is empty.
         return next(
-            (p.name for p in self._presets if p.id == preset_id),
+            (p.name for p in (*self._presets, *FALLBACK_PRESETS) if p.id == preset_id),
             retired.name if retired else preset_id,
         )
 
@@ -968,6 +1022,7 @@ class CameraWebController:
                 "processingSound": self._sound.processing_enabled,
                 "maintenance": self._maintenance,
                 "canShare": not self._standalone,
+                "stylesOff": self._styles_off,
                 "simulate": self._simulate,
                 "revision": self._revision,
                 "sessionId": self._session_id,

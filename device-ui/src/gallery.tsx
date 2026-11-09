@@ -430,7 +430,7 @@ export function PhotoDetail({
                 Hold
               </button>
             )}
-            {version?.status === "failed" && (
+            {version?.status === "failed" && !state.stylesOff && (
               <button
                 className="glass-button"
                 disabled={pending}
