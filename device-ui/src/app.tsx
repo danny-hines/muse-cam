@@ -194,14 +194,6 @@ export function App() {
               </button>
               <button
                 className="glass-button square"
-                aria-label="Open gallery"
-                disabled={state.status === "countdown"}
-                onClick={() => navigate("gallery")}
-              >
-                <Icon name="gallery" />
-              </button>
-              <button
-                className="glass-button square"
                 aria-label="Open settings"
                 disabled={state.status === "countdown"}
                 onClick={() => navigate("settings")}
@@ -263,6 +255,27 @@ export function App() {
             </aside>
           )}
           <footer className="camera-footer">
+            <button
+              className="roll-button"
+              aria-label={
+                state.galleryCount
+                  ? `Open gallery, ${state.galleryCount} ${state.galleryCount === 1 ? "photo" : "photos"}`
+                  : "Open gallery"
+              }
+              disabled={state.status === "countdown"}
+              onClick={() => navigate("gallery")}
+            >
+              {state.latestPhoto ? (
+                <img
+                  key={state.latestPhoto.thumbnailUrl}
+                  src={state.latestPhoto.thumbnailUrl}
+                  alt=""
+                  draggable={false}
+                />
+              ) : (
+                <Icon name="gallery" />
+              )}
+            </button>
             <div className="current-style">
               <span className="eyebrow">
                 {state.preset.id === "original" ? "Your next photo" : "Your next imagination"}

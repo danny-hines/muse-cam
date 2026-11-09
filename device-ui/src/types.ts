@@ -37,6 +37,7 @@ export type CameraState = {
   battery: number | null;
   galleryRevision: number;
   galleryCount: number;
+  latestPhoto: { id: string; thumbnailUrl: string } | null;
   notifications: Notice[];
   lastCaptureId: string | null;
   volume: number;

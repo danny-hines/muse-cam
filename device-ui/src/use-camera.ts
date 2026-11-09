@@ -27,6 +27,7 @@ const FALLBACK: CameraState = {
   battery: null,
   galleryRevision: 0,
   galleryCount: 0,
+  latestPhoto: null,
   notifications: [],
   lastCaptureId: null,
   volume: 35,

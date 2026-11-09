@@ -961,6 +961,7 @@ class CameraWebController:
                 },
                 "galleryRevision": self._gallery_revision,
                 "galleryCount": self._store.photo_counts()["all"],
+                "latestPhoto": self._latest_photo(),
                 "notifications": list(self._notifications),
                 "lastCaptureId": self._last_capture_id,
                 "volume": self._sound.volume,
@@ -1030,6 +1031,15 @@ class CameraWebController:
             "thumbnailUrl": cover_json["thumbnailUrl"] if cover_json
             else f"/api/gallery/{photo.photo_id}/thumbnail",
         }
+
+    def _latest_photo(self) -> dict | None:
+        """The newest photo, for the camera screen's gallery button."""
+        photos = self._store.photos(limit=1)
+        if not photos:
+            return None
+        photo = photos[0]
+        item = self.photo_json(photo, self._store.versions([photo.photo_id])[photo.photo_id])
+        return {"id": item["id"], "thumbnailUrl": item["thumbnailUrl"]}
 
     def gallery(self, offset: int = 0, status: str = "all") -> dict:
         photos = self._store.photos(limit=40, offset=offset, status=status)

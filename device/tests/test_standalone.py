@@ -185,11 +185,17 @@ def test_original_takes_a_plain_photo_that_can_be_styled_later(tmp_path: Path) -
     controller.start()
     try:
         wait_until(lambda: controller.state()["status"] == "live")
+        assert controller.state()["latestPhoto"] is None
         controller.dispatch("select", {"presetId": "original"})
         controller.dispatch("capture")
         wait_until(lambda: controller.state()["galleryCount"] == 1)
         [item] = controller.gallery()["items"]
         assert (item["status"], item["cover"], item["versionCount"]) == ("original", None, 0)
+        # The camera screen's gallery button shows the newest photo.
+        assert controller.state()["latestPhoto"] == {
+            "id": item["id"],
+            "thumbnailUrl": f"/api/gallery/{item['id']}/thumbnail",
+        }
         assert controller._store.counts() == {}
         notice = controller.state()["notifications"][-1]
         assert (notice["captureId"], notice["photoId"]) == (None, item["id"])
@@ -207,6 +213,9 @@ def test_original_takes_a_plain_photo_that_can_be_styled_later(tmp_path: Path) -
         [version] = detail["versions"]
         assert version["presetId"] == "claymation"
         assert detail["cover"]["id"] == version["id"]
+        assert controller.state()["latestPhoto"]["thumbnailUrl"] == (
+            f"/api/versions/{version['id']}/thumbnail?kind=result"
+        )
         assert len(requests) == 1
     finally:
         controller.close()
