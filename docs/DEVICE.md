@@ -124,7 +124,7 @@ by root, readable by the `musecam` group, and mode 0640:
 | `MUSECAM_MODE` | `standalone`. Without it, the camera is connected. |
 | `MUSECAM_MODEL_PROVIDER` | `meta` (Muse Image, the default), `openai`, or `mock` for a no-cost test tint. |
 | `META_API_KEY` / `OPENAI_API_KEY` | The key for the selected provider. |
-| `MUSECAM_MODEL_ID` | Optional model override. Defaults: `muse-image-1.0` and `gpt-image-2.5-flare`. |
+| `MUSECAM_MODEL_ID` | Optional model override. Defaults: `muse-image-1.0` and `gpt-image-2.6-flare`. |
 
 The key is used only by the camera service. It is never passed on a command line,
 written to logs, or returned to the touchscreen interface. To change a setting,

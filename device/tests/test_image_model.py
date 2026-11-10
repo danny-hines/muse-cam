@@ -215,4 +215,4 @@ def test_description_reports_the_key_without_revealing_it(tmp_path: Path) -> Non
     }
     assert "m-secret-value" not in json.dumps(present)
     assert missing["apiKey"] == "OPENAI_API_KEY is missing"
-    assert missing["model"] == "gpt-image-2.5-flare"
+    assert missing["model"] == "gpt-image-2.6-flare"

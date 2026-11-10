@@ -22,7 +22,7 @@ from .config import DeviceConfig
 META_IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 META_IMAGE_MODEL = "muse-image-1.0"
 OPENAI_IMAGE_EDIT_URL = "https://api.openai.com/v1/images/edits"
-OPENAI_IMAGE_MODEL = "gpt-image-2.5-flare"
+OPENAI_IMAGE_MODEL = "gpt-image-2.6-flare"
 API_KEY_NAMES = {"meta": "META_API_KEY", "openai": "OPENAI_API_KEY"}
 DEFAULT_MODELS = {"meta": META_IMAGE_MODEL, "openai": OPENAI_IMAGE_MODEL, "mock": "mock"}
 TIMEOUT = httpx.Timeout(240.0, connect=20.0)
