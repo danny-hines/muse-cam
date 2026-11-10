@@ -269,7 +269,7 @@ pages, and stops at either end. The arrow buttons provide the same navigation.
 Pinch a gallery photo to zoom from 1× to 4×, then drag with one finger to pan;
 swipes only change photos when zoomed out.
 Double-tap to switch between 2× and the full photo, or tap **Fit** to reset.
-A stationary hold (or the **Hold** button) compares the original at the same zoom;
+A stationary hold compares the original at the same zoom;
 moving or adding a second finger cancels comparison. Original-only photos also
 support zoom, and opening a different photo resets the view. With the viewer
 focused, left/right arrows browse while zoomed out, `+`/`-` adjust zoom, and `0` fits the photo.

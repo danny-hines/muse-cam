@@ -470,34 +470,12 @@ export function PhotoDetail({
                 ? version.error
                 : version?.edit
                   ? editSummary(version.edit, filterName)
-                : resultUrl
-                  ? "Swipe to browse · Pinch to zoom · Hold for original"
-                  : version
-                    ? "Swipe to browse · Pinch to zoom · Original saved"
-                    : "Swipe to browse · Pinch to zoom"}
+                : version && !resultUrl
+                  ? "Swipe to browse · Pinch to zoom · Original saved"
+                  : "Swipe to browse · Pinch to zoom"}
             </p>
           </div>
           <div className="detail-actions">
-            {resultUrl && (
-              <button
-                className="glass-button"
-                aria-label="Hold to view original"
-                onPointerDown={(event) => {
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  setOriginal(true);
-                }}
-                onPointerUp={() => setOriginal(false)}
-                onPointerCancel={() => setOriginal(false)}
-                onLostPointerCapture={() => setOriginal(false)}
-                onKeyDown={(event) => {
-                  if (event.key === " ") setOriginal(true);
-                }}
-                onKeyUp={() => setOriginal(false)}
-              >
-                <Icon name="eye" />
-                Hold
-              </button>
-            )}
             {version?.status === "failed" && !state.stylesOff && (
               <button
                 className="glass-button"
