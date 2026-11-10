@@ -133,6 +133,7 @@ def test_openai_sends_the_photo_as_a_multipart_edit() -> None:
     assert b'name="model"\r\n\r\ngpt-image-custom' in body
     assert b'name="prompt"\r\n\r\n' + STYLE.prompt.encode() in body
     assert b'name="image"; filename="photo.jpg"' in body
+    assert b"input_fidelity" not in body
     assert jpeg() in body
 
 

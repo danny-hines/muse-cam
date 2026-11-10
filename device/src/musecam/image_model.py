@@ -222,9 +222,8 @@ class OpenAIImage(_HttpImageModel):
                 "model": self.model,
                 "prompt": style.prompt,
                 "n": "1",
+                # No input_fidelity: the Flare models answer 400 to it.
                 "output_format": "jpeg",
-                # Keep faces and composition close to the photo, as the prompts ask.
-                "input_fidelity": "high",
             },
             files={"image": ("photo.jpg", image, "image/jpeg")},
         )
