@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#101211">
+<title>Muse Cam photos</title>
+<style>
+  :root {
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #f4f1e9;
+    background: #101211;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; min-height: 100vh; }
+  h1, p { margin: 0; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    padding-top: max(14px, env(safe-area-inset-top));
+    background: #101211ee;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #ffffff0e;
+  }
+  header > div { margin-right: auto; min-width: 0; }
+  h1 { font-size: 20px; font-weight: 600; white-space: nowrap; }
+  .muted { font-size: 13px; color: #a5b0a7; margin-top: 3px; }
+  .button {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    background: #171b1d;
+    border: 1px solid #ffffff24;
+  }
+  .button.primary { background: #f8b17d; color: #24211d; border-color: #ffc59a; }
+  main { padding: 12px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  .tile {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1b1f1d;
+  }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile span {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #101211cc;
+  }
+  .note { padding: 48px 20px; text-align: center; color: #a5b0a7; line-height: 1.5; }
+  .more { display: flex; justify-content: center; padding: 18px 0 6px; }
+  [hidden] { display: none !important; }
+  .viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    background: #0b0c0c;
+  }
+  .viewer-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .viewer-top div { margin-right: auto; min-width: 0; }
+  .viewer-top h1 { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .stage img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    -webkit-touch-callout: default;
+    user-select: auto;
+    -webkit-user-select: auto;
+  }
+  .versions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .versions::-webkit-scrollbar { display: none; }
+  .versions button {
+    flex: none;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #1b1f1d;
+    border: 1px solid #ffffff1c;
+  }
+  .versions button[aria-pressed="true"] { background: #f4f1e9; color: #171b1d; }
+  .viewer-bottom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  .viewer-bottom p { flex: 1; font-size: 12px; color: #a5b0a7; line-height: 1.4; margin: 0; }
+  @media (hover: hover) and (pointer: fine) { .touch-only { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Muse Cam photos</h1>
+    <p class="muted" id="summary">Loading…</p>
+  </div>
+  <a class="button" id="all" href="all.zip" hidden>Download all</a>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+  <p class="note" id="note" hidden></p>
+  <div class="more"><button class="button" id="more" hidden>Show more</button></div>
+</main>
+<section class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Photo" hidden>
+  <div class="viewer-top">
+    <div>
+      <h1 id="viewer-name"></h1>
+      <p class="muted" id="viewer-date"></p>
+    </div>
+    <button class="button" id="close">Close</button>
+  </div>
+  <div class="stage"><img id="photo" alt=""></div>
+  <div class="versions" id="versions"></div>
+  <div class="viewer-bottom">
+    <p><span class="touch-only">To save to your photo library, touch and hold the photo.</span></p>
+    <a class="button primary" id="save" download>Download</a>
+  </div>
+</section>
+<script>
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const address = (image, size) => `${image.base}/${size}?v=${image.v}`;
+  const megabytes = (bytes) =>
+    bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+  const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+  let next = 0;
+
+  function closed() {
+    // The camera stops answering when its Get photos screen closes.
+    $("note").textContent =
+      "The camera has stopped sharing its photos. Open Get photos on the camera and scan the new code.";
+    $("note").hidden = false;
+    $("more").hidden = true;
+    $("all").hidden = true;
+  }
+
+  function show(photo, index) {
+    const image = photo.images[index];
+    $("photo").src = address(image, "full");
+    $("viewer-name").textContent = image.name;
+    $("viewer-date").textContent = day.format(new Date(photo.createdAt));
+    $("save").href = address(image, "save");
+    const versions = $("versions");
+    versions.replaceChildren();
+    versions.hidden = photo.images.length < 2;
+    photo.images.forEach((other, position) => {
+      const button = document.createElement("button");
+      button.textContent = other.name;
+      button.setAttribute("aria-pressed", String(position === index));
+      button.onclick = () => show(photo, position);
+      versions.append(button);
+    });
+  }
+
+  function open(photo) {
+    show(photo, 0);
+    $("viewer").hidden = false;
+    document.body.style.overflow = "hidden";
+    history.pushState({ viewer: true }, "");
+  }
+
+  function close() {
+    $("viewer").hidden = true;
+    $("photo").removeAttribute("src");
+    document.body.style.overflow = "";
+  }
+
+  // The phone's back button closes the photo instead of leaving the page.
+  window.addEventListener("popstate", close);
+  $("close").onclick = () => history.back();
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("viewer").hidden) history.back();
+  });
+
+  async function load() {
+    $("more").disabled = true;
+    let page;
+    try {
+      const response = await fetch(`photos?offset=${next}`);
+      if (!response.ok) throw new Error();
+      page = await response.json();
+    } catch {
+      closed();
+      return;
+    }
+    if (page.total) {
+      const { photos, images, bytes } = page.total;
+      $("summary").textContent = photos
+        ? `${photos} ${photos === 1 ? "photo" : "photos"} · tap to save`
+        : "No photos yet";
+      if (!photos) {
+        $("note").textContent = "Photos you take with the camera show up here.";
+        $("note").hidden = false;
+      }
+      $("all").title = `One ZIP file, ${megabytes(bytes)}`;
+      $("all").hidden = !images;
+    }
+    for (const photo of page.items) {
+      const tile = document.createElement("button");
+      tile.className = "tile";
+      const image = document.createElement("img");
+      image.loading = "lazy";
+      image.alt = `${photo.images[0].name}, ${day.format(new Date(photo.createdAt))}`;
+      image.src = address(photo.images[0], "thumb");
+      tile.append(image);
+      if (photo.images.length > 1) {
+        const count = document.createElement("span");
+        count.textContent = photo.images.length;
+        count.title = `${photo.images.length} versions`;
+        tile.append(count);
+      }
+      tile.onclick = () => open(photo);
+      $("grid").append(tile);
+    }
+    next = page.nextOffset;
+    $("more").hidden = next === null;
+    $("more").disabled = false;
+  }
+
+  $("more").onclick = load;
+  load();
+</script>
+</body>
+</html>

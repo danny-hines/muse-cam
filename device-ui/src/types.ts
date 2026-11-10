@@ -56,6 +56,8 @@ export type CameraState = {
   canShare: boolean;
   // Standalone cameras edit photos; Edited versions can't be shared.
   canEdit: boolean;
+  // Standalone cameras hand photos to a phone over Wi-Fi.
+  canTransfer: boolean;
   filters: Filter[];
   simulate: boolean;
   revision: number;

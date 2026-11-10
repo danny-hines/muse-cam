@@ -151,6 +151,30 @@ sudo -u musecam /opt/muse-cam/.venv/bin/musecam --config /etc/musecam/device.env
   submit /path/to/photo.jpg --preset alien-visitor --output /tmp/muse-test.jpg
 ```
 
+### Getting photos off a standalone camera
+
+A standalone camera has no web gallery, so its photos go to a phone or computer
+over Wi-Fi. In the gallery, tap **Get photos**. The screen shows a QR code and an
+address. Put the phone on the same Wi-Fi as the camera (a phone's own hotspot
+works, with the camera joined to it in Settings), scan the code, and the phone's
+browser opens the camera's photos: every original and every finished version.
+Tap a photo and touch and hold it to save it to the photo library, or use
+**Download**. **Download all** sends one ZIP file, which suits a computer.
+
+While that screen is open, and only then, the camera serves a second, read-only
+page on port 8081 of its Wi-Fi address (`musecam serve --transfer-port` changes
+it). Every address on it starts with a random code that is new each time the
+screen opens, so a device needs the QR code or the typed address to see anything;
+without it every request is a 404. The page can list and download photos and
+nothing else: it cannot delete, edit, or reach settings. Tapping **Done**, leaving
+the screen, or restarting the camera closes it, and it also closes by itself
+about 30 seconds after the screen stops showing. The page is plain HTTP, so use
+it on a network you trust; anyone on that Wi-Fi who sees the code can view the
+photos while it is open. Networks that keep devices apart from each other (many
+hotel and guest networks) block it; use a phone hotspot there. Connected cameras
+don't have this screen, because their roll holds guests' photos and they share
+through the web gallery instead.
+
 `doctor` reports the provider, model, and whether the key is set. To connect a
 standalone camera to a Muse Cam server later, rerun the installer with
 `--claim YOUR-SETUP-CODE`.
@@ -388,4 +412,6 @@ lookup with Ctrl+C. Use `ssh -6` with the hostname or its current link-local IPv
 address and the Mac interface suffix (for example `%en0`) when IPv4 is unavailable.
 
 The camera UI listens only on `127.0.0.1:8080` on the Pi. Access from a workstation
-requires an SSH tunnel; discovering its LAN address does not expose the UI there.
+requires an SSH tunnel; discovering its LAN address does not expose the UI there. The one
+exception is the read-only [Get photos page](#getting-photos-off-a-standalone-camera)
+of a standalone camera, which listens on port 8081 only while that screen is open.

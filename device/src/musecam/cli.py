@@ -55,6 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8080)
+    serve.add_argument(
+        "--transfer-port",
+        type=int,
+        default=8081,
+        help="Port the Get photos page uses on the network while it is open",
+    )
 
     doctor = subcommands.add_parser("doctor", help="Check camera, display, GPIO, storage, and API")
     doctor.add_argument("--profile", help="Override MUSECAM_PROFILE")
@@ -238,6 +244,7 @@ def _run_web_app(args: argparse.Namespace) -> int:
         offline=args.offline,
         host=args.host,
         port=args.port,
+        transfer_port=args.transfer_port,
     )
     return 0
 

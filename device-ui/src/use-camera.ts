@@ -38,6 +38,7 @@ const FALLBACK: CameraState = {
   maintenance: false,
   canShare: true,
   canEdit: false,
+  canTransfer: false,
   filters: [],
   simulate: false,
   revision: 0,

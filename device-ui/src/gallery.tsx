@@ -13,6 +13,7 @@ import { api } from "./use-camera";
 import { Icon } from "./icons";
 import { PhotoViewer } from "./photo-viewer";
 import { Editor } from "./editor";
+import { Transfer } from "./transfer";
 import { editSummary } from "./edit-math";
 
 type Act = (action: CameraAction, values?: object) => Promise<unknown>;
@@ -96,6 +97,7 @@ export function Gallery({
     nextOffset: null,
   });
   const [loading, setLoading] = useState(true);
+  const [transferring, setTransferring] = useState(false);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -155,7 +157,18 @@ export function Gallery({
             </p>
           )}
         </div>
-        <Icon name="gallery" />
+        {state.canTransfer ? (
+          <button
+            className="glass-button"
+            disabled={state.galleryCount === 0}
+            onClick={() => setTransferring(true)}
+          >
+            <Icon name="share" size={18} />
+            Get photos
+          </button>
+        ) : (
+          <Icon name="gallery" />
+        )}
       </header>
       <nav className="filter-row" aria-label="Filter photos">
         {[
@@ -212,6 +225,7 @@ export function Gallery({
           </button>
         )}
       </div>
+      {transferring && <Transfer onClose={() => setTransferring(false)} />}
     </section>
   );
 }

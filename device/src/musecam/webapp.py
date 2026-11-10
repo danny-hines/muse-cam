@@ -48,6 +48,7 @@ from .image_model import (
 from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
+from .transfer import PhotoTransfer
 
 LOGGER = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).with_name("static")
@@ -1049,6 +1050,9 @@ class CameraWebController:
                 "canShare": not self._standalone,
                 # Edited versions can't be shared, so only standalone cameras edit.
                 "canEdit": self._standalone,
+                # A standalone camera's photos go to a phone over Wi-Fi. A connected
+                # camera shares them through the gallery, and its roll holds guests' photos.
+                "canTransfer": self._standalone,
                 "filters": [{"id": p.id, "name": p.name} for p in FILTER_PRESETS],
                 "stylesOff": self._styles_off,
                 "simulate": self._simulate,
@@ -1676,15 +1680,39 @@ async def _system(request: web.Request) -> web.Response:
     return web.json_response(result, headers={"Cache-Control": "no-store"})
 
 
+async def _transfer(request: web.Request) -> web.Response:
+    transfer: PhotoTransfer = request.app["transfer"]
+    if not request.app["controller"]._standalone:
+        raise web.HTTPNotFound()
+    action = request.match_info.get("action")
+    if action is None:
+        result = transfer.status()
+    elif action == "start":
+        result = await transfer.start()
+    elif action == "stop":
+        result = await transfer.stop()
+    else:
+        raise web.HTTPNotFound()
+    return web.json_response(result, headers={"Cache-Control": "no-store"})
+
+
 async def _index(_: web.Request) -> web.StreamResponse:
     if not (STATIC_DIR / "index.html").is_file():
         raise web.HTTPServiceUnavailable(text="Camera UI has not been built")
     return web.FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
-def create_web_app(controller: CameraWebController) -> web.Application:
+def create_web_app(
+    controller: CameraWebController, *, transfer_port: int = 8081
+) -> web.Application:
     app = web.Application(middlewares=[local_requests], client_max_size=8192)
     app["controller"] = controller
+    transfer = app["transfer"] = PhotoTransfer(controller, port=transfer_port)
+
+    async def close_transfer(_: web.Application) -> None:
+        await transfer.stop()
+
+    app.on_shutdown.append(close_transfer)
 
     async def stop_streams(_: web.Application) -> None:
         # End persistent SSE/MJPEG responses before aiohttp waits for connections.
@@ -1713,6 +1741,8 @@ def create_web_app(controller: CameraWebController) -> web.Application:
     app.router.add_post("/api/settings", _settings)
     app.router.add_post("/api/sound", _sound)
     app.router.add_post("/api/system/{action}", _system)
+    app.router.add_get("/api/transfer", _transfer)
+    app.router.add_post("/api/transfer/{action}", _transfer)
     if (STATIC_DIR / "assets").is_dir():
         app.router.add_static("/assets", STATIC_DIR / "assets")
     return app
@@ -1726,10 +1756,16 @@ def run_web_app(
     offline: bool,
     host: str,
     port: int,
+    transfer_port: int = 8081,
 ) -> None:
     controller = CameraWebController(config, profile, simulate=simulate, offline=offline)
     controller.start()
     try:
-        web.run_app(create_web_app(controller), host=host, port=port, print=None)
+        web.run_app(
+            create_web_app(controller, transfer_port=transfer_port),
+            host=host,
+            port=port,
+            print=None,
+        )
     finally:
         controller.close()
