@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import time
 from dataclasses import dataclass
 from importlib.resources import files
@@ -18,6 +19,8 @@ import httpx
 from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps
 
 from .config import DeviceConfig
+
+LOG = logging.getLogger(__name__)
 
 META_IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 META_IMAGE_MODEL = "muse-image-1.0"
@@ -87,27 +90,39 @@ def style_prompt(preset_id: str) -> StylePrompt:
     return style
 
 
-def _error_message(payload: Any) -> tuple[str | None, str | None]:
+# OpenAI has sent the out-of-credit error as the code and, with a newer code, as the type.
+OUT_OF_CREDIT = {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}
+
+
+def _error_message(payload: Any) -> tuple[str | None, set[str]]:
+    """The provider's message, and its error code and type."""
     error = payload.get("error") if isinstance(payload, dict) else None
     if not isinstance(error, dict):
-        return None, None
+        return None, set()
     message = error.get("message")
-    code = error.get("code")
     return (
         message if isinstance(message, str) else None,
-        code if isinstance(code, str) else None,
+        {kind for kind in (error.get("code"), error.get("type")) if isinstance(kind, str)},
     )
 
 
 def _status_error(provider: str, status: int, payload: Any) -> ImageModelError:
-    message, code = _error_message(payload)
+    message, kinds = _error_message(payload)
+    # The gallery shows a short message; the log keeps the provider's own reason.
+    LOG.warning(
+        "%s image request failed: HTTP %s %s: %s",
+        provider,
+        status,
+        "/".join(sorted(kinds)) or "no code",
+        (message or "no message")[:300],
+    )
     if status in {401, 403}:
         return ImageModelError(
             f"The API key was rejected. Check {API_KEY_NAMES[provider]} in "
             "/etc/musecam/device.env, then restart the camera.",
             account=True,
         )
-    if code == "insufficient_quota":
+    if kinds & OUT_OF_CREDIT:
         return ImageModelError(
             "The API account is out of credit. Add credit, then restart the camera.",
             account=True,
@@ -115,7 +130,7 @@ def _status_error(provider: str, status: int, payload: Any) -> ImageModelError:
     if status in {408, 409, 429} or status >= 500:
         return ImageModelError(BUSY_MESSAGE, retry=True)
     detail = (message or "").lower()
-    if code == "moderation_blocked" or (
+    if "moderation_blocked" in kinds or (
         status == 400 and ("filtered" in detail or "content management policy" in detail)
     ):
         return ImageModelError(FILTERED_MESSAGE)

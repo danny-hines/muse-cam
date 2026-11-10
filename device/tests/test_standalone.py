@@ -281,6 +281,11 @@ def test_a_camera_without_a_key_takes_plain_photos(tmp_path: Path) -> None:
     (
         (401, {"code": "invalid_api_key", "message": "bad"}, "The API key was rejected"),
         (429, {"code": "insufficient_quota", "message": "quota"}, "out of credit"),
+        (
+            429,
+            {"type": "insufficient_quota", "code": "credit_balance_exhausted", "message": "none"},
+            "out of credit",
+        ),
     ),
 )
 def test_a_broken_key_turns_styles_off_until_restart(

@@ -141,6 +141,11 @@ def test_openai_sends_the_photo_as_a_multipart_edit() -> None:
     (
         (400, {"code": "moderation_blocked", "message": "blocked"}, FILTERED_MESSAGE, False),
         (429, {"code": "insufficient_quota", "message": "quota"}, "out of credit", False),
+        (
+            429,
+            {"type": "insufficient_quota", "code": "credit_balance_exhausted", "message": "none"},
+            "out of credit", False,
+        ),
         (429, {"code": "rate_limit_exceeded", "message": "slow"}, BUSY_MESSAGE, True),
         (401, {"code": "invalid_api_key", "message": "bad"}, "Check OPENAI_API_KEY", False),
     ),
