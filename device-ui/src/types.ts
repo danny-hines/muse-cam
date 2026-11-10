@@ -1,7 +1,9 @@
+import type { EditRecipe } from "./edit-math";
+
 export type Preset = {
   id: string;
-  // Original and looks are made on the camera; Random picks an imagined style.
-  kind: "original" | "random" | "look" | "imagined";
+  // Original saves the photo as taken; Random picks an imagined style.
+  kind: "original" | "random" | "imagined";
   name: string;
   description: string;
   accent: string;
@@ -49,6 +51,9 @@ export type CameraState = {
   maintenance: boolean;
   // False on standalone cameras, which have no server to share to.
   canShare: boolean;
+  // Standalone cameras edit photos; Edited versions can't be shared.
+  canEdit: boolean;
+  looks: Look[];
   simulate: boolean;
   revision: number;
   sessionId: string;
@@ -88,7 +93,10 @@ export type Version = {
   attempts: number;
   resultUrl: string | null;
   thumbnailUrl: string;
+  // Set on an Edited version.
+  edit: EditRecipe | null;
 };
+export type Look = { id: string; name: string };
 // An original shot and the versions made from it.
 export type Photo = {
   id: string;

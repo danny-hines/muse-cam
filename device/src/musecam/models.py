@@ -67,6 +67,9 @@ class CaptureJob:
     preset_name: str | None = None
     # The original photo this job is a version of.
     photo_id: str | None = None
+    # An Edited version's recipe: its look, adjustments, and the name of the
+    # version it was edited from (None for the original).
+    edit: dict | None = None
 
 
 @dataclass(frozen=True)

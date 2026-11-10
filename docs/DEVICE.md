@@ -70,31 +70,42 @@ The installer follows Waveshare's current 800×480 setup: it enables full KMS an
 A standalone camera calls the image model itself with the owner's API key. It
 needs no Muse Cam server, setup code, or device token. It works like a connected
 camera: the style rail, Random, timer, gallery, Restyle, Retry, and Delete are
-the same, and photos queue and retry when the network or model is busy. Only
-**Share** is missing, since there is no event gallery to publish to.
+the same, and photos queue and retry when the network or model is busy.
+**Share** is missing, since there is no event gallery to publish to. Standalone
+cameras add **Original** and the photo editor.
 
 The style rail also starts with **Original**, which saves the photo with no
 style and makes no API call. Restyle it from the gallery later. A new camera
 starts on Random; the rail remembers the last choice. Connected cameras don't
 offer Original, since event photos are always imagined.
 
-Below Original come five **looks**: Black & White, Warm Film, Faded, Punchy, and
-Vintage. The camera makes these itself with no API call, usually within a few
-seconds, and they don't wait behind a photo the model is still working on. Each
-is a version like any style, so Restyle can add a look to an older photo too. A
-look is saved at about half the sensor's resolution, 2304 × 1296 on a Camera
-Module 3. Random picks only from the model-made styles, which follow the looks
-after a divider. The recipes are in `device/src/musecam/looks.py`.
+**Edit** in a photo's view opens the editor on whatever is selected: the
+original, a styled version, or an earlier edit. The **Looks** tab has five finishes,
+Black & White, Warm Film, Faded, Punchy, and Vintage, shown as thumbnails of the
+photo. The **Adjust** tab has Light, Contrast, Color, and Warmth sliders from −100
+to +100; double-tap one to zero it. Hold the photo to see it before editing.
+**Done** saves an **Edited** version in the photo's stack, at the photo's saved
+size, in about 0.5–2 s on a Pi 3B+. Editing an Edited version picks up its look
+and sliders and updates that version instead of adding another. An edit of a
+styled version keeps the styled image it started from even if that version is
+deleted later. Edits make no API call. Connected cameras don't edit, since an
+Edited version can't be shared to an event.
+
+The camera renders each look, and the screen previews the sliders instantly with
+an SVG filter built from the same numbers the camera uses to save the photo. The
+math is in `device/src/musecam/edits.py` and `device-ui/src/edit-math.ts`, and a
+test on each side checks the same values. The look recipes are in
+`device/src/musecam/looks.py`.
 
 When no style can run, the camera falls back to Original. That happens when the
 key for the selected provider is missing from `/etc/musecam/device.env`, or when
 the model rejects the key or reports the account out of credit. The first photo
 that hits a rejected key or empty account shows **Styles are off**, and the
-camera makes no more model calls. The rail then offers only Original and the
-looks, Restyle offers only looks, Retry is hidden, versions still waiting for the
-model fail with the reason, and Settings › Device says how to fix it. Styles come
-back when the camera restarts with a working key, along with the last one chosen
-unless a look was picked since.
+camera makes no more model calls. The rail is then hidden, since Original is all
+that's left, Restyle and Retry are hidden, versions still waiting for the model
+fail with the reason, and Settings › Device says how to fix it. Editing still
+works. Styles come back, along with the last one chosen, when the camera restarts
+with a working key.
 
 Install with `--standalone`. The installer asks for
 the key on the terminal without echoing it; `--api-key-stdin` reads it from
@@ -213,7 +224,8 @@ when any of its versions is in that state.
 
 Open a photo to see its versions along the top: **Original** first, then each
 style, oldest first, with a dot on versions that are waiting or failed. Tap one to
-view it. Hold a result to compare its original; release to return. **Restyle**
+view it. Hold a result to compare its original; release to return. On a
+standalone camera, **Edit** opens the editor (see [Standalone mode](#standalone-mode)). **Restyle**
 adds a new version with the chosen style, which the viewer selects so you can
 watch it process. **Retry** adds another attempt at a failed version, keeping the
 failed one for reference. Versions share their photo's original file. Gallery

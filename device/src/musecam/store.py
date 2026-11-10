@@ -12,7 +12,9 @@ from pathlib import Path
 from .models import CaptureJob, Photo, Preset
 
 # A photo is one original shot. Each row in captures is a version of a photo: a
-# style job with its own result. Versions share their photo's original file.
+# style job with its own result. Versions share their photo's original file. An
+# Edited version also has an edit recipe, and its source is the image it was
+# edited from: the original or another version's result.
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS captures (
     capture_id TEXT PRIMARY KEY,
@@ -94,6 +96,8 @@ class CaptureStore:
                 self._connection.execute("ALTER TABLE captures ADD COLUMN preset_name TEXT")
             if "photo_id" not in columns:
                 self._connection.execute("ALTER TABLE captures ADD COLUMN photo_id TEXT")
+            if "edit" not in columns:
+                self._connection.execute("ALTER TABLE captures ADD COLUMN edit TEXT")
             self._connection.execute(
                 "CREATE INDEX IF NOT EXISTS captures_photo_idx ON captures(photo_id, created_at)"
             )
@@ -203,6 +207,26 @@ class CaptureStore:
                 """,
                 (capture_id, photo_id, preset_id, str(source_path)),
             )
+
+    def add_edit(
+        self,
+        capture_id: str,
+        photo_id: str,
+        source_path: Path,
+        result_path: Path,
+        recipe: dict,
+    ) -> None:
+        """Save a finished Edited version of a photo."""
+        with self._lock, self._connection:
+            self._connection.execute(
+                "INSERT INTO captures (capture_id, photo_id, preset_id, preset_name, "
+                "source_path, result_path, status, edit) "
+                "VALUES (?, ?, 'edit', 'Edited', ?, ?, 'complete', ?)",
+                (capture_id, photo_id, str(source_path), str(result_path), json.dumps(recipe)),
+            )
+
+    def update_edit(self, capture_id: str, recipe: dict) -> None:
+        self._update(capture_id, "edit = ?", (json.dumps(recipe),))
 
     def mark_uploading(self, capture_id: str) -> None:
         self._update(capture_id, "status = 'uploading', attempts = attempts + 1, error = NULL")
@@ -506,4 +530,5 @@ class CaptureStore:
             created_at=row["created_at"],
             preset_name=row["preset_name"],
             photo_id=row["photo_id"],
+            edit=json.loads(row["edit"]) if row["edit"] else None,
         )

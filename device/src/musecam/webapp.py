@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
@@ -34,13 +35,16 @@ from .battery import create_battery
 from .camera import Camera, FocusState, create_camera, prepare_capture
 from .client import MuseCamClient
 from .config import DeviceConfig, HardwareProfile
+from .edits import Edit
+from .edits import preview as edit_preview
+from .edits import render as render_edit
 from .image_model import (
     ImageModelError,
     create_image_model,
     style_prompt,
     styles_unavailable,
 )
-from .looks import LOOK_PRESETS, apply_look, is_look
+from .looks import LOOK_PRESETS
 from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
@@ -160,10 +164,12 @@ class CameraWebController:
         )
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-generate")
         self._share_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-share")
-        # Looks take a second or two on the camera, so they don't wait behind a model call.
-        self._look_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="musecam-look")
         self._actions: Queue[tuple[str, dict]] = Queue(maxsize=16)
         self._photo_operations = threading.Lock()
+        # One edit saves at a time. Rendering happens outside _photo_operations so the
+        # camera loop keeps running, and _editing_id keeps that version from deletion.
+        self._edit_lock = threading.Lock()
+        self._editing_id: str | None = None
         self._stop = threading.Event()
         self._state_changed = threading.Condition(threading.RLock())
         self._frame_changed = threading.Condition(threading.RLock())
@@ -188,8 +194,6 @@ class CameraWebController:
         self._camera_start_attempts = 0
         self._future: Future[CaptureOutcome] | None = None
         self._processing_id: str | None = None
-        self._look_future: Future[CaptureOutcome] | None = None
-        self._look_id: str | None = None
         self._share_future: Future[Generation] | None = None
         self._sharing_id: str | None = None
         self._retraction_future: Future[None] | None = None
@@ -244,9 +248,8 @@ class CameraWebController:
         # entry, and the interface hides the picker.
         presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
         if self._standalone:
-            # Original and looks need no model, so they stay when styles are off.
-            imagined = [] if self._styles_off else presets
-            presets = [ORIGINAL_PRESET, *LOOK_PRESETS, *imagined]
+            # Original needs no model, so it is all that stays when styles are off.
+            presets = [ORIGINAL_PRESET] if self._styles_off else [ORIGINAL_PRESET, *presets]
         self._presets = presets
         selected = self._store.setting("presetId")
         if selected in {"elven-dawn", "frost-and-crown"}:
@@ -259,15 +262,9 @@ class CameraWebController:
             "disc-2-reference",
         }:
             selected = "memory-card"
-        # With nothing saved, start on Random, else the first imagined style, else
-        # Original.
+        # With nothing saved, start on the first style rather than Original.
         default = next(
-            (
-                i
-                for i, p in enumerate(self._presets)
-                if p.id != ORIGINAL_PRESET.id and not is_look(p.id)
-            ),
-            0,
+            (i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id), 0
         )
         self._preset_index = next(
             (i for i, p in enumerate(self._presets) if p.id == selected), default
@@ -335,7 +332,6 @@ class CameraWebController:
                     self._poll_actions()
                     self._poll_countdown()
                     self._poll_future()
-                    self._poll_look()
                     self._poll_share()
                     self._sync_retractions()
                     self._start_pending()
@@ -475,11 +471,9 @@ class CameraWebController:
                     self._preset_index = (
                         self._preset_index + (-1 if action == "previous" else 1)
                     ) % len(self._presets)
-                chosen = self._presets[self._preset_index].id
-                # Original while styles are off is the fallback, not a choice: keep the
-                # saved style so it returns with the key. Looks chosen then do stick.
-                if not (self._styles_off and chosen == ORIGINAL_PRESET.id):
-                    self._store.set_setting("presetId", chosen)
+                # Keep the saved style while styles are off, so it returns with the key.
+                if not self._styles_off:
+                    self._store.set_setting("presetId", self._presets[self._preset_index].id)
                 self._publish_locked()
         elif action == "capture":
             # GPIO and keyboard shutter presses share this path. Consume the
@@ -535,9 +529,7 @@ class CameraWebController:
 
     def _resolve_preset(self, preset: Preset) -> Preset:
         if preset.id == "random":
-            return random.choice(
-                [p for p in self._presets if p.id not in PICKER_ONLY and not is_look(p.id)]
-            )
+            return random.choice([p for p in self._presets if p.id not in PICKER_ONLY])
         return preset
 
     def _clear_countdown_locked(self) -> None:
@@ -622,6 +614,8 @@ class CameraWebController:
 
     def _remix(self, values: dict, *, retry: bool) -> None:
         """Add a version to a photo: a new style (Restyle) or another try (Retry)."""
+        if self._styles_off:
+            raise ValueError(self._styles_off)
         self._can_save()
         if retry:
             failed = self._store.get(str(values.get("captureId")))
@@ -636,8 +630,6 @@ class CameraWebController:
             preset_id = values.get("presetId")
         if photo is None or not photo.source_path.is_file():
             raise ValueError("The original photo is unavailable")
-        if self._styles_off and not is_look(preset_id):
-            raise ValueError(self._styles_off)
         if preset_id == ORIGINAL_PRESET.id or (
             preset_id not in {p.id for p in self._presets}
             and not (retry and preset_id in RETIRED_PRESETS)
@@ -659,25 +651,17 @@ class CameraWebController:
         )
 
     def _start_pending(self) -> None:
-        if self._maintenance or (self._future is not None and self._look_future is not None):
+        if self._future is not None or self._maintenance:
             return
         now = time.monotonic()
-        ready = [
-            job
-            for job in self._store.pending(MAX_PENDING)
-            if self._retry_after.get(job.capture_id, 0) <= now
-        ]
-        look = next((job for job in ready if is_look(job.preset_id)), None)
-        if self._look_future is None and look is not None:
-            self._store.mark_uploading(look.capture_id)
-            with self._state_changed:
-                self._look_id = look.capture_id
-                self._look_future = self._look_executor.submit(self._process_job, look)
-                self._gallery_revision += 1
-                self._publish_locked()
-        if self._future is not None:
-            return
-        pending = next((job for job in ready if not is_look(job.preset_id)), None)
+        pending = next(
+            (
+                job
+                for job in self._store.pending(MAX_PENDING)
+                if self._retry_after.get(job.capture_id, 0) <= now
+            ),
+            None,
+        )
         if pending is None:
             return
         self._store.mark_uploading(pending.capture_id)
@@ -691,13 +675,7 @@ class CameraWebController:
     def _process_job(self, job: CaptureJob) -> CaptureOutcome:
         result_path = self._results_dir / f"{job.capture_id}.jpg"
         try:
-            if is_look(job.preset_id):
-                apply_look(job.preset_id, job.source_path, result_path)
-                generation = Generation(
-                    f"look-{job.capture_id}", job.capture_id, "complete", job.preset_id,
-                    None, None, None,
-                )
-            elif self._image_model is not None:
+            if self._image_model is not None:
                 generation = self._transform_locally(job, result_path)
             elif self._client is None:
                 # Simulated processing is intentionally visible for UX verification.
@@ -777,7 +755,7 @@ class CameraWebController:
 
     def _fail_queued(self, reason: str) -> None:
         """Fail waiting versions now rather than call a model that can't answer."""
-        jobs = [job for job in self._store.pending(MAX_PENDING) if not is_look(job.preset_id)]
+        jobs = self._store.pending(MAX_PENDING)
         for job in jobs:
             self._store.mark_failed(job.capture_id, reason)
         if jobs:
@@ -799,38 +777,6 @@ class CameraWebController:
         return Generation(
             f"local-{job.capture_id}", job.capture_id, "complete", job.preset_id, None, None, None
         )
-
-    def _poll_look(self) -> None:
-        if self._look_future is None or not self._look_future.done():
-            return
-        future, capture_id = self._look_future, self._look_id
-        self._look_future, self._look_id = None, None
-        try:
-            job = future.result().job
-        except Exception:
-            LOGGER.exception("Look worker failed")
-            if capture_id:
-                self._store.mark_failed(
-                    capture_id, "Couldn’t finish this photo. Your original is saved."
-                )
-            job = None
-        if job is not None and job.status == "complete":
-            self._last_result_id = job.capture_id
-            self._sound.play("success")
-            self._notify(
-                "success", "Your photo is ready", self._job_preset_name(job), job.capture_id
-            )
-        else:
-            self._sound.play("error")
-            self._notify(
-                "error",
-                "Photo needs attention",
-                (job.error if job else None) or "Use Retry or Restyle",
-                capture_id,
-            )
-        with self._state_changed:
-            self._gallery_revision += 1
-            self._publish_locked()
 
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
@@ -876,7 +822,7 @@ class CameraWebController:
                 self._notify(
                     "error",
                     "Styles are off",
-                    "Original and the looks still work. See Settings › Device.",
+                    "Photos are saved plain, and you can still edit them. See Settings › Device.",
                     job.capture_id,
                 )
             else:
@@ -1004,7 +950,7 @@ class CameraWebController:
         if (
             self._store.counts().get("uploading", 0)
             or self._future
-            or self._look_future
+            or self._editing_id
             or self._share_future
         ):
             raise ValueError("Wait for processing to finish before shutting down")
@@ -1048,6 +994,7 @@ class CameraWebController:
     def _preset_name(self, preset_id: str) -> str:
         retired = RETIRED_PRESETS.get(preset_id)
         # Bundled styles keep their names while styles are off and the rail is empty.
+        # Looks were once styles too, so older versions may use one.
         return next(
             (
                 p.name
@@ -1095,6 +1042,9 @@ class CameraWebController:
                 "processingSound": self._sound.processing_enabled,
                 "maintenance": self._maintenance,
                 "canShare": not self._standalone,
+                # Edited versions can't be shared, so only standalone cameras edit.
+                "canEdit": self._standalone,
+                "looks": [{"id": p.id, "name": p.name} for p in LOOK_PRESETS],
                 "stylesOff": self._styles_off,
                 "simulate": self._simulate,
                 "revision": self._revision,
@@ -1103,14 +1053,9 @@ class CameraWebController:
 
     @staticmethod
     def _preset_json(preset: Preset) -> dict:
-        kind = (
-            preset.id
-            if preset.id in PICKER_ONLY
-            else "look" if is_look(preset.id) else "imagined"
-        )
         return {
             "id": preset.id,
-            "kind": kind,
+            "kind": preset.id if preset.id in PICKER_ONLY else "imagined",
             "name": preset.name,
             "description": preset.description,
             "accent": preset.accent,
@@ -1122,6 +1067,11 @@ class CameraWebController:
 
     def version_json(self, job: CaptureJob) -> dict:
         thumbnail_kind = "result" if job.result_path else "source"
+        # Editing again replaces an Edited version's image, so its URLs change with it.
+        stamp = ""
+        if job.edit is not None:
+            recipe = json.dumps(job.edit, sort_keys=True).encode()
+            stamp = hashlib.sha1(recipe, usedforsecurity=False).hexdigest()[:10]
         return {
             "id": job.capture_id,
             "photoId": job.photo_id,
@@ -1132,8 +1082,12 @@ class CameraWebController:
             "shareUrl": job.share_url,
             "createdAt": self._timestamp(job.created_at),
             "attempts": job.attempts,
-            "resultUrl": f"/api/versions/{job.capture_id}/result" if job.result_path else None,
-            "thumbnailUrl": f"/api/versions/{job.capture_id}/thumbnail?kind={thumbnail_kind}",
+            "resultUrl": f"/api/versions/{job.capture_id}/result{f'?v={stamp}' if stamp else ''}"
+            if job.result_path
+            else None,
+            "thumbnailUrl": f"/api/versions/{job.capture_id}/thumbnail?kind={thumbnail_kind}"
+            + (f"&v={stamp}" if stamp else ""),
+            "edit": job.edit,
         }
 
     @staticmethod
@@ -1198,28 +1152,30 @@ class CameraWebController:
     def _check_deletable(self, versions: list[CaptureJob]) -> None:
         if self._maintenance or self._stop.is_set():
             raise ValueError("Camera is restarting or updating. Try again shortly.")
-        busy = {self._processing_id, self._look_id, self._sharing_id}
+        busy = {self._processing_id, self._editing_id, self._sharing_id}
         if any(job.status == "uploading" or job.capture_id in busy for job in versions):
             raise ValueError("Wait for this photo to finish processing or sharing before deleting.")
 
-    def _version_files(self, job: CaptureJob) -> list[tuple[Path, Path]]:
-        # A version made before photos existed has its own copy of the original.
-        files = [(job.source_path, self._captures_dir)]
-        files.append((job.result_path or self._results_dir / f"{job.capture_id}.jpg",
-                      self._results_dir))
-        files.append((self._results_dir / f"{job.capture_id}.download", self._results_dir))
-        return files
+    def _version_files(self, job: CaptureJob) -> list[Path]:
+        # A version made before photos existed has its own copy of the original. An
+        # Edited version's source is the image it was edited from.
+        return [
+            job.source_path,
+            job.result_path or self._results_dir / f"{job.capture_id}.jpg",
+            self._results_dir / f"{job.capture_id}.download",
+        ]
 
     def _remove_files(
-        self, files: list[tuple[Path, Path]], *, capture_ids: set[str], photo_id: str | None
+        self, files: list[Path], *, capture_ids: set[str], photo_id: str | None
     ) -> None:
         # Validate every path before removing anything. A file that another photo
         # or version still uses (such as a shared original) stays.
-        for path, directory in files:
-            if path.is_symlink() or path.resolve().parent != directory.resolve():
+        gallery = {self._captures_dir.resolve(), self._results_dir.resolve()}
+        for path in files:
+            if path.is_symlink() or path.resolve().parent not in gallery:
                 raise ValueError("Photo files are outside the camera gallery")
         try:
-            for path, _ in files:
+            for path in files:
                 if not self._store.referenced_elsewhere(
                     path, capture_ids=capture_ids, photo_id=photo_id
                 ):
@@ -1279,7 +1235,7 @@ class CameraWebController:
                 raise ValueError("Photo was not found")
             versions = self._store.versions([photo_id])[photo_id]
             self._check_deletable(versions)
-            files = [(photo.source_path, self._captures_dir)]
+            files = [photo.source_path]
             for job in versions:
                 files.extend(self._version_files(job))
             capture_ids = {job.capture_id for job in versions}
@@ -1292,6 +1248,89 @@ class CameraWebController:
                 "Public share removal is queued until connected" if retract
                 else "Removed from this camera",
             )
+
+    def _edit_source(
+        self, photo_id: str, target: str | None
+    ) -> tuple[Path, CaptureJob | None, str | None]:
+        """What editing ``target`` starts from.
+
+        Returns the starting image, the Edited version to update (None for a new
+        one), and the name of the version the image came from (None for the
+        original). ``target`` is a version id, or None or "original".
+        """
+        photo = self._store.get_photo(photo_id)
+        if photo is None:
+            raise ValueError("Photo was not found")
+        if target is None or target == "original":
+            return self._media_file(photo.source_path), None, None
+        job = self._store.get(str(target))
+        if job is None or job.photo_id != photo_id:
+            raise ValueError("That version of the photo was not found")
+        if job.edit is not None:
+            # Editing an edit picks up its recipe from the same starting image.
+            return self._media_file(job.source_path), job, job.edit.get("from")
+        if job.status != "complete":
+            raise ValueError("Wait for this version to finish before editing it")
+        return self._media_file(job.result_path), None, self._job_preset_name(job)
+
+    def edit_preview(self, photo_id: str, target: str | None, look: str | None,
+                     size: str) -> bytes:
+        source, _, _ = self._edit_source(photo_id, target)
+        try:
+            return edit_preview(source, look, size)
+        except OSError as error:
+            raise ValueError("Photo unavailable") from error
+
+    def save_edit(self, photo_id: str, values: object) -> dict:
+        """Save an edit as a new Edited version, or update the Edited version it came from."""
+        if not self._standalone:
+            raise ValueError("Editing needs a standalone camera")
+        if not isinstance(values, dict):
+            raise ValueError("Invalid edit")
+        target = values.get("target")
+        if target is not None and not isinstance(target, str):
+            raise ValueError("Invalid edit")
+        edit = Edit.parse({key: value for key, value in values.items() if key != "target"})
+        if not self._edit_lock.acquire(blocking=False):
+            raise ValueError("Another edit is saving")
+        try:
+            with self._photo_operations, self._state_changed:
+                if self._maintenance or self._stop.is_set():
+                    raise ValueError("Camera is restarting or updating. Try again shortly.")
+                source, editing, base_name = self._edit_source(photo_id, target)
+                if self._system.storage()["free"] < MIN_FREE_BYTES:
+                    raise ValueError("Storage is nearly full. Free space before saving edits.")
+                capture_id = editing.capture_id if editing else self._new_id()
+                self._editing_id = capture_id
+            temporary = self._results_dir / f"{capture_id}.edit"
+            try:
+                # About 0.5–2 s on a Pi, so the camera loop keeps running meanwhile.
+                render_edit(source, temporary, edit)
+                with self._photo_operations, self._state_changed:
+                    # The photo, or the version the edit starts from, may have been
+                    # deleted while it rendered.
+                    if self._edit_source(photo_id, target)[0] != source:
+                        raise ValueError("This photo changed while saving. Try again.")
+                    result = self._results_dir / f"{capture_id}.jpg"
+                    temporary.replace(result)
+                    recipe = {**edit.to_json(), "from": base_name}
+                    if editing:
+                        self._store.update_edit(capture_id, recipe)
+                    else:
+                        self._store.add_edit(capture_id, photo_id, source, result, recipe)
+                    self._gallery_revision += 1
+                    if self._view["screen"] == "photo" and self._view["photoId"] == photo_id:
+                        self._view = {**self._view, "versionId": capture_id}
+                    self._publish_locked()
+            except OSError as error:
+                LOGGER.warning("Edit failed for %s", photo_id, exc_info=True)
+                raise ValueError("Couldn’t save this edit. Your photo is unchanged.") from error
+            finally:
+                temporary.unlink(missing_ok=True)
+                self._editing_id = None
+        finally:
+            self._edit_lock.release()
+        return {"versionId": capture_id}
 
     def _media_file(self, path: Path | None) -> Path:
         if (
@@ -1369,7 +1408,7 @@ class CameraWebController:
             if (
                 self._maintenance
                 or self._future
-                or self._look_future
+                or self._editing_id
                 or self._share_future
                 or not self._actions.empty()
                 or counts.get("queued", 0)
@@ -1415,7 +1454,6 @@ class CameraWebController:
         if self._thread is not None:
             self._thread.join(timeout=10)
         self._executor.shutdown(wait=True, cancel_futures=True)
-        self._look_executor.shutdown(wait=True, cancel_futures=True)
         self._share_executor.shutdown(wait=True, cancel_futures=True)
         self._sound.close()
         if self._client is not None:
@@ -1531,6 +1569,28 @@ async def _version_delete(request: web.Request) -> web.Response:
     return web.json_response({"deleted": True})
 
 
+async def _edit_preview(request: web.Request) -> web.Response:
+    look = request.query.get("look", "none")
+    body = await asyncio.to_thread(
+        request.app["controller"].edit_preview,
+        request.match_info["photo_id"],
+        request.query.get("target"),
+        None if look == "none" else look,
+        request.query.get("size", ""),
+    )
+    return web.Response(
+        body=body, content_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"}
+    )
+
+
+async def _edit_save(request: web.Request) -> web.Response:
+    values = await request.json()
+    result = await asyncio.to_thread(
+        request.app["controller"].save_edit, request.match_info["photo_id"], values
+    )
+    return web.json_response(result)
+
+
 def _thumbnail(path: Path) -> bytes:
     with Image.open(path) as original:
         image = original.convert("RGB")
@@ -1641,6 +1701,8 @@ def create_web_app(controller: CameraWebController) -> web.Application:
     app.router.add_get("/api/gallery/{photo_id}/{kind}", _photo_media)
     app.router.add_post("/api/versions/{capture_id}/delete", _version_delete)
     app.router.add_get("/api/versions/{capture_id}/{kind}", _version_media)
+    app.router.add_get("/api/edit/{photo_id}/preview", _edit_preview)
+    app.router.add_post("/api/edit/{photo_id}", _edit_save)
     app.router.add_get("/api/settings", _settings)
     app.router.add_post("/api/settings", _settings)
     app.router.add_post("/api/sound", _sound)

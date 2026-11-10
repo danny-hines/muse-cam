@@ -438,8 +438,8 @@ export function Settings({
                   <div>
                     <strong>Styles are off</strong>
                     <p>
-                      {state.stylesOff} Until then, Original and the looks still
-                      work.
+                      {state.stylesOff} Until then, photos are saved plain,
+                      and you can still edit them in Your roll.
                     </p>
                   </div>
                 </div>

@@ -1,22 +1,19 @@
-"""Looks: photo finishes made on the camera with no model, key, or network.
+"""Looks: photo finishes the editor makes on the camera with no model, key, or network.
 
-Each look is a small Pillow recipe. They work at about half the sensor's
-resolution, which keeps a Pi 3B+ quick and still leaves far more pixels than the
-screen or a phone needs.
+Each look is a small Pillow recipe. On a Pi 3B+ one takes about 0.5–1.7 s on a
+saved 1920 × 1280 photo.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
+from functools import lru_cache
 
 from PIL import Image, ImageChops, ImageEnhance, ImageOps
 
 from .models import Preset
 
-# The longest side a look keeps. A 4608 × 2592 Camera Module 3 photo decodes at
-# half size, 2304 × 1296.
-MAX_SIDE = 2400
+GRAIN_TILE = 512
 
 
 def _levels(image: Image.Image, red: tuple, green: tuple, blue: tuple) -> Image.Image:
@@ -28,8 +25,19 @@ def _levels(image: Image.Image, red: tuple, green: tuple, blue: tuple) -> Image.
     return image.point(table(*red) + table(*green) + table(*blue))
 
 
+@lru_cache(maxsize=1)
+def _grain_tile() -> Image.Image:
+    # Full-size noise costs most of a second on a Pi 3B+; tiling one costs ~0.02 s.
+    return Image.effect_noise((GRAIN_TILE, GRAIN_TILE), 40)
+
+
 def _grain(image: Image.Image, amount: float) -> Image.Image:
-    noise = Image.effect_noise(image.size, 40).convert("RGB")
+    tile = _grain_tile()
+    layer = Image.new("L", image.size)
+    for x in range(0, image.width, tile.width):
+        for y in range(0, image.height, tile.height):
+            layer.paste(tile, (x, y))
+    noise = Image.merge("RGB", (layer, layer, layer))
     noisy = ImageChops.add(image, noise, scale=1.0, offset=-128)
     return Image.blend(image, noisy, amount)
 
@@ -99,22 +107,3 @@ LOOKS: dict[str, tuple[Preset, Callable[[Image.Image], Image.Image]]] = {
 }
 LOOK_PRESETS = [preset for preset, _ in LOOKS.values()]
 
-
-def is_look(preset_id: str | None) -> bool:
-    return preset_id in LOOKS
-
-
-def apply_look(look_id: str, source: Path, destination: Path) -> None:
-    """Write ``source`` with the look applied to ``destination`` as a JPEG."""
-    _, recipe = LOOKS[look_id]
-    with Image.open(source) as opened:
-        # JPEG draft mode decodes at a fraction of full size, which is most of the
-        # time saved on a Pi.
-        width, height = opened.size
-        if max(width, height) >= MAX_SIDE * 1.5:
-            opened.draft("RGB", (width // 2, height // 2))
-        image = ImageOps.exif_transpose(opened).convert("RGB")
-    image.thumbnail((MAX_SIDE, MAX_SIDE))
-    temporary = destination.with_suffix(".look")
-    recipe(image).save(temporary, "JPEG", quality=90, optimize=True)
-    temporary.replace(destination)

@@ -11,6 +11,8 @@ import type {
 import { api } from "./use-camera";
 import { Icon } from "./icons";
 import { PhotoViewer } from "./photo-viewer";
+import { Editor } from "./editor";
+import { editSummary } from "./edit-math";
 
 type Act = (action: CameraAction, values?: object) => Promise<unknown>;
 export const photoStatus = (status: string) =>
@@ -22,13 +24,7 @@ export const photoStatus = (status: string) =>
     original: "Original",
   })[status] || status;
 export const presetIcon = (preset: Preset) =>
-  preset.kind === "random"
-    ? "shuffle"
-    : preset.kind === "original"
-      ? "camera"
-      : preset.kind === "look"
-        ? "look"
-        : "spark";
+  preset.kind === "random" ? "shuffle" : preset.kind === "original" ? "camera" : "spark";
 const isWaiting = (status: string) => status === "queued" || status === "uploading";
 
 function StatusIcon({ status, shared }: { status: string; shared: boolean }) {
@@ -240,6 +236,7 @@ export function PhotoDetail({
   );
   const [original, setOriginal] = useState(false);
   const [remixing, setRemixing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [presetId, setPresetId] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -344,6 +341,11 @@ export function PhotoDetail({
     }
   };
   const showing = original || !version ? null : version.id;
+  // The original, or any finished version, can be edited.
+  const editable = state.canEdit && (!version || (version.status === "complete" && !!resultUrl));
+  const lookName = (lookId: string) =>
+    state.looks.find((look) => look.id === lookId)?.name ?? lookId;
+  const covered = remixing || editing;
   return (
     <section className="page detail-page" aria-label="Photo detail">
       {photo && (
@@ -352,13 +354,13 @@ export function PhotoDetail({
           sourceUrl={photo.sourceUrl}
           resultUrl={resultUrl}
           original={original}
-          disabled={remixing || confirmDelete}
+          disabled={covered || confirmDelete}
           onCompare={setOriginal}
           onPrevious={photo.previousId ? () => onOpen(photo.previousId!) : undefined}
           onNext={photo.nextId ? () => onOpen(photo.nextId!) : undefined}
         />
       )}
-      <header className="detail-header" inert={remixing}>
+      <header className="detail-header" inert={covered}>
         <button className="glass-button" onClick={onBack}>
           <Icon name="back" />
           Your roll
@@ -394,7 +396,7 @@ export function PhotoDetail({
         </button>
       </header>
       {photo && (
-        <div className="detail-footer" inert={remixing}>
+        <div className="detail-footer" inert={covered}>
           <div className="detail-title">
             <span className="eyebrow">
               {version
@@ -407,6 +409,8 @@ export function PhotoDetail({
             <p>
               {version?.status === "failed"
                 ? version.error
+                : version?.edit
+                  ? editSummary(version.edit, lookName)
                 : resultUrl
                   ? "Swipe to browse · Pinch to zoom · Hold for original"
                   : version
@@ -445,6 +449,16 @@ export function PhotoDetail({
                 Retry
               </button>
             )}
+            {editable && (
+              <button
+                className="glass-button"
+                disabled={pending}
+                onClick={() => setEditing(true)}
+              >
+                <Icon name="edit" />
+                Edit
+              </button>
+            )}
             {styles.length > 0 && (
               <button
                 className="primary-button"
@@ -455,7 +469,7 @@ export function PhotoDetail({
                 Restyle
               </button>
             )}
-            {resultUrl && version && state.canShare && (
+            {resultUrl && version && state.canShare && !version.edit && (
               <button
                 className="glass-button"
                 disabled={pending || !!version.shareUrl || state.sharingId === version.id}
@@ -500,6 +514,18 @@ export function PhotoDetail({
           error={deleteError}
           onCancel={() => setConfirmDelete(false)}
           onDelete={(scope) => void remove(scope)}
+        />
+      )}
+      {editing && photo && (
+        <Editor
+          photoId={id}
+          version={version}
+          looks={state.looks}
+          onClose={() => setEditing(false)}
+          onSaved={(saved) => {
+            setEditing(false);
+            choose(saved);
+          }}
         />
       )}
       {remixing && (
