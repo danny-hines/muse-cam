@@ -619,7 +619,7 @@ class CameraWebController:
         )
 
     def _remix(self, values: dict, *, retry: bool) -> None:
-        """Add a version to a photo: a new style (Restyle) or another try (Retry)."""
+        """Restyle adds a version to a photo. Retry queues a failed version again."""
         if self._styles_off:
             raise ValueError(self._styles_off)
         self._can_save()
@@ -644,17 +644,28 @@ class CameraWebController:
         if preset_id == "random":
             preset_id = self._resolve_preset(RANDOM_PRESET).id
         capture_id = self._new_id()
-        # Versions share their photo's original. Deleting a version never removes it.
-        self._store.enqueue(capture_id, preset_id, photo.source_path, photo_id=photo.photo_id)
+        if retry:
+            # The failed version itself goes back in the queue. Nothing is added.
+            self._store.requeue(failed.capture_id, capture_id)
+            self._retry_after.pop(failed.capture_id, None)
+        else:
+            # Versions share their photo's original. Deleting a version never removes it.
+            self._store.enqueue(capture_id, preset_id, photo.source_path, photo_id=photo.photo_id)
         with self._state_changed:
             self._gallery_revision += 1
             if self._view["screen"] == "photo" and self._view["photoId"] == photo.photo_id:
                 self._view = {**self._view, "versionId": capture_id}
             self._publish_locked()
-        self._notify(
-            "queued", "New version queued", "Your original photo is kept", capture_id,
-            photo_id=photo.photo_id,
-        )
+        if retry:
+            self._notify(
+                "queued", "Trying again", self._job_preset_name(failed), capture_id,
+                photo_id=photo.photo_id,
+            )
+        else:
+            self._notify(
+                "queued", "New version queued", "Your original photo is kept", capture_id,
+                photo_id=photo.photo_id,
+            )
 
     def _start_pending(self) -> None:
         if self._future is not None or self._maintenance:

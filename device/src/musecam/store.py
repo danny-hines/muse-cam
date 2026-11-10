@@ -234,6 +234,17 @@ class CaptureStore:
     def mark_queued(self, capture_id: str, error: str) -> None:
         self._update(capture_id, "status = 'queued', error = ?", (error,))
 
+    def requeue(self, capture_id: str, new_id: str) -> None:
+        """Queue a failed version again, in its place among the photo's versions.
+
+        It takes a new ID because the server remembers how the old one ended.
+        """
+        self._update(
+            capture_id,
+            "capture_id = ?, status = 'queued', attempts = 0, error = NULL",
+            (new_id,),
+        )
+
     def mark_failed(self, capture_id: str, error: str) -> None:
         self._update(capture_id, "status = 'failed', error = ?", (error,))
 

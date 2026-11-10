@@ -253,8 +253,8 @@ style, oldest first, with a dot on versions that are waiting or failed. Tap one 
 view it. Hold a result to compare its original; release to return. On a
 standalone camera, **Edit** opens the editor (see [Standalone mode](#standalone-mode)). **Restyle**
 adds a new version with the chosen style, which the viewer selects so you can
-watch it process. **Retry** adds another attempt at a failed version, keeping the
-failed one for reference. Versions share their photo's original file. Gallery
+watch it process. **Retry** runs a failed version again in place, without adding
+a version. Versions share their photo's original file. Gallery
 photos are not automatically pruned. **Share** publishes the selected version to
 the camera's event gallery only when explicitly tapped.
 

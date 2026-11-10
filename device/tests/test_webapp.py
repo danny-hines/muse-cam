@@ -146,9 +146,10 @@ def test_retired_styles_leave_cached_picker_but_keep_gallery_and_retry(
         pending = controller._store.pending()
         assert len(pending) == 1
         assert pending[0].preset_id == preset_id
-        # A retry is another version of the same photo, sharing its original.
+        # A retry queues the failed version again instead of adding another.
         assert (pending[0].photo_id, pending[0].source_path) == ("retired", source)
-        assert controller._store.get("retired").status == "failed"
+        assert controller._store.get("retired") is None
+        assert len(controller._store.versions(["retired"])["retired"]) == 1
     finally:
         controller.close()
 
@@ -267,7 +268,7 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         controller.close()
 
 
-def test_gallery_retry_and_restyle_add_versions_to_one_photo(tmp_path: Path) -> None:
+def test_gallery_retry_replaces_and_restyle_adds_a_version(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     source = tmp_path / "captures" / "old.jpg"
     Image.new("RGB", (100, 80), "orange").save(source)
@@ -281,9 +282,10 @@ def test_gallery_retry_and_restyle_add_versions_to_one_photo(tmp_path: Path) -> 
         wait_until(lambda: controller._store.counts().get("complete") == 1)
         [photo] = controller.gallery()["items"]
         retried = photo["cover"]
-        assert (photo["id"], photo["versionCount"], photo["status"]) == ("old", 2, "complete")
+        # Retry replaces the failed version. It doesn't add another one.
+        assert (photo["id"], photo["versionCount"], photo["status"]) == ("old", 1, "complete")
         assert retried["id"] != "old" and retried["presetId"] == style
-        assert controller._store.get("old").status == "failed"
+        assert controller._store.get("old") is None
         assert controller.version_path(retried["id"], "source") == source
         # The camera shows the new version on the photo the guest is looking at.
         assert controller.state()["view"]["versionId"] == retried["id"]
@@ -293,7 +295,7 @@ def test_gallery_retry_and_restyle_add_versions_to_one_photo(tmp_path: Path) -> 
         wait_until(lambda: controller._store.counts().get("complete") == 2)
         detail = controller.photo_detail("old")
         assert [v["presetId"] for v in detail["versions"]] == [
-            style, style, controller._presets[2].id,
+            style, controller._presets[2].id,
         ]
         assert detail["cover"]["presetId"] == controller._presets[2].id
         assert controller.state()["galleryCount"] == 1
