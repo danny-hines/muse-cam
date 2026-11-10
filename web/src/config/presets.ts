@@ -9,6 +9,11 @@ export const presetSchema = z.object({
   description: z.string().min(1),
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   hue: z.number().int().min(0).max(360),
+  // Fun styles reimagine the photo. Looks keep the people and the moment in a
+  // realistic photograph, and are free with the light, time of day, and atmosphere.
+  // Cameras list the two on separate tabs, and Random and Surprise pick fun styles
+  // only. Fun when absent.
+  category: z.enum(["fun", "look"]).optional(),
   prompt: z.string().min(24),
   // Private media refs of images sent to the model after the photo, in order; the
   // prompt describes each one.
@@ -29,6 +34,11 @@ const fantasyPreservationPrompt =
 
 const costumePreservationPrompt =
   "Preserve each person's recognizable facial identity, age, skin tone, expression, body proportions, and pose. Keep the same people and animals and their everyday activity. Replace contemporary clothing, headwear, and accessories with the requested period designs while keeping faces clearly visible and people comfortably clothed. Preserve the composition, camera angle, and overall scene layout while reinterpreting objects and surroundings as period equivalents. Use original costume designs. Do not add captions, lettering, logos, borders, signatures, or watermarks.";
+
+// Looks must hand back the same people in the same place, so this is far stricter
+// than the fun styles' wording. The light and time of day are each look's to change.
+const lookPreservationPrompt =
+  "This is a photographic enhancement of the same moment, not a restyle: the result must stay a realistic photograph. Keep every person and animal exactly as photographed, with the same face, facial features, age, skin tone, hair, expression, body, pose, clothing, and accessories. Do not add, remove, or replace any people, animals, objects, or text. Keep the same place, composition, camera angle, and framing; the light, time of day, and atmosphere may change as described above. Keep natural skin texture; do not smooth, slim, or beautify anyone. Do not add captions, logos, borders, signatures, or watermarks.";
 
 const presetCatalog: Preset[] = z.array(presetSchema).parse([
   {
@@ -400,6 +410,66 @@ const presetCatalog: Preset[] = z.array(presetSchema).parse([
     hue: 28,
     prompt: `Reimagine the supplied photograph as a cinematic live-action Western during a relaxed everyday moment in a frontier town or ranch. Dress people in broad-brimmed cowboy hats, woven work shirts, denim, worn leather vests, neckerchiefs, practical boots, and long dusters as appropriate to their pose and activity. Keep hat brims lifted enough to see every face clearly. Translate the photographed surroundings into weathered timber storefronts, ranch buildings, hitching rails, rustic furniture, and dusty paths while preserving the original layout. For interiors, use warm window light, aged wood, and simple brass lamps; for exteriors, use golden sunlight, long shadows, and a little dust in the air. Use warm earth colors, tactile fabrics, and subtle widescreen-era film grain without changing the image aspect ratio. Keep the mood friendly and unhurried, with no showdown. ${costumePreservationPrompt}`,
   },
+  {
+    id: "golden-hour",
+    version: 1,
+    category: "look",
+    name: "Golden Hour",
+    description: "The same photo in low, warm evening sun with soft long shadows.",
+    accent: "#f2b35c",
+    hue: 36,
+    prompt: `Relight the supplied photograph as if it had been taken in the last hour before sunset. Use low, warm, directional sunlight from one side, soft long shadows, a gentle golden rim of light on hair and shoulders, and warm highlights with slightly cooler shadows. Indoors, bring the warm sunlight in from the direction of the existing windows or main light. Keep skin tones natural and believable, and keep the exposure balanced so faces stay clearly visible. ${lookPreservationPrompt}`,
+  },
+  {
+    id: "studio-portrait",
+    version: 1,
+    category: "look",
+    name: "Studio Portrait",
+    description: "Soft, flattering portrait light, as if a photographer had lit the room.",
+    accent: "#e8e2d4",
+    hue: 44,
+    prompt: `Relight the supplied photograph the way a professional portrait photographer would light it on location. Light the people with one large, soft key light from slightly to one side of the camera, gentle fill in the shadows, and a subtle light separating hair and shoulders from the background. Add natural catchlights in the eyes. Let the existing background fall slightly darker and a little softer so the people stand out, without replacing it with a backdrop. Use clean, accurate color and gentle contrast. ${lookPreservationPrompt}`,
+  },
+  {
+    id: "soft-focus",
+    version: 1,
+    category: "look",
+    name: "Soft Focus",
+    description: "A fast portrait lens: the subject sharp, the background melted into blur.",
+    accent: "#c9b8e8",
+    hue: 262,
+    prompt: `Re-render the supplied photograph as if it had been taken with a fast professional portrait lens at a wide aperture. Keep the main subjects critically sharp, and render everything in front of and behind them with smooth, natural optical blur that increases with distance, turning small background lights into soft round highlights. Keep the edges of hair, glasses, and hands clean and accurate, with no halos or cut-out look. Leave the lighting and colors as photographed. ${lookPreservationPrompt}`,
+  },
+  {
+    id: "direct-flash",
+    version: 1,
+    category: "look",
+    name: "Flash",
+    description: "Direct on-camera flash: crisp, bright subjects against a darker room.",
+    accent: "#f6f3ea",
+    hue: 50,
+    prompt: `Relight the supplied photograph as if it had been taken with a direct on-camera flash, in the style of a candid editorial party photograph. Light the nearest subjects brightly and crisply from the camera position, with a small hard shadow just behind them, glossy highlights, and saturated color. Let the light fall off quickly so the background is noticeably darker than the subjects. Keep faces well exposed, without blown-out skin or red eyes. ${lookPreservationPrompt}`,
+  },
+  {
+    id: "night-out",
+    version: 1,
+    category: "look",
+    name: "Night Out",
+    description: "Moody evening light: deep blue dusk and the warm glow of lamps.",
+    accent: "#7f9cf0",
+    hue: 225,
+    prompt: `Relight the supplied photograph as if it had been taken in the same place just after dusk. Darken the ambient light to a deep blue evening tone, and make the lamps, screens, windows, and other light sources already in the scene glow warmly. Light the people softly with that warm glow so their faces stay clearly visible against the cooler, darker surroundings. Use rich shadows, gentle highlights, and a cinematic low-light look with fine natural grain. ${lookPreservationPrompt}`,
+  },
+  {
+    id: "silver-portrait",
+    version: 1,
+    category: "look",
+    name: "Silver Portrait",
+    description: "Black and white with sculpted light, deep blacks, and fine grain.",
+    accent: "#a9afb5",
+    hue: 210,
+    prompt: `Re-render the supplied photograph as a classic black-and-white fine-art portrait. Convert it to rich monochrome with deep blacks, luminous skin tones, and a full range of grays. Relight the people with soft, directional light from one side that sculpts faces and lets the background fall darker. Add fine, even silver-film grain. ${lookPreservationPrompt}`,
+  },
 ]);
 
 // Retired styles remain resolvable for existing photos, shared links, and queued jobs.
@@ -470,7 +540,10 @@ export function surpriseCandidates(
   recentIds: readonly string[] = [],
   random = Math.random,
 ): Preset[] {
-  const pool = [...presetsForEvent(catalog, event)];
+  const listed = presetsForEvent(catalog, event);
+  // A surprise is a fun style, unless the event chose only looks.
+  const fun = listed.filter((preset) => preset.category !== "look");
+  const pool = fun.length > 0 ? fun : [...listed];
   for (let i = pool.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];

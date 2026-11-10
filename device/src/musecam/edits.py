@@ -1,9 +1,9 @@
-"""Edits: a look plus four adjustments, applied to a photo on the camera.
+"""Edits: a filter plus four adjustments, applied to a photo on the camera.
 
 An edit is saved as a recipe on an Edited version, so editing that version again
 picks up where it left off. The touchscreen previews the adjustments with an SVG
 filter built from the same numbers (device-ui/src/edit-math.ts), on a preview the
-camera renders with the look already applied.
+camera renders with the filter already applied.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from .looks import LOOKS
+from .filters import FILTERS
 
 EDIT_PRESET_ID = "edit"
 ADJUSTMENTS = ("light", "contrast", "color", "warmth")
@@ -29,6 +29,8 @@ LUMA = (0.2126, 0.7152, 0.0722)
 
 @dataclass(frozen=True)
 class Edit:
+    # The filter's id. Saved recipes and the edit API call it "look", its first
+    # name, so edits already on a roll still load.
     look: str | None = None
     light: int = 0
     contrast: int = 0
@@ -40,8 +42,8 @@ class Edit:
         if not isinstance(values, dict) or values.keys() - {"look", *ADJUSTMENTS}:
             raise ValueError("Invalid edit")
         look = values.get("look")
-        if look is not None and look not in LOOKS:
-            raise ValueError("Choose an available look")
+        if look is not None and look not in FILTERS:
+            raise ValueError("Choose an available filter")
         amounts = {}
         for name in ADJUSTMENTS:
             amount = values.get(name, 0)
@@ -110,7 +112,7 @@ def open_photo(source: Path, max_side: int) -> Image.Image:
 
 def apply(image: Image.Image, edit: Edit) -> Image.Image:
     if edit.look:
-        image = LOOKS[edit.look][1](image)
+        image = FILTERS[edit.look][1](image)
     return adjust(image, edit)
 
 
@@ -122,19 +124,19 @@ def render(source: Path, destination: Path, edit: Edit) -> None:
 
 
 @lru_cache(maxsize=24)
-def _preview(source: str, modified: int, look: str | None, max_side: int) -> bytes:
+def _preview(source: str, modified: int, filter_id: str | None, max_side: int) -> bytes:
     image = open_photo(Path(source), max_side)
-    if look:
-        image = LOOKS[look][1](image)
+    if filter_id:
+        image = FILTERS[filter_id][1](image)
     output = BytesIO()
     image.save(output, "JPEG", quality=85)
     return output.getvalue()
 
 
-def preview(source: Path, look: str | None, size: str) -> bytes:
-    """A small JPEG with only the look applied; the screen previews adjustments."""
-    if look is not None and look not in LOOKS:
-        raise ValueError("Choose an available look")
+def preview(source: Path, filter_id: str | None, size: str) -> bytes:
+    """A small JPEG with only the filter applied; the screen previews adjustments."""
+    if filter_id is not None and filter_id not in FILTERS:
+        raise ValueError("Choose an available filter")
     if size not in PREVIEW_SIDES:
         raise ValueError("Choose a preview size")
-    return _preview(str(source), source.stat().st_mtime_ns, look, PREVIEW_SIDES[size])
+    return _preview(str(source), source.stat().st_mtime_ns, filter_id, PREVIEW_SIDES[size])

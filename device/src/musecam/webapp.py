@@ -38,13 +38,13 @@ from .config import DeviceConfig, HardwareProfile
 from .edits import Edit
 from .edits import preview as edit_preview
 from .edits import render as render_edit
+from .filters import FILTER_PRESETS
 from .image_model import (
     ImageModelError,
     create_image_model,
     style_prompt,
     styles_unavailable,
 )
-from .looks import LOOK_PRESETS
 from .models import CaptureJob, Generation, Photo, Preset, ScreenState
 from .store import CaptureStore
 from .system import DeviceSystem
@@ -244,6 +244,9 @@ class CameraWebController:
             loaded = presets or self._store.load_presets() or FALLBACK_PRESETS
         styles = [p for p in loaded if p.id not in RETIRED_PRESETS and p.id != "random"]
         styles = styles or FALLBACK_PRESETS
+        # Each tab's styles sit together, so the buttons step through one tab and
+        # then the other.
+        styles = sorted(styles, key=lambda p: p.category == "look")
         # A single style, such as an event's server-picked Surprise, needs no Random
         # entry, and the interface hides the picker.
         presets = styles if len(styles) == 1 else [RANDOM_PRESET, *styles]
@@ -529,7 +532,9 @@ class CameraWebController:
 
     def _resolve_preset(self, preset: Preset) -> Preset:
         if preset.id == "random":
-            return random.choice([p for p in self._presets if p.id not in PICKER_ONLY])
+            styles = [p for p in self._presets if p.id not in PICKER_ONLY]
+            # Random is a fun style; a look is always a deliberate choice.
+            return random.choice([p for p in styles if p.category == "fun"] or styles)
         return preset
 
     def _clear_countdown_locked(self) -> None:
@@ -994,11 +999,11 @@ class CameraWebController:
     def _preset_name(self, preset_id: str) -> str:
         retired = RETIRED_PRESETS.get(preset_id)
         # Bundled styles keep their names while styles are off and the rail is empty.
-        # Looks were once styles too, so older versions may use one.
+        # Filters were once styles too, so older versions may use one.
         return next(
             (
                 p.name
-                for p in (*self._presets, *LOOK_PRESETS, *FALLBACK_PRESETS)
+                for p in (*self._presets, *FILTER_PRESETS, *FALLBACK_PRESETS)
                 if p.id == preset_id
             ),
             retired.name if retired else preset_id,
@@ -1044,7 +1049,7 @@ class CameraWebController:
                 "canShare": not self._standalone,
                 # Edited versions can't be shared, so only standalone cameras edit.
                 "canEdit": self._standalone,
-                "looks": [{"id": p.id, "name": p.name} for p in LOOK_PRESETS],
+                "filters": [{"id": p.id, "name": p.name} for p in FILTER_PRESETS],
                 "stylesOff": self._styles_off,
                 "simulate": self._simulate,
                 "revision": self._revision,
@@ -1056,6 +1061,7 @@ class CameraWebController:
         return {
             "id": preset.id,
             "kind": preset.id if preset.id in PICKER_ONLY else "imagined",
+            "category": preset.category,
             "name": preset.name,
             "description": preset.description,
             "accent": preset.accent,
@@ -1273,11 +1279,11 @@ class CameraWebController:
             raise ValueError("Wait for this version to finish before editing it")
         return self._media_file(job.result_path), None, self._job_preset_name(job)
 
-    def edit_preview(self, photo_id: str, target: str | None, look: str | None,
+    def edit_preview(self, photo_id: str, target: str | None, filter_id: str | None,
                      size: str) -> bytes:
         source, _, _ = self._edit_source(photo_id, target)
         try:
-            return edit_preview(source, look, size)
+            return edit_preview(source, filter_id, size)
         except OSError as error:
             raise ValueError("Photo unavailable") from error
 
@@ -1570,12 +1576,12 @@ async def _version_delete(request: web.Request) -> web.Response:
 
 
 async def _edit_preview(request: web.Request) -> web.Response:
-    look = request.query.get("look", "none")
+    filter_id = request.query.get("filter", "none")
     body = await asyncio.to_thread(
         request.app["controller"].edit_preview,
         request.match_info["photo_id"],
         request.query.get("target"),
-        None if look == "none" else look,
+        None if filter_id == "none" else filter_id,
         request.query.get("size", ""),
     )
     return web.Response(

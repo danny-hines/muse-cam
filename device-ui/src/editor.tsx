@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Look, Version } from "./types";
+import type { Filter, Version } from "./types";
 import { api } from "./use-camera";
 import { Icon } from "./icons";
 import {
@@ -18,22 +18,23 @@ import {
 export function Editor({
   photoId,
   version,
-  looks,
+  filters,
   onClose,
   onSaved,
 }: {
   photoId: string;
   version: Version | null;
-  looks: Look[];
+  filters: Filter[];
   onClose: () => void;
   onSaved: (versionId: string) => void;
 }) {
   const start = version?.edit ?? null;
   const target = version?.id ?? "original";
-  const [tab, setTab] = useState<"looks" | "adjust">(
-    start && !start.look && adjusted(start) ? "adjust" : "looks",
+  const [tab, setTab] = useState<"filters" | "adjust">(
+    start && !start.look && adjusted(start) ? "adjust" : "filters",
   );
-  const [look, setLook] = useState<string | null>(start?.look ?? null);
+  // A saved recipe calls its filter "look", the name filters first had.
+  const [filter, setFilter] = useState<string | null>(start?.look ?? null);
   const [values, setValues] = useState<Adjustments>(
     start
       ? { light: start.light, contrast: start.contrast, color: start.color, warmth: start.warmth }
@@ -42,16 +43,16 @@ export function Editor({
   const [comparing, setComparing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  // The camera renders looks; the screen adds the adjustments as a filter.
-  const preview = (lookId: string | null, size: "thumb" | "screen") =>
+  // The camera renders filters; the screen adds the adjustments in SVG.
+  const preview = (filterId: string | null, size: "thumb" | "screen") =>
     `/api/edit/${encodeURIComponent(photoId)}/preview?target=${encodeURIComponent(target)}` +
-    `&look=${lookId ?? "none"}&size=${size}`;
-  const wanted = preview(look, "screen");
+    `&filter=${filterId ?? "none"}&size=${size}`;
+  const wanted = preview(filter, "screen");
   const before = preview(null, "screen");
   const [shown, setShown] = useState(wanted);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    // Keep the last look on screen until the next one arrives.
+    // Keep the last filter on screen until the next one arrives.
     let active = true;
     setLoading(true);
     const image = new Image();
@@ -76,7 +77,7 @@ export function Editor({
   const { exponent, matrix } = useMemo(() => adjustment(values), [values]);
   const filtered = adjusted(values) && !comparing;
   const changed =
-    look !== (start?.look ?? null) ||
+    filter !== (start?.look ?? null) ||
     ADJUSTMENTS.some(({ key }) => values[key] !== (start?.[key] ?? 0));
   const save = async () => {
     setSaving(true);
@@ -84,7 +85,7 @@ export function Editor({
     try {
       const result = await api<{ versionId: string }>(
         `/api/edit/${encodeURIComponent(photoId)}`,
-        { target: version?.id ?? null, look, ...values },
+        { target: version?.id ?? null, look: filter, ...values },
       );
       onSaved(result.versionId);
     } catch (problem) {
@@ -143,14 +144,14 @@ export function Editor({
             style={{ filter: filtered ? "url(#edit-adjust)" : "none" }}
           />
           <span className="editor-hint">
-            {comparing ? "Before" : loading ? "Loading look…" : "Hold to compare"}
+            {comparing ? "Before" : loading ? "Loading filter…" : "Hold to compare"}
           </span>
         </div>
         <aside className="editor-panel">
           <nav className="editor-tabs" role="tablist" aria-label="Edit tools">
             {(
               [
-                ["looks", "Looks", "look"],
+                ["filters", "Filters", "filter"],
                 ["adjust", "Adjust", "settings"],
               ] as const
             ).map(([key, label, icon]) => (
@@ -166,15 +167,15 @@ export function Editor({
               </button>
             ))}
           </nav>
-          {tab === "looks" ? (
-            <div className="look-grid" role="tabpanel" aria-label="Looks">
-              {[{ id: null, name: "None" }, ...looks].map((item) => (
+          {tab === "filters" ? (
+            <div className="filter-grid" role="tabpanel" aria-label="Filters">
+              {[{ id: null, name: "None" }, ...filters].map((item) => (
                 <button
                   key={item.id ?? "none"}
-                  className={look === item.id ? "look-tile selected" : "look-tile"}
-                  aria-pressed={look === item.id}
+                  className={filter === item.id ? "filter-tile selected" : "filter-tile"}
+                  aria-pressed={filter === item.id}
                   disabled={saving}
-                  onClick={() => setLook(item.id)}
+                  onClick={() => setFilter(item.id)}
                 >
                   <img src={preview(item.id, "thumb")} alt="" draggable={false} />
                   <span>{item.name}</span>

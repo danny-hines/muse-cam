@@ -7,6 +7,7 @@ export type Adjustments = {
   warmth: number;
 };
 export type EditRecipe = Adjustments & {
+  // The filter's id. Recipes saved on a roll call it "look", its first name.
   look: string | null;
   // The name of the version the edit started from; null for the original.
   from?: string | null;
@@ -54,10 +55,10 @@ export const signed = (value: number) =>
   value > 0 ? `+${value}` : value < 0 ? `−${-value}` : "0";
 
 // "From First Contact · Warm Film · Light +20 · Color −10"
-export function editSummary(edit: EditRecipe, lookName: (id: string) => string) {
+export function editSummary(edit: EditRecipe, filterName: (id: string) => string) {
   const parts = [
     edit.from ? `From ${edit.from}` : "",
-    edit.look ? lookName(edit.look) : "",
+    edit.look ? filterName(edit.look) : "",
     ...ADJUSTMENTS.filter(({ key }) => edit[key]).map(
       ({ key, label }) => `${label} ${signed(edit[key])}`,
     ),

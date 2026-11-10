@@ -351,6 +351,35 @@ svg {
   display: grid;
   place-items: center;
 }
+.style-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 11px;
+  background: #1d2420;
+  border: 1px solid #ffffff12;
+}
+.style-tabs button {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #bcc4b9;
+}
+.style-tabs button.selected {
+  background: #f7b583;
+  color: #24211d;
+}
+.rail-heading > .style-tabs {
+  flex: 1;
+  margin: 5px 0 5px -8px;
+}
+.style-sheet > .style-tabs {
+  margin: 0 19px 10px;
+}
 .rail-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1083,7 +1112,7 @@ svg {
   background: #f7b583;
   color: #24211d;
 }
-.look-grid {
+.filter-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -1091,7 +1120,7 @@ svg {
   min-height: 0;
   scrollbar-width: none;
 }
-.look-tile {
+.filter-tile {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1103,14 +1132,14 @@ svg {
   font-weight: 550;
   color: #d6d9cf;
 }
-.look-tile img {
+.filter-tile img {
   width: 100%;
   aspect-ratio: 3 / 2;
   object-fit: cover;
   border-radius: 8px;
   background: #2a302c;
 }
-.look-tile.selected {
+.filter-tile.selected {
   border-color: #f7b583;
   color: #fff;
 }

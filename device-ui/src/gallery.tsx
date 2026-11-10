@@ -7,6 +7,7 @@ import type {
   PhotoDetailData,
   Preset,
   Version,
+  StyleTab,
 } from "./types";
 import { api } from "./use-camera";
 import { Icon } from "./icons";
@@ -25,6 +26,39 @@ export const photoStatus = (status: string) =>
   })[status] || status;
 export const presetIcon = (preset: Preset) =>
   preset.kind === "random" ? "shuffle" : preset.kind === "original" ? "camera" : "spark";
+
+// Fun and Looks, shown only when the camera has styles of both kinds.
+export function StyleTabs({
+  tab,
+  onChange,
+}: {
+  tab: StyleTab;
+  onChange: (tab: StyleTab) => void;
+}) {
+  return (
+    <nav className="style-tabs" role="tablist" aria-label="Kinds of style">
+      {(
+        [
+          ["fun", "Fun"],
+          ["look", "Looks"],
+        ] as const
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={tab === key}
+          className={tab === key ? "selected" : ""}
+          onClick={() => onChange(key)}
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+export const hasBothKinds = (presets: Preset[]) =>
+  presets.some((preset) => preset.category === "look") &&
+  presets.some((preset) => preset.kind === "imagined" && preset.category === "fun");
 const isWaiting = (status: string) => status === "queued" || status === "uploading";
 
 function StatusIcon({ status, shared }: { status: string; shared: boolean }) {
@@ -238,6 +272,7 @@ export function PhotoDetail({
   const [remixing, setRemixing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [presetId, setPresetId] = useState("");
+  const [styleTab, setStyleTab] = useState<StyleTab>("fun");
   const [pending, setPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState<"version" | "photo" | null>(null);
@@ -305,20 +340,30 @@ export function PhotoDetail({
   const photoBusy = versions.some(versionBusy);
   // Restyle can pick Random, but Original is not a style.
   const styles = state.presets.filter((preset) => preset.id !== "original");
+  const tabbed = hasBothKinds(styles);
+  const listed = tabbed ? styles.filter((preset) => preset.category === styleTab) : styles;
+  const showStyles = (tab: StyleTab) => {
+    setStyleTab(tab);
+    // Create version always makes the style that is on screen and marked.
+    const first = styles.find((preset) => preset.category === tab);
+    if (first && tab !== styleTab) setPresetId(first.id);
+  };
   const restyle = () => {
     // With a single style there is nothing to pick.
     if (styles.length === 1) {
       void perform("remix", { photoId: id, presetId: styles[0].id });
       return;
     }
-    if (!styles.some((preset) => preset.id === presetId)) {
+    let chosen = styles.find((preset) => preset.id === presetId);
+    if (!chosen) {
       const current = version?.presetId ?? state.preset.id;
-      setPresetId(
-        (styles.find((preset) => preset.id === current) ??
-          styles.find((preset) => preset.id === state.preset.id) ??
-          styles[0]).id,
-      );
+      chosen =
+        styles.find((preset) => preset.id === current) ??
+        styles.find((preset) => preset.id === state.preset.id) ??
+        styles[0];
+      setPresetId(chosen.id);
     }
+    setStyleTab(chosen.category);
     setRemixing(true);
   };
   const remove = async (scope: "version" | "photo") => {
@@ -343,8 +388,8 @@ export function PhotoDetail({
   const showing = original || !version ? null : version.id;
   // The original, or any finished version, can be edited.
   const editable = state.canEdit && (!version || (version.status === "complete" && !!resultUrl));
-  const lookName = (lookId: string) =>
-    state.looks.find((look) => look.id === lookId)?.name ?? lookId;
+  const filterName = (filterId: string) =>
+    state.filters.find((item) => item.id === filterId)?.name ?? filterId;
   const covered = remixing || editing;
   return (
     <section className="page detail-page" aria-label="Photo detail">
@@ -410,7 +455,7 @@ export function PhotoDetail({
               {version?.status === "failed"
                 ? version.error
                 : version?.edit
-                  ? editSummary(version.edit, lookName)
+                  ? editSummary(version.edit, filterName)
                 : resultUrl
                   ? "Swipe to browse · Pinch to zoom · Hold for original"
                   : version
@@ -520,7 +565,7 @@ export function PhotoDetail({
         <Editor
           photoId={id}
           version={version}
-          looks={state.looks}
+          filters={state.filters}
           onClose={() => setEditing(false)}
           onSaved={(saved) => {
             setEditing(false);
@@ -549,8 +594,9 @@ export function PhotoDetail({
                 <Icon name="close" />
               </button>
             </header>
-            <div className="style-options">
-              {styles.map((preset) => (
+            {tabbed && <StyleTabs tab={styleTab} onChange={showStyles} />}
+            <div className="style-options" key={styleTab}>
+              {listed.map((preset) => (
                 <StyleOption
                   key={preset.id}
                   preset={preset}

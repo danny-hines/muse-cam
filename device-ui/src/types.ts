@@ -4,10 +4,13 @@ export type Preset = {
   id: string;
   // Original saves the photo as taken; Random picks an imagined style.
   kind: "original" | "random" | "imagined";
+  // Looks keep the people and the moment; they get their own tab.
+  category: "fun" | "look";
   name: string;
   description: string;
   accent: string;
 };
+export type StyleTab = Preset["category"];
 export type Notice = {
   id: number;
   kind: string;
@@ -53,7 +56,7 @@ export type CameraState = {
   canShare: boolean;
   // Standalone cameras edit photos; Edited versions can't be shared.
   canEdit: boolean;
-  looks: Look[];
+  filters: Filter[];
   simulate: boolean;
   revision: number;
   sessionId: string;
@@ -96,7 +99,7 @@ export type Version = {
   // Set on an Edited version.
   edit: EditRecipe | null;
 };
-export type Look = { id: string; name: string };
+export type Filter = { id: string; name: string };
 // An original shot and the versions made from it.
 export type Photo = {
   id: string;

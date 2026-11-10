@@ -72,7 +72,7 @@ describe("preset catalog", () => {
     expect(bundled).toEqual(publicPresets);
     expect(publicPresets).toHaveLength(presets.length);
     for (const preset of publicPresets) {
-      expect(Object.keys(preset).sort()).toEqual(["accent", "description", "id", "name", "version"]);
+      expect(Object.keys(preset).sort()).toEqual(["accent", "category", "description", "id", "name", "version"]);
       expect(getPreset(preset.id)).toBeDefined();
     }
   });
@@ -150,7 +150,12 @@ describe("event styles", () => {
     const ids = (random: () => number) => surpriseCandidates(catalog, { presetIds }, [], random).map(({ id }) => id);
     expect(ids(() => 0).sort()).toEqual([...presetIds].sort());
     expect(ids(() => 0)).not.toEqual(ids(() => 0.99));
-    expect(surpriseCandidates(catalog, null)).toHaveLength(presets.length);
+    // Looks keep the photo realistic, so a surprise never lands on one.
+    const fun = presets.filter(({ category }) => category !== "look");
+    expect(fun.length).toBeLessThan(presets.length);
+    expect(surpriseCandidates(catalog, null).map(({ id }) => id).sort()).toEqual(fun.map(({ id }) => id).sort());
+    const looksOnly = { presetIds: ["golden-hour", "soft-focus"] };
+    expect(surpriseCandidates(catalog, looksOnly).map(({ id }) => id).sort()).toEqual(looksOnly.presetIds);
     expect(catalog.get(surprisePreset.id)).toBeUndefined();
   });
 

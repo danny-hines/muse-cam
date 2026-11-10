@@ -67,7 +67,7 @@ describe("camera style list", () => {
     const response = await GET(new Request("https://camera.test/api/device/presets", {
       headers: { Authorization: `Bearer ${token}` },
     }));
-    expect((await response.json()).presets).toEqual([surprisePreset]);
+    expect((await response.json()).presets).toEqual([{ ...surprisePreset, category: "fun" }]);
   });
 
   it("fails rather than replace the camera's cached list when events or styles can't load", async () => {

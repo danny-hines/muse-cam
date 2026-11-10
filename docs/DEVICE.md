@@ -80,22 +80,24 @@ starts on Random; the rail remembers the last choice. Connected cameras don't
 offer Original, since event photos are always imagined.
 
 **Edit** in a photo's view opens the editor on whatever is selected: the
-original, a styled version, or an earlier edit. The **Looks** tab has five finishes,
+original, a styled version, or an earlier edit. The **Filters** tab has five finishes,
 Black & White, Warm Film, Faded, Punchy, and Vintage, shown as thumbnails of the
 photo. The **Adjust** tab has Light, Contrast, Color, and Warmth sliders from −100
 to +100; double-tap one to zero it. Hold the photo to see it before editing.
 **Done** saves an **Edited** version in the photo's stack, at the photo's saved
-size, in about 0.5–2 s on a Pi 3B+. Editing an Edited version picks up its look
+size, in about 0.5–2 s on a Pi 3B+. Editing an Edited version picks up its filter
 and sliders and updates that version instead of adding another. An edit of a
 styled version keeps the styled image it started from even if that version is
 deleted later. Edits make no API call. Connected cameras don't edit, since an
 Edited version can't be shared to an event.
 
-The camera renders each look, and the screen previews the sliders instantly with
+The camera renders each filter, and the screen previews the sliders instantly with
 an SVG filter built from the same numbers the camera uses to save the photo. The
 math is in `device/src/musecam/edits.py` and `device-ui/src/edit-math.ts`, and a
-test on each side checks the same values. The look recipes are in
-`device/src/musecam/looks.py`.
+test on each side checks the same values. The filter recipes are in
+`device/src/musecam/filters.py`. Filters were first called looks, so their ids
+start with `look-` and a saved edit stores its filter as `look`; the AI styles on
+the **Looks** tab are unrelated.
 
 When no style can run, the camera falls back to Original. That happens when the
 key for the selected provider is missing from `/etc/musecam/device.env`, or when
@@ -134,7 +136,7 @@ Rerunning the installer keeps the mode, key, and any settings added by hand. Add
 the installer then asks for that provider's key.
 
 The camera sends the same prompts and request as the server's Muse Image
-provider. It bundles the 30 public styles in
+provider. It bundles the 36 public styles in
 `device/src/musecam/standalone-presets.json`. After changing a built-in style in
 `web/src/config/presets.ts`, run `pnpm --dir web styles:export`; a web test fails
 until the two match. Event-only styles stay on the server. The prompts were

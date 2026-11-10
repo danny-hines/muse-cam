@@ -132,10 +132,36 @@ original. The Python wheel contains and loads both catalogs.
 ## Keeping the device catalog synchronized
 
 `device/src/musecam/presets.json` bundles active public metadata (ID, version,
-name, description, accent). `device/src/musecam/retired-presets.json` preserves
-metadata for retired styles. Both are included in the installed Python package.
-Update these files when changing metadata; web tests verify parity and ensure
-prompts are absent from the public API response.
+name, description, accent, category). `device/src/musecam/retired-presets.json`
+preserves metadata for retired styles. Both are included in the installed Python
+package. `pnpm --dir web styles:export` writes `presets.json` and the standalone
+camera's `standalone-presets.json` from `web/src/config/presets.ts`; web tests
+verify parity and ensure prompts are absent from the public API response.
+
+## Fun styles and looks
+
+Each style has a `category`. **Fun** styles (the default when the field is
+absent) reimagine the photo: they may change clothing, props, the setting, or the
+medium. **Looks** (`category: "look"`) keep the people and the moment in a
+realistic photograph, and are free to change the light, the time of day, and the
+atmosphere: Night Out turns an afternoon into dusk and lights the lamps. A look
+is a matter of taste, not a correction. A style that changes clothing or adds or
+swaps things in the scene belongs in fun, however photographic it is (Found in
+1997 and Mall Portrait, 1988 are fun for that reason).
+
+The camera shows the two kinds on **Fun** and **Looks** tabs, on the capture
+rail and in the Restyle picker, when its list has both; Original sits above the
+tabs. Random on the camera and Surprise on the server pick fun styles only, and
+fall back to the whole list when an event has no fun styles. The device API sends
+`category` with each style; cameras older than the tabs ignore it and show one
+list.
+
+The look prompts share `lookPreservationPrompt`, which is stricter than the fun
+styles' preservation text: same faces, clothing, pose, place, and framing, with
+no people or objects added or removed.
+
+The photo editor's **Filters** are a different thing: fixed recipes the camera
+applies itself, with no model (see `docs/DEVICE.md`).
 
 Event-only styles are never bundled: `presets.json` holds the default catalog
 only, and the API sends event-only styles just to cameras whose event turns

@@ -347,7 +347,7 @@ def test_an_edit_adds_an_edited_version_and_editing_it_again_updates_it(
         wait_until(lambda: controller.state()["view"]["photoId"] == photo_id)
         state = controller.state()
         assert state["canEdit"] is True
-        assert [look["id"] for look in state["looks"]][:2] == ["look-bw", "look-warm-film"]
+        assert [item["id"] for item in state["filters"]][:2] == ["look-bw", "look-warm-film"]
 
         saved = controller.save_edit(
             photo_id, {"target": None, "look": "look-warm-film", "light": 20}
@@ -521,7 +521,7 @@ def test_the_editor_over_http(tmp_path: Path) -> None:
         async with TestClient(TestServer(create_web_app(controller))) as client:
             photo_id = await asyncio.to_thread(take_plain_photo, controller)
             response = await client.get(
-                f"/api/edit/{photo_id}/preview?target=original&look=look-bw&size=thumb"
+                f"/api/edit/{photo_id}/preview?target=original&filter=look-bw&size=thumb"
             )
             assert (response.status, response.content_type) == (200, "image/jpeg")
             with Image.open(BytesIO(await response.read())) as image:
@@ -561,7 +561,25 @@ def test_random_picks_only_imagined_styles(tmp_path: Path, monkeypatch) -> None:
     )
     try:
         controller._resolve_preset(RANDOM_PRESET)
-        assert {p.id for p in seen} == {p.id for p in FALLBACK_PRESETS}
+        # Looks keep the photo realistic, so Random never lands on one.
+        fun = {p.id for p in FALLBACK_PRESETS if p.category == "fun"}
+        assert {p.id for p in seen} == fun
+        assert fun < {p.id for p in FALLBACK_PRESETS}
+    finally:
+        controller.close()
+
+
+def test_looks_follow_the_fun_styles(tmp_path: Path) -> None:
+    listed = {"id": "a", "version": 1, "name": "A", "description": "", "accent": "#fff"}
+    assert Preset.from_api(listed).category == "fun"
+    assert Preset.from_api({**listed, "category": "look"}).category == "look"
+    controller = make_standalone(tmp_path, offline=True)
+    try:
+        controller._load_presets()
+        styles = [p for p in controller.state()["presets"] if p["kind"] == "imagined"]
+        kinds = [p["category"] for p in styles]
+        assert kinds == sorted(kinds)  # "fun" sorts before "look"
+        assert {"fun", "look"} == set(kinds)
     finally:
         controller.close()
 

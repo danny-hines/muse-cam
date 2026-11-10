@@ -4,209 +4,287 @@
     "version": 3,
     "name": "After the End",
     "description": "A quiet world reclaimed by nature: weathered buildings, greenery, and amber light.",
-    "accent": "#ff6c51"
+    "accent": "#ff6c51",
+    "category": "fun"
   },
   {
     "id": "kid-drawing",
     "version": 1,
     "name": "Fridge Masterpiece",
     "description": "Wobbly crayons, joyful colors, and the confidence of a five-year-old artist.",
-    "accent": "#ffd84a"
+    "accent": "#ffd84a",
+    "category": "fun"
   },
   {
     "id": "alien-visitor",
     "version": 2,
     "name": "First Contact",
     "description": "A friendly visitor, green-violet light, and a little everyday science-fiction wonder.",
-    "accent": "#d7ff42"
+    "accent": "#d7ff42",
+    "category": "fun"
   },
   {
     "id": "claymation",
     "version": 1,
     "name": "Tiny Clay World",
     "description": "Hand-shaped characters, miniature sets, fingerprints, and stop-motion charm.",
-    "accent": "#f39b69"
+    "accent": "#f39b69",
+    "category": "fun"
   },
   {
     "id": "disposable-90s",
     "version": 2,
     "name": "Found in 1997",
     "description": "Direct flash, chunky grain, and a late-90s makeover for outfits, hair, and gadgets.",
-    "accent": "#5ac6c8"
+    "accent": "#5ac6c8",
+    "category": "fun"
   },
   {
     "id": "storybook",
     "version": 1,
     "name": "Bedtime Legend",
     "description": "A warm, richly painted page from an old and well-loved storybook.",
-    "accent": "#6657de"
+    "accent": "#6657de",
+    "category": "fun"
   },
   {
     "id": "panel-one",
     "version": 1,
     "name": "Panel One",
     "description": "Bold comic inks, halftone dots, and vintage printed color.",
-    "accent": "#ec765e"
+    "accent": "#ec765e",
+    "category": "fun"
   },
   {
     "id": "after-school",
     "version": 1,
     "name": "Anime Cel",
     "description": "A nostalgic cel-anime frame with painted backgrounds and expressive faces.",
-    "accent": "#f89db7"
+    "accent": "#f89db7",
+    "category": "fun"
   },
   {
     "id": "prime-time",
     "version": 1,
     "name": "Prime Time",
     "description": "Your everyday cast in a bright, flat-color animated sitcom.",
-    "accent": "#f2c94c"
+    "accent": "#f2c94c",
+    "category": "fun"
   },
   {
     "id": "big-screen",
     "version": 1,
     "name": "3D Toon",
     "description": "Expressive sculpted characters and warm cinematic 3D animation.",
-    "accent": "#f7a85c"
+    "accent": "#f7a85c",
+    "category": "fun"
   },
   {
     "id": "pocket-arcade",
     "version": 1,
     "name": "Title Screen",
     "description": "Detailed pixel illustration with the atmosphere of a retro title screen.",
-    "accent": "#75bdff"
+    "accent": "#75bdff",
+    "category": "fun"
   },
   {
     "id": "player-one",
     "version": 1,
     "name": "Player One",
     "description": "Small playable sprites in a full 16-bit game scene built from your photo.",
-    "accent": "#8ac975"
+    "accent": "#8ac975",
+    "category": "fun"
   },
   {
     "id": "memory-card",
     "version": 3,
     "name": "Insert Disc 2",
     "description": "Chunky console characters, soft photographic textures, and a wider view of close-up portraits.",
-    "accent": "#a6b987"
+    "accent": "#a6b987",
+    "category": "fun"
   },
   {
     "id": "age-of-legends",
     "version": 2,
     "name": "Age of Legends",
     "description": "One fantasy world, many moods: woodland courts, dragon dynasties, and royal castles.",
-    "accent": "#cba564"
+    "accent": "#cba564",
+    "category": "fun"
   },
   {
     "id": "paper-universe",
     "version": 1,
     "name": "Paper Universe",
     "description": "Folded paper, layered silhouettes, and tiny sculpted shadows.",
-    "accent": "#dfb996"
+    "accent": "#dfb996",
+    "category": "fun"
   },
   {
     "id": "soft-spot",
     "version": 1,
     "name": "Soft Spot",
     "description": "Padded felt figures, woolly scenery, and embroidered details.",
-    "accent": "#e4a4be"
+    "accent": "#e4a4be",
+    "category": "fun"
   },
   {
     "id": "neon-rain",
     "version": 1,
     "name": "Neon Rain",
     "description": "Neon reflections, cinematic color, and a quietly futuristic night.",
-    "accent": "#b29bff"
+    "accent": "#b29bff",
+    "category": "fun"
   },
   {
     "id": "stained-in-light",
     "version": 1,
     "name": "Stained in Light",
     "description": "Luminous jewel-colored glass and carefully traced dark outlines.",
-    "accent": "#78bed8"
+    "accent": "#78bed8",
+    "category": "fun"
   },
   {
     "id": "brick-by-brick",
     "version": 1,
     "name": "Brick by Brick",
     "description": "Plastic minifigures and a whole world built from glossy interlocking bricks.",
-    "accent": "#f4c542"
+    "accent": "#f4c542",
+    "category": "fun"
   },
   {
     "id": "museum-piece",
     "version": 1,
     "name": "Museum Piece",
     "description": "Rich oil paint, velvet clothing, and an unnecessarily regal old-master portrait.",
-    "accent": "#bd955b"
+    "accent": "#bd955b",
+    "category": "fun"
   },
   {
     "id": "mall-portrait-1988",
     "version": 1,
     "name": "Mall Portrait, 1988",
     "description": "Feathered hair, pastel sweaters, and gloriously soft-focus shopping-mall glamour.",
-    "accent": "#d4a6d5"
+    "accent": "#d4a6d5",
+    "category": "fun"
   },
   {
     "id": "midnight-matinee",
     "version": 1,
     "name": "Midnight Matinee",
     "description": "Silver-screen noir, hard shadows, and an everyday moment full of mystery.",
-    "accent": "#aab4c7"
+    "accent": "#aab4c7",
+    "category": "fun"
   },
   {
     "id": "rubber-hose",
     "version": 1,
     "name": "Rubber Hose",
     "description": "Bendy limbs, pie-cut eyes, and the mischievous bounce of a 1930s cartoon.",
-    "accent": "#d8cbb0"
+    "accent": "#d8cbb0",
+    "category": "fun"
   },
   {
     "id": "velvet-fever",
     "version": 1,
     "name": "Velvet Fever",
     "description": "Fluorescent color, flowing patterns, and the glow of a psychedelic blacklight poster.",
-    "accent": "#dc79ef"
+    "accent": "#dc79ef",
+    "category": "fun"
   },
   {
     "id": "dream-logic",
     "version": 1,
     "name": "Dream Logic",
     "description": "Ordinary people, floating furniture, and a photoreal world with impossible rules.",
-    "accent": "#9bbde5"
+    "accent": "#9bbde5",
+    "category": "fun"
   },
   {
     "id": "wish-you-were-here",
     "version": 1,
     "name": "Wish You Were Here",
     "description": "A glamorous vintage travel illustration starring wherever you happen to be.",
-    "accent": "#ebaa74"
+    "accent": "#ebaa74",
+    "category": "fun"
   },
   {
     "id": "snow-globe",
     "version": 1,
     "name": "Snow Globe",
     "description": "Your scene in a tiny glass globe, with drifting snow and curved reflections.",
-    "accent": "#a8d8e6"
+    "accent": "#a8d8e6",
+    "category": "fun"
   },
   {
     "id": "deep-blue",
     "version": 1,
     "name": "Deep Blue",
     "description": "An enchanted underwater world with rippling sunlight, bubbles, and passing fish.",
-    "accent": "#57bfd1"
+    "accent": "#57bfd1",
+    "category": "fun"
   },
   {
     "id": "high-seas",
     "version": 1,
     "name": "High Seas",
     "description": "Tricorn hats, weathered coats, and a sunlit pirate adventure on the high seas.",
-    "accent": "#58b7af"
+    "accent": "#58b7af",
+    "category": "fun"
   },
   {
     "id": "high-noon",
     "version": 1,
     "name": "High Noon",
     "description": "Cowboy hats, worn leather, and the dusty golden light of a classic Western.",
-    "accent": "#d79861"
+    "accent": "#d79861",
+    "category": "fun"
+  },
+  {
+    "id": "golden-hour",
+    "version": 1,
+    "name": "Golden Hour",
+    "description": "The same photo in low, warm evening sun with soft long shadows.",
+    "accent": "#f2b35c",
+    "category": "look"
+  },
+  {
+    "id": "studio-portrait",
+    "version": 1,
+    "name": "Studio Portrait",
+    "description": "Soft, flattering portrait light, as if a photographer had lit the room.",
+    "accent": "#e8e2d4",
+    "category": "look"
+  },
+  {
+    "id": "soft-focus",
+    "version": 1,
+    "name": "Soft Focus",
+    "description": "A fast portrait lens: the subject sharp, the background melted into blur.",
+    "accent": "#c9b8e8",
+    "category": "look"
+  },
+  {
+    "id": "direct-flash",
+    "version": 1,
+    "name": "Flash",
+    "description": "Direct on-camera flash: crisp, bright subjects against a darker room.",
+    "accent": "#f6f3ea",
+    "category": "look"
+  },
+  {
+    "id": "night-out",
+    "version": 1,
+    "name": "Night Out",
+    "description": "Moody evening light: deep blue dusk and the warm glow of lamps.",
+    "accent": "#7f9cf0",
+    "category": "look"
+  },
+  {
+    "id": "silver-portrait",
+    "version": 1,
+    "name": "Silver Portrait",
+    "description": "Black and white with sculpted light, deep blacks, and fine grain.",
+    "accent": "#a9afb5",
+    "category": "look"
   }
 ]

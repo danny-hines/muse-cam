@@ -13,6 +13,9 @@ class Preset:
     name: str
     description: str
     accent: str
+    # Looks keep the people and the moment and get their own tab. Lists from
+    # an older server or cache have no category, and everything in them is fun.
+    category: str = "fun"
 
     @classmethod
     def from_api(cls, value: dict[str, Any]) -> Preset:
@@ -22,6 +25,7 @@ class Preset:
             name=str(value["name"]),
             description=str(value["description"]),
             accent=str(value["accent"]),
+            category="look" if value.get("category") == "look" else "fun",
         )
 
 
@@ -67,7 +71,7 @@ class CaptureJob:
     preset_name: str | None = None
     # The original photo this job is a version of.
     photo_id: str | None = None
-    # An Edited version's recipe: its look, adjustments, and the name of the
+    # An Edited version's recipe: its filter, adjustments, and the name of the
     # version it was edited from (None for the original).
     edit: dict | None = None
 

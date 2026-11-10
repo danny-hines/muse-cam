@@ -1,6 +1,6 @@
-"""Looks: photo finishes the editor makes on the camera with no model, key, or network.
+"""Filters: photo finishes the editor makes on the camera with no model, key, or network.
 
-Each look is a small Pillow recipe. On a Pi 3B+ one takes about 0.5–1.7 s on a
+Each filter is a small Pillow recipe. On a Pi 3B+ one takes about 0.5–1.7 s on a
 saved 1920 × 1280 photo.
 """
 
@@ -80,7 +80,10 @@ def vintage(image: Image.Image) -> Image.Image:
     return _grain(_vignette(sepia, 0.45), 0.25)
 
 
-LOOKS: dict[str, tuple[Preset, Callable[[Image.Image], Image.Image]]] = {
+# Filters were first called looks, a name the AI styles on the Looks tab have
+# since taken. Rolls already hold edits made with these ids, so the ids keep
+# their "look-" prefix.
+FILTERS: dict[str, tuple[Preset, Callable[[Image.Image], Image.Image]]] = {
     preset.id: (preset, recipe)
     for preset, recipe in (
         (
@@ -105,5 +108,5 @@ LOOKS: dict[str, tuple[Preset, Callable[[Image.Image], Image.Image]]] = {
         ),
     )
 }
-LOOK_PRESETS = [preset for preset, _ in LOOKS.values()]
+FILTER_PRESETS = [preset for preset, _ in FILTERS.values()]
 

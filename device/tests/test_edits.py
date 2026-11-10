@@ -7,7 +7,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from musecam.edits import MAX_SIDE, Edit, adjust, adjustment, preview, render
-from musecam.looks import LOOK_PRESETS, LOOKS
+from musecam.filters import FILTER_PRESETS, FILTERS
 
 
 def photo(path: Path, size: tuple[int, int]) -> Path:
@@ -30,12 +30,12 @@ def ramp() -> Image.Image:
     return image
 
 
-def test_every_look_keeps_a_camera_photo_at_its_size(tmp_path: Path) -> None:
+def test_every_filter_keeps_a_camera_photo_at_its_size(tmp_path: Path) -> None:
     source = photo(tmp_path / "source.jpg", (1920, 1280))
     before = source.read_bytes()
-    for look_id in LOOKS:
-        result = tmp_path / f"{look_id}.jpg"
-        render(source, result, Edit(look=look_id))
+    for filter_id in FILTERS:
+        result = tmp_path / f"{filter_id}.jpg"
+        render(source, result, Edit(look=filter_id))
         with Image.open(result) as image:
             assert (image.format, image.size) == ("JPEG", (1920, 1280))
     assert source.read_bytes() == before
@@ -50,22 +50,22 @@ def test_large_photos_are_scaled_down_and_small_ones_kept(tmp_path: Path) -> Non
         assert image.size == (640, 480)
 
 
-def test_black_and_white_has_no_color_and_the_other_looks_change_it(tmp_path: Path) -> None:
+def test_black_and_white_has_no_color_and_the_other_filters_change_it(tmp_path: Path) -> None:
     source = photo(tmp_path / "source.jpg", (800, 480))
     with Image.open(source) as original:
         sky = original.convert("RGB").getpixel((40, 40))
-    for look_id in LOOKS:
-        render(source, tmp_path / f"{look_id}.jpg", Edit(look=look_id))
-        with Image.open(tmp_path / f"{look_id}.jpg") as image:
+    for filter_id in FILTERS:
+        render(source, tmp_path / f"{filter_id}.jpg", Edit(look=filter_id))
+        with Image.open(tmp_path / f"{filter_id}.jpg") as image:
             red, green, blue = image.convert("RGB").getpixel((40, 40))
-        if look_id == "look-bw":
+        if filter_id == "look-bw":
             assert max(red, green, blue) - min(red, green, blue) <= 3
         else:
-            assert (red, green, blue) != sky, look_id
+            assert (red, green, blue) != sky, filter_id
 
 
-def test_looks_have_names() -> None:
-    assert [preset.name for preset in LOOK_PRESETS] == [
+def test_filters_have_names() -> None:
+    assert [preset.name for preset in FILTER_PRESETS] == [
         "Black & White", "Warm Film", "Faded", "Punchy", "Vintage",
     ]
 
@@ -75,7 +75,7 @@ def test_looks_have_names() -> None:
     (
         ([], "Invalid edit"),
         ({"brightness": 10}, "Invalid edit"),
-        ({"look": "look-sepia"}, "available look"),
+        ({"look": "look-sepia"}, "available filter"),
         ({"light": 101}, "-100 to 100"),
         ({"color": 1.5}, "-100 to 100"),
         ({"warmth": True}, "-100 to 100"),
@@ -151,7 +151,7 @@ def test_the_screen_uses_the_same_numbers() -> None:
     )
 
 
-def test_previews_are_small_jpegs_with_the_look(tmp_path: Path) -> None:
+def test_previews_are_small_jpegs_with_the_filter(tmp_path: Path) -> None:
     source = photo(tmp_path / "source.jpg", (1920, 1280))
     for size, expected in (("thumb", (200, 133)), ("screen", (800, 533))):
         with Image.open(BytesIO(preview(source, "look-bw", size))) as image:
@@ -159,7 +159,7 @@ def test_previews_are_small_jpegs_with_the_look(tmp_path: Path) -> None:
             red, green, blue = image.convert("RGB").getpixel((20, 20))
             assert max(red, green, blue) - min(red, green, blue) <= 3
     assert preview(source, None, "thumb") is preview(source, None, "thumb")
-    with pytest.raises(ValueError, match="available look"):
+    with pytest.raises(ValueError, match="available filter"):
         preview(source, "look-sepia", "thumb")
     with pytest.raises(ValueError, match="preview size"):
         preview(source, None, "huge")

@@ -4,7 +4,8 @@ import { authenticateDevice, DeviceAuthError } from "@/lib/device-auth";
 import { getFleetRepository } from "@/lib/fleet";
 import { getStyleCatalog } from "@/lib/styles";
 
-type ListedPreset = Pick<Preset, "id" | "version" | "name" | "description" | "accent">;
+type ListedPreset = Pick<Preset, "id" | "version" | "name" | "description" | "accent"> &
+  Partial<Pick<Preset, "category">>;
 
 // Cameras have always sent their credential here, so an event's styles reach
 // existing cameras without an update. Anyone else gets the default catalog.
@@ -34,6 +35,8 @@ export async function GET(request: Request) {
         name: preset.name,
         description: preset.description,
         accent: preset.accent,
+        // Cameras put looks on their own tab; older ones ignore this.
+        category: preset.category ?? "fun",
       })),
     },
     { headers: { "Cache-Control": "private, no-store" } },

@@ -4,6 +4,7 @@ import type { CameraAction, CameraState, Preset } from "./types";
 const preset: Preset = {
   id: "starting",
   kind: "imagined",
+  category: "fun",
   name: "Warming up",
   description: "Getting the camera ready",
   accent: "#ffac71",
@@ -37,7 +38,7 @@ const FALLBACK: CameraState = {
   maintenance: false,
   canShare: true,
   canEdit: false,
-  looks: [],
+  filters: [],
   simulate: false,
   revision: 0,
   sessionId: "",

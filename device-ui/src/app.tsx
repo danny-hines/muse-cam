@@ -5,10 +5,10 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import type { CameraState, Notice } from "./types";
+import type { CameraState, Notice, StyleTab } from "./types";
 import { useCamera } from "./use-camera";
 import { Icon } from "./icons";
-import { Gallery, PhotoDetail, presetIcon } from "./gallery";
+import { Gallery, hasBothKinds, PhotoDetail, presetIcon, StyleTabs } from "./gallery";
 import { Settings } from "./settings";
 import { FocusTarget } from "./focus";
 
@@ -17,6 +17,7 @@ export function App() {
   const { screen, photoId } = state.view;
   const [galleryFilter, setGalleryFilter] = useState("all");
   const [stylesOpen, setStylesOpen] = useState(true);
+  const [styleTab, setStyleTab] = useState<StyleTab>("fun");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
   const seenNotice = useRef(0);
@@ -74,7 +75,11 @@ export function App() {
       block: "nearest",
       behavior: "smooth",
     });
-  }, [state.presetIndex, stylesOpen, screen]);
+  }, [state.presetIndex, stylesOpen, screen, styleTab]);
+  useEffect(() => {
+    // Follow the chosen style to its tab, including one picked with the buttons.
+    if (state.preset.kind !== "original") setStyleTab(state.preset.category);
+  }, [state.preset.id, state.preset.kind, state.preset.category]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
@@ -114,9 +119,16 @@ export function App() {
   const working = state.queued + (state.processingId ? 1 : 0);
   // An event can give the camera a single style, such as a server-picked Surprise.
   const choosesStyle = state.presets.length > 1;
+  // Original stays above the tabs' lists; each tab shows its own styles.
+  const tabbed = hasBothKinds(state.presets);
+  const railStyles = tabbed
+    ? state.presets.filter(
+        (preset) => preset.kind === "original" || preset.category === styleTab,
+      )
+    : state.presets;
   // Imagined styles are numbered from 01; Original and Random get icons.
   const styleNumbers = new Map<string, number>();
-  for (const preset of state.presets) {
+  for (const preset of railStyles) {
     if (preset.kind === "imagined") styleNumbers.set(preset.id, styleNumbers.size + 1);
   }
   const canFocus = connected && state.status === "live" && !state.maintenance;
@@ -205,7 +217,11 @@ export function App() {
           {choosesStyle && stylesOpen && (
             <aside className="style-rail" aria-label="Choose a style">
               <div className="rail-heading">
-                <span>IMAGINE IT AS</span>
+                {tabbed ? (
+                  <StyleTabs tab={styleTab} onChange={setStyleTab} />
+                ) : (
+                  <span>IMAGINE IT AS</span>
+                )}
                 <button
                   aria-label="Hide styles"
                   onClick={() => setStylesOpen(false)}
@@ -213,8 +229,8 @@ export function App() {
                   <Icon name="close" size={17} />
                 </button>
               </div>
-              <div className="rail-scroll">
-                {state.presets.map((preset) => (
+              <div className="rail-scroll" key={styleTab}>
+                {railStyles.map((preset) => (
                   <button
                     key={preset.id}
                     ref={
@@ -278,7 +294,9 @@ export function App() {
               <span className="eyebrow">
                 {state.preset.kind === "original"
                   ? "Your next photo"
-                  : "Your next imagination"}
+                  : state.preset.category === "look"
+                    ? "Your next photo, with a new look"
+                    : "Your next imagination"}
               </span>
               <strong>{state.preset.name}</strong>
               <span className="shutter-hint">
