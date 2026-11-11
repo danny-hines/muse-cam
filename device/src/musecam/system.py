@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import socket
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -12,17 +13,20 @@ class DeviceSystem:
         self.data_dir = data_dir
         self.simulate = simulate
         self._demo_ssid = "Studio Wi-Fi"
+        self._demo_saved = {"Studio Wi-Fi", "Home"}
         self._demo_job: dict[str, Any] = {"phase": "idle", "message": ""}
 
     def request(self, action: str, **values: Any) -> dict[str, Any]:
-        if action == "wifi-connect":
-            ssid, password = values.get("ssid"), values.get("password", "")
+        if action in {"wifi-connect", "wifi-forget"}:
+            ssid = values.get("ssid")
             if (
                 not isinstance(ssid, str)
                 or not 1 <= len(ssid.encode()) <= 32
                 or any(ord(c) < 32 for c in ssid)
             ):
                 raise ValueError("Enter a Wi-Fi name between 1 and 32 bytes")
+        if action == "wifi-connect":
+            password = values.get("password", "")
             if not isinstance(password, str) or (password and not 8 <= len(password) <= 63):
                 raise ValueError("Wi-Fi passwords must have 8–63 characters")
             if type(values.get("hidden", False)) is not bool:
@@ -36,22 +40,36 @@ class DeviceSystem:
                             "signal": signal,
                             "security": security,
                             "active": ssid == self._demo_ssid,
+                            "saved": ssid in self._demo_saved,
                         }
                         for ssid, signal, security in [
                             ("Studio Wi-Fi", 91, "WPA2"),
                             ("Office Guest", 78, "WPA2"),
                             ("Cafe", 55, ""),
                         ]
-                    ]
+                    ],
+                    "saved": sorted(self._demo_saved, key=str.casefold),
                 }
             if action == "wifi-connect":
                 self._demo_ssid = values["ssid"]
+                self._demo_saved.add(values["ssid"])
                 self._demo_job = {
+                    "id": str(uuid.uuid4()),
                     "phase": "complete",
                     "kind": "wifi",
                     "message": "Connected (simulator)",
                 }
                 return self._demo_job
+            if action == "wifi-forget":
+                if values["ssid"] not in self._demo_saved:
+                    raise ValueError("That network is not saved on this camera")
+                self._demo_saved.discard(values["ssid"])
+                if values["ssid"] == self._demo_ssid:
+                    self._demo_ssid = "Not connected"
+                return {
+                    "forgotten": values["ssid"],
+                    "saved": sorted(self._demo_saved, key=str.casefold),
+                }
             if action == "update-check":
                 return {
                     "current": "simulator",

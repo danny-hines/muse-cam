@@ -129,8 +129,14 @@ export type Network = {
   signal: number;
   security: string;
   active: boolean;
+  saved?: boolean;
 };
-export type DeviceJob = { phase: string; kind?: string; message?: string };
+export type DeviceJob = {
+  id?: string;
+  phase: string;
+  kind?: string;
+  message?: string;
+};
 export type SettingsData = {
   volume: number;
   processingSound: boolean;

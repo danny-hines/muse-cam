@@ -279,7 +279,7 @@ not saved or shared images.
 **Settings** includes:
 
 - Sounds: persistent master volume, mute, optional quiet processing chirps, and previews of the shutter click, processing, success, and failure cues. The default is a conservative 35%; zero silences every cue. Original synthesized sounds require no downloaded audio assets.
-- Wi-Fi: nearby networks, saved-network reconnection, hidden SSID entry, and a touchscreen password keyboard. A failed join removes its new profile and attempts to restore the previous connection. WPA personal and open networks are supported; enterprise certificates and captive-portal login are not configured here. Use a suitable office guest network or hotspot, or provision an enterprise profile separately.
+- Wi-Fi: nearby networks, hidden SSID entry, and a touchscreen password keyboard. Every network the camera joins stays saved and rejoins automatically; saved networks join with one tap, and **Saved networks** lists them all with **Forget**, which removes the profile and its password (forget a network, then join it again, to change its password). Joining with a new password replaces the old profile only once the new one connects. A failed join removes its new profile and attempts to restore the previous connection. WPA personal and open networks are supported; enterprise certificates and captive-portal login are not configured here. Use a suitable office guest network or hotspot, or provision an enterprise profile separately.
 - Storage: free/used space and photo counts. Originals and every version remain on the camera.
 - Device: hostname, addresses, installed commit, battery capability, and update controls. PiSugar S Plus does not expose a percentage; the interface reports that limitation.
 

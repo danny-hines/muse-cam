@@ -1700,10 +1700,13 @@ async def _sound(request: web.Request) -> web.Response:
 async def _system(request: web.Request) -> web.Response:
     controller = request.app["controller"]
     action = request.match_info["action"]
-    if action not in {"wifi-scan", "wifi-connect", "update-check", "update-apply"}:
+    if action not in {"wifi-scan", "wifi-connect", "wifi-forget", "update-check", "update-apply"}:
         raise web.HTTPNotFound()
     values = await request.json()
-    allowed = {"ssid", "password", "hidden"} if action == "wifi-connect" else set()
+    allowed = {
+        "wifi-connect": {"ssid", "password", "hidden"},
+        "wifi-forget": {"ssid"},
+    }.get(action, set())
     if not isinstance(values, dict) or values.keys() - allowed:
         raise ValueError("Invalid settings request")
     if action == "update-apply":

@@ -99,6 +99,130 @@ def test_saved_wifi_reconnect_reuses_profile(tmp_path, monkeypatch):
     assert control.JOB["phase"] == "complete"
 
 
+class SavedProfile:
+    def __init__(self, ssid, uuid, timestamp=0, mode="infrastructure"):
+        self.settings = {
+            "802-11-wireless": {"ssid": ssid.encode(), "mode": mode},
+            "connection": {"uuid": uuid, "timestamp": timestamp},
+        }
+        self.deleted = False
+
+    def GetSettings(self):
+        return self.settings
+
+    def Delete(self):
+        self.deleted = True
+
+
+def fake_network_manager(monkeypatch, profiles, added=None):
+    objects = {f"/{i}": profile for i, profile in enumerate(profiles)}
+
+    class Manager:
+        def ListConnections(self):
+            return [path for path, profile in objects.items() if not profile.deleted]
+
+        def AddConnection(self, settings):
+            if added is None:
+                pytest.fail("Existing Wi-Fi should be reused")
+            added.append(settings)
+            ssid = bytes(settings["802-11-wireless"]["ssid"]).decode()
+            objects["/new"] = SavedProfile(ssid, settings["connection"]["uuid"], 99)
+            return "/new"
+
+    manager = Manager()
+    monkeypatch.setitem(
+        sys.modules,
+        "dbus",
+        types.SimpleNamespace(
+            SystemBus=lambda: types.SimpleNamespace(
+                get_object=lambda _, path: manager if "Settings" in path else objects[path]
+            ),
+            Interface=lambda obj, name: obj,
+            ByteArray=bytes,
+        ),
+    )
+    return objects
+
+
+def test_scan_marks_every_saved_network(tmp_path, monkeypatch):
+    control = load_control(tmp_path)
+    fake_network_manager(
+        monkeypatch,
+        [
+            SavedProfile("Home", "a"),
+            SavedProfile("Office", "b"),
+            SavedProfile("Office", "c"),
+            SavedProfile("Camera hotspot", "d", mode="ap"),
+        ],
+    )
+    monkeypatch.setattr(
+        control,
+        "run",
+        lambda *args, **kwargs: "*:Home:80:WPA2\n :Cafe:60:\n :Office:40:WPA2",
+    )
+    result = control.handle({"action": "wifi-scan"})
+    assert result["saved"] == ["Home", "Office"]
+    assert {x["ssid"]: x["saved"] for x in result["networks"]} == {
+        "Home": True,
+        "Cafe": False,
+        "Office": True,
+    }
+
+
+def test_new_password_replaces_old_profile_only_after_it_works(tmp_path, monkeypatch):
+    control = load_control(tmp_path)
+    old = SavedProfile("Office", "old-uuid")
+    added = []
+    fake_network_manager(monkeypatch, [old], added)
+    monkeypatch.setattr(control, "run", lambda *args, **kwargs: "")
+    control.wifi_connect({"ssid": "Office", "password": "new-password-1"})
+    assert added and old.deleted
+    assert control.JOB["phase"] == "complete"
+
+
+def test_failed_new_password_keeps_old_profile(tmp_path, monkeypatch):
+    control = load_control(tmp_path)
+    old = SavedProfile("Office", "old-uuid")
+    objects = fake_network_manager(monkeypatch, [old], [])
+
+    def run(*args, **kwargs):
+        if "up" in args:
+            raise subprocess.CalledProcessError(10, args)
+        return ""
+
+    monkeypatch.setattr(control, "run", run)
+    control.wifi_connect({"ssid": "Office", "password": "wrong-password"})
+    assert not old.deleted and objects["/new"].deleted
+    assert control.JOB["phase"] == "failed"
+
+
+def test_saved_password_failure_suggests_forgetting(tmp_path, monkeypatch):
+    control = load_control(tmp_path)
+    fake_network_manager(monkeypatch, [SavedProfile("Office", "old-uuid")])
+
+    def run(*args, **kwargs):
+        if "up" in args:
+            raise subprocess.CalledProcessError(10, args)
+        return ""
+
+    monkeypatch.setattr(control, "run", run)
+    control.wifi_connect({"ssid": "Office", "password": ""})
+    assert "forget the network" in control.JOB["message"]
+
+
+def test_forget_removes_every_profile_for_the_network(tmp_path, monkeypatch):
+    control = load_control(tmp_path)
+    profiles = [SavedProfile("Office", "a"), SavedProfile("Office", "b"), SavedProfile("Home", "c")]
+    fake_network_manager(monkeypatch, profiles)
+    result = control.handle({"action": "wifi-forget", "ssid": "Office"})
+    assert [p.deleted for p in profiles] == [True, True, False]
+    assert result == {"forgotten": "Office", "saved": ["Home"]}
+    with pytest.raises(ValueError, match="not saved"):
+        control.handle({"action": "wifi-forget", "ssid": "Office"})
+    with pytest.raises(ValueError):
+        control.handle({"action": "wifi-forget", "ssid": ""})
+
+
 def git_at(directory: Path, *args):
     return subprocess.check_output(
         ["git", "-C", str(directory), *args], text=True, stderr=subprocess.DEVNULL

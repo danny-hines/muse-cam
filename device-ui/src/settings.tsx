@@ -18,6 +18,9 @@ export function Settings({
   const [tab, setTab] = useState("sound");
   const [data, setData] = useState<SettingsData | null>(null);
   const [networks, setNetworks] = useState<Network[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
+  const [forgetting, setForgetting] = useState<string | null>(null);
+  const [forgetBusy, setForgetBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [network, setNetwork] = useState<Network | null>(null);
   const [ssid, setSsid] = useState("");
@@ -58,6 +61,18 @@ export function Settings({
       clearTimeout(timer);
     };
   }, [report, state.maintenance]);
+  // A finished join changes which networks are saved and connected.
+  const wifiJob =
+    job?.kind === "wifi" && job.phase !== "running"
+      ? `${job.id ?? ""}:${job.phase}:${job.message ?? ""}`
+      : null;
+  const seenWifiJob = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!data) return;
+    if (seenWifiJob.current !== undefined && wifiJob && wifiJob !== seenWifiJob.current)
+      void scan();
+    seenWifiJob.current = wifiJob;
+  }, [wifiJob, !!data]);
   // Persist even if this screen closes before a debounced slider write fires.
   const saveSound = (nextVolume: number, nextProcessing: boolean) => {
     setVolume(nextVolume);
@@ -77,10 +92,12 @@ export function Settings({
   const scan = async () => {
     setScanning(true);
     try {
-      setNetworks(
-        (await api<{ networks: Network[] }>("/api/system/wifi-scan", {}))
-          .networks,
+      const result = await api<{ networks: Network[]; saved?: string[] }>(
+        "/api/system/wifi-scan",
+        {},
       );
+      setNetworks(result.networks);
+      setSaved(result.saved ?? []);
     } catch (error) {
       report((error as Error).message);
     } finally {
@@ -88,20 +105,29 @@ export function Settings({
     }
   };
   const chooseNetwork = (next: Network) => {
+    if (next.ssid && next.ssid === data?.device.ssid) return;
+    // Saved networks already have their password on the camera.
+    if (next.saved) {
+      void join(next.ssid, false);
+      return;
+    }
     setNetwork(next);
     setSsid(next.ssid);
     setPassword("");
     setShowPassword(false);
     setKeyboardField(next.ssid ? "password" : "ssid");
   };
-  const join = async () => {
+  const join = async (
+    joinSsid = ssid,
+    hidden = network?.ssid === "",
+  ) => {
     if (connecting) return;
     setConnecting(true);
     try {
       await api("/api/system/wifi-connect", {
-        ssid,
-        password,
-        hidden: network?.ssid === "",
+        ssid: joinSsid,
+        password: network ? password : "",
+        hidden,
       });
       setPassword("");
       setNetwork(null);
@@ -111,6 +137,27 @@ export function Settings({
       report((error as Error).message);
     } finally {
       setConnecting(false);
+    }
+  };
+  const forget = async (name: string) => {
+    setForgetBusy(true);
+    try {
+      const result = await api<{ saved: string[] }>(
+        "/api/system/wifi-forget",
+        { ssid: name },
+      );
+      setSaved(result.saved);
+      setNetworks((items) =>
+        items.map((item) =>
+          item.ssid === name ? { ...item, saved: false } : item,
+        ),
+      );
+      setForgetting(null);
+      setData(await api<SettingsData>("/api/settings"));
+    } catch (error) {
+      report((error as Error).message);
+    } finally {
+      setForgetBusy(false);
     }
   };
   const checkUpdate = async () => {
@@ -307,18 +354,24 @@ export function Settings({
                 {networks.map((item) => (
                   <button
                     key={item.ssid}
-                    disabled={jobBusy || item.security.includes("802.1X")}
+                    disabled={
+                      jobBusy ||
+                      connecting ||
+                      (item.security.includes("802.1X") && !item.saved)
+                    }
                     onClick={() => chooseNetwork(item)}
                   >
                     <Icon name="wifi" />
                     <span>
                       <strong>{item.ssid}</strong>
                       <small>
-                        {item.security.includes("802.1X")
-                          ? "Enterprise · use a saved profile or guest network"
-                          : item.ssid === data?.device.ssid
-                            ? "Connected"
-                            : item.security || "Open network"}
+                        {item.ssid === data?.device.ssid
+                          ? "Connected"
+                          : item.saved
+                            ? "Saved · tap to join"
+                            : item.security.includes("802.1X")
+                              ? "Enterprise · use a saved profile or guest network"
+                              : item.security || "Open network"}
                       </small>
                     </span>
                     <span>{item.signal}%</span>
@@ -349,8 +402,37 @@ export function Settings({
               >
                 Join a hidden or other network
               </button>
+              {saved.length > 0 && (
+                <>
+                  <h3 className="saved-heading">Saved networks</h3>
+                  <div className="network-list saved-networks">
+                    {saved.map((name) => (
+                      <div key={name}>
+                        <span>
+                          <strong>{name}</strong>
+                          <small>
+                            {name === data?.device.ssid
+                              ? "Connected"
+                              : networks.some((x) => x.ssid === name)
+                                ? "In range"
+                                : "Joins automatically when nearby"}
+                          </small>
+                        </span>
+                        <button
+                          className="chip"
+                          disabled={jobBusy || forgetBusy}
+                          onClick={() => setForgetting(name)}
+                        >
+                          Forget
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               <p className="muted-copy">
-                Saved Wi-Fi reconnects automatically. For office networks that
+                Every network you join is saved and reconnects automatically.
+                Forget one to change its password. For office networks that
                 need a browser login or certificates, use guest Wi-Fi or a
                 hotspot.
               </p>
@@ -501,6 +583,15 @@ export function Settings({
           )}
         </div>
       </div>
+      {forgetting && (
+        <ForgetDialog
+          ssid={forgetting}
+          connected={forgetting === data?.device.ssid}
+          busy={forgetBusy}
+          onCancel={() => setForgetting(null)}
+          onForget={() => void forget(forgetting)}
+        />
+      )}
       {network && (
         <div
           className="network-editor"
@@ -588,5 +679,60 @@ export function Settings({
         </div>
       )}
     </section>
+  );
+}
+
+function ForgetDialog({
+  ssid,
+  connected,
+  busy,
+  onCancel,
+  onForget,
+}: {
+  ssid: string;
+  connected: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onForget: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current!;
+    element.showModal();
+    return () => element.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="delete-dialog"
+      aria-labelledby="forget-network-title"
+      onKeyDown={(event) => event.stopPropagation()}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onCancel();
+      }}
+    >
+      <h2 id="forget-network-title">Forget {ssid}?</h2>
+      <p>
+        The camera will remove its saved password and stop joining this
+        network automatically.
+        {connected
+          ? " It will disconnect now and switch to another saved network if one is nearby."
+          : ""}
+      </p>
+      <footer>
+        <button
+          className="glass-button"
+          autoFocus
+          disabled={busy}
+          onClick={onCancel}
+        >
+          Keep
+        </button>
+        <button className="danger-button" disabled={busy} onClick={onForget}>
+          {busy ? "Forgetting…" : "Forget network"}
+        </button>
+      </footer>
+    </dialog>
   );
 }

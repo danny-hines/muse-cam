@@ -147,33 +147,70 @@ def update_check() -> dict:
     }
 
 
-def wifi_connect(values: dict) -> None:
+NM = "org.freedesktop.NetworkManager"
+
+
+def settings_manager():
     # Import here: the simulator and workstation tests do not require D-Bus.
     import dbus
 
-    ssid, password = values["ssid"], values.get("password", "")
-    previous = run("nmcli", "-g", "GENERAL.CON-UUID", "device", "show", "wlan0")
-    new_path = None
     bus = dbus.SystemBus()
     manager = dbus.Interface(
-        bus.get_object(
-            "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager/Settings"
-        ),
-        "org.freedesktop.NetworkManager.Settings",
+        bus.get_object(NM, "/org/freedesktop/NetworkManager/Settings"),
+        f"{NM}.Settings",
     )
+    return dbus, bus, manager
+
+
+def saved_wifi(bus, manager) -> list[dict]:
+    """Every saved Wi-Fi client profile, newest first. Secrets are never read."""
+    profiles = []
+    for path in manager.ListConnections():
+        connection = dbus_connection(bus, path)
+        settings = connection.GetSettings()
+        wireless = settings.get("802-11-wireless", {})
+        if not wireless.get("ssid") or wireless.get("mode", "infrastructure") != "infrastructure":
+            continue
+        profiles.append(
+            {
+                "ssid": bytes(wireless["ssid"]),
+                "uuid": str(settings["connection"]["uuid"]),
+                "timestamp": int(settings["connection"].get("timestamp", 0)),
+                "connection": connection,
+            }
+        )
+    return sorted(profiles, key=lambda x: -x["timestamp"])
+
+
+def dbus_connection(bus, path):
+    import dbus
+
+    return dbus.Interface(bus.get_object(NM, path), f"{NM}.Settings.Connection")
+
+
+def saved_ssids() -> list[str]:
+    _, bus, manager = settings_manager()
+    names = {x["ssid"].decode(errors="replace") for x in saved_wifi(bus, manager)}
+    return sorted(names, key=str.casefold)
+
+
+def wifi_networks() -> dict:
+    result = wifi_scan()
+    saved = saved_ssids()
+    for network in result["networks"]:
+        network["saved"] = network["ssid"] in saved
+    return {**result, "saved": saved}
+
+
+def wifi_connect(values: dict) -> None:
+    dbus, bus, manager = settings_manager()
+    ssid, password = values["ssid"], values.get("password", "")
+    previous = run("nmcli", "-g", "GENERAL.CON-UUID", "device", "show", "wlan0")
+    new_path, matches = None, []
     try:
-        # Reuse saved networks when no replacement password was supplied.
-        selected = None
-        for path in manager.ListConnections():
-            connection = dbus.Interface(
-                bus.get_object("org.freedesktop.NetworkManager", path),
-                "org.freedesktop.NetworkManager.Settings.Connection",
-            )
-            settings = connection.GetSettings()
-            if bytes(settings.get("802-11-wireless", {}).get("ssid", [])) == ssid.encode():
-                if not password:
-                    selected = str(settings["connection"]["uuid"])
-                    break
+        matches = [x for x in saved_wifi(bus, manager) if x["ssid"] == ssid.encode()]
+        # Reuse the saved network when no replacement password was supplied.
+        selected = matches[0]["uuid"] if matches and not password else None
         if selected is None:
             selected = str(uuid.uuid4())
             profile = {
@@ -206,14 +243,18 @@ def wifi_connect(values: dict) -> None:
             "wlan0",
             timeout=40,
         )
+        if new_path is not None:
+            # The new details work, so they replace any older profile for this name.
+            for match in matches:
+                try:
+                    match["connection"].Delete()
+                except Exception:
+                    pass
         set_job("complete", f"Connected to {ssid}", kind="wifi")
     except Exception:
         if new_path is not None:
             try:
-                dbus.Interface(
-                    bus.get_object("org.freedesktop.NetworkManager", new_path),
-                    "org.freedesktop.NetworkManager.Settings.Connection",
-                ).Delete()
+                dbus_connection(bus, new_path).Delete()
             except Exception:
                 pass
         restored = False
@@ -225,10 +266,35 @@ def wifi_connect(values: dict) -> None:
                 pass
         set_job(
             "failed",
-            "Could not connect. Check the network and password. "
+            (
+                "Could not connect. Check the network and password. "
+                if password or not matches
+                else "Could not connect with the saved password. "
+                "If it changed, forget the network and join it again. "
+            )
             + ("Previous Wi-Fi restored." if restored else "Choose another network to reconnect."),
             kind="wifi",
         )
+
+
+def wifi_forget(ssid: str) -> dict:
+    _, bus, manager = settings_manager()
+    matches = [x for x in saved_wifi(bus, manager) if x["ssid"] == ssid.encode()]
+    if not matches:
+        raise ValueError("That network is not saved on this camera")
+    for match in matches:
+        match["connection"].Delete()
+    return {"forgotten": ssid, "saved": saved_ssids()}
+
+
+def validate_ssid(ssid: object) -> str:
+    if (
+        not isinstance(ssid, str)
+        or not 1 <= len(ssid.encode()) <= 32
+        or any(ord(c) < 32 for c in ssid)
+    ):
+        raise ValueError("Enter a Wi-Fi name between 1 and 32 bytes")
+    return ssid
 
 
 def apply_update() -> None:
@@ -354,20 +420,21 @@ def handle(values: dict) -> dict:
     if action == "status":
         return status()
     if action == "wifi-scan":
-        return wifi_scan()
+        return wifi_networks()
+    if action == "wifi-forget":
+        ssid = validate_ssid(values.get("ssid"))
+        with LOCK:
+            if JOB["phase"] == "running":
+                raise ValueError("A device operation is already running")
+            return wifi_forget(ssid)
     if action == "update-check":
         with LOCK:
             if JOB["phase"] == "running":
                 raise ValueError("A device operation is already running")
             return update_check()
     if action == "wifi-connect":
-        ssid, password = values.get("ssid"), values.get("password", "")
-        if (
-            not isinstance(ssid, str)
-            or not 1 <= len(ssid.encode()) <= 32
-            or any(ord(c) < 32 for c in ssid)
-        ):
-            raise ValueError("Enter a Wi-Fi name between 1 and 32 bytes")
+        validate_ssid(values.get("ssid"))
+        password = values.get("password", "")
         if not isinstance(password, str) or (password and not 8 <= len(password) <= 63):
             raise ValueError("Wi-Fi passwords must have 8–63 characters")
 
