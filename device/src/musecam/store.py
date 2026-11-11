@@ -55,7 +55,9 @@ CAPTURE_FILTERS = {
 }
 # A photo matches a filter when any of its versions does.
 PHOTO_FILTERS = {
-    key: "1 = 1" if key == "all" else (
+    key: "1 = 1"
+    if key == "all"
+    else (
         "EXISTS (SELECT 1 FROM captures WHERE captures.photo_id = photos.photo_id "
         f"AND captures.{condition})"
     )
@@ -135,8 +137,10 @@ class CaptureStore:
         # Count entries, not paths: two captures may name the very same file.
         entries_by_size = Counter(
             sizes[path]
-            for path in [*(row["source_path"] for row in rows),
-                         *(photo["source_path"] for photo in existing)]
+            for path in [
+                *(row["source_path"] for row in rows),
+                *(photo["source_path"] for photo in existing),
+            ]
             if sizes[path] is not None
         )
         digests: dict[str, str | None] = {}
@@ -332,7 +336,8 @@ class CaptureStore:
         with self._lock:
             row = self._connection.execute(
                 "SELECT capture_id FROM share_retractions WHERE retry_at <= ? "
-                "ORDER BY retry_at, rowid LIMIT 1", (time.time(),)
+                "ORDER BY retry_at, rowid LIMIT 1",
+                (time.time(),),
             ).fetchone()
         return row["capture_id"] if row else None
 
@@ -408,10 +413,12 @@ class CaptureStore:
         """Photos matching each gallery filter."""
         with self._lock:
             row = self._connection.execute(
-                "SELECT " + ", ".join(
-                    f"COALESCE(SUM({condition}), 0) AS \"{key}\""
+                "SELECT "
+                + ", ".join(
+                    f'COALESCE(SUM({condition}), 0) AS "{key}"'
                     for key, condition in PHOTO_FILTERS.items()
-                ) + " FROM photos"
+                )
+                + " FROM photos"
             ).fetchone()
         return {key: row[key] for key in PHOTO_FILTERS}
 
@@ -491,12 +498,16 @@ class CaptureStore:
                 ((row["capture_id"],) for row in rows),
             )
             photo_ids = list(dict.fromkeys(row["photo_id"] for row in rows if row["photo_id"]))
-            emptied = self._connection.execute(
-                "SELECT photo_id, source_path FROM photos WHERE photo_id IN "
-                f"({','.join('?' * len(photo_ids))}) AND NOT EXISTS "
-                "(SELECT 1 FROM captures WHERE captures.photo_id = photos.photo_id)",
-                photo_ids,
-            ).fetchall() if photo_ids else []
+            emptied = (
+                self._connection.execute(
+                    "SELECT photo_id, source_path FROM photos WHERE photo_id IN "
+                    f"({','.join('?' * len(photo_ids))}) AND NOT EXISTS "
+                    "(SELECT 1 FROM captures WHERE captures.photo_id = photos.photo_id)",
+                    photo_ids,
+                ).fetchall()
+                if photo_ids
+                else []
+            )
             self._connection.executemany(
                 "DELETE FROM photos WHERE photo_id = ?",
                 ((row["photo_id"],) for row in emptied),

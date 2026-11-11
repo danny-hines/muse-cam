@@ -75,14 +75,20 @@ CAMERA_RETRY_DELAY = 3.0
 MAX_CAMERA_START_ATTEMPTS = 3
 TIMER_OPTIONS = (0, 5, 10)
 RANDOM_PRESET = Preset(
-    id="random", version=1, name="Random",
-    description="A surprise style for every photo", accent="#d6b8ff",
+    id="random",
+    version=1,
+    name="Random",
+    description="A surprise style for every photo",
+    accent="#d6b8ff",
 )
 # Takes the photo with no style. Only standalone cameras offer it; event cameras
 # exist to imagine every shot.
 ORIGINAL_PRESET = Preset(
-    id="original", version=1, name="Original",
-    description="No style, just the photo", accent="#e9e4d6",
+    id="original",
+    version=1,
+    name="Original",
+    description="No style, just the photo",
+    accent="#e9e4d6",
 )
 PICKER_ONLY = {RANDOM_PRESET.id, ORIGINAL_PRESET.id}
 
@@ -185,7 +191,9 @@ class CameraWebController:
         self._countdown_preset: Preset | None = None
         self._status = ScreenState.STARTING
         self._view: dict[str, str | None] = {
-            "screen": "camera", "photoId": None, "versionId": None,
+            "screen": "camera",
+            "photoId": None,
+            "versionId": None,
         }
         self._message = "Starting camera"
         self._network_online = not offline
@@ -267,9 +275,7 @@ class CameraWebController:
         }:
             selected = "memory-card"
         # With nothing saved, start on the first style rather than Original.
-        default = next(
-            (i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id), 0
-        )
+        default = next((i for i, p in enumerate(self._presets) if p.id != ORIGINAL_PRESET.id), 0)
         self._preset_index = next(
             (i for i, p in enumerate(self._presets) if p.id == selected), default
         )
@@ -341,8 +347,11 @@ class CameraWebController:
                     self._start_pending()
                 self._refresh_battery()
                 now = time.monotonic()
-                if (self._future is not None and self._countdown_deadline is None
-                        and now - self._last_processing_sound > 7):
+                if (
+                    self._future is not None
+                    and self._countdown_deadline is None
+                    and now - self._last_processing_sound > 7
+                ):
                     self._sound.play("processing")
                     self._last_processing_sound = now
                 if (
@@ -658,12 +667,18 @@ class CameraWebController:
             self._publish_locked()
         if retry:
             self._notify(
-                "queued", "Trying again", self._job_preset_name(failed), capture_id,
+                "queued",
+                "Trying again",
+                self._job_preset_name(failed),
+                capture_id,
                 photo_id=photo.photo_id,
             )
         else:
             self._notify(
-                "queued", "New version queued", "Your original photo is kept", capture_id,
+                "queued",
+                "New version queued",
+                "Your original photo is kept",
+                capture_id,
                 photo_id=photo.photo_id,
             )
 
@@ -1137,7 +1152,8 @@ class CameraWebController:
             "versionCount": len(versions),
             "cover": cover_json,
             "sourceUrl": f"/api/gallery/{photo.photo_id}/original",
-            "thumbnailUrl": cover_json["thumbnailUrl"] if cover_json
+            "thumbnailUrl": cover_json["thumbnailUrl"]
+            if cover_json
             else f"/api/gallery/{photo.photo_id}/thumbnail",
         }
 
@@ -1217,7 +1233,8 @@ class CameraWebController:
             self._retry_after.pop(capture_id, None)
         self._notifications = deque(
             (
-                notice for notice in self._notifications
+                notice
+                for notice in self._notifications
                 if notice["captureId"] not in capture_ids
                 and (photo_id is None or notice["photoId"] != photo_id)
             ),
@@ -1243,8 +1260,10 @@ class CameraWebController:
             self._store.delete(capture_id, retract_share=retract)
             self._forget({capture_id})
             self._notify(
-                "deleted", "Version deleted",
-                "Public share removal is queued until connected" if retract
+                "deleted",
+                "Version deleted",
+                "Public share removal is queued until connected"
+                if retract
                 else "The original photo is kept",
             )
 
@@ -1265,8 +1284,10 @@ class CameraWebController:
             self._store.delete_photo(photo_id, retract=retract)
             self._forget(capture_ids, photo_id)
             self._notify(
-                "deleted", "Photo deleted",
-                "Public share removal is queued until connected" if retract
+                "deleted",
+                "Photo deleted",
+                "Public share removal is queued until connected"
+                if retract
                 else "Removed from this camera",
             )
 
@@ -1294,8 +1315,9 @@ class CameraWebController:
             raise ValueError("Wait for this version to finish before editing it")
         return self._media_file(job.result_path), None, self._job_preset_name(job)
 
-    def edit_preview(self, photo_id: str, target: str | None, filter_id: str | None,
-                     size: str) -> bytes:
+    def edit_preview(
+        self, photo_id: str, target: str | None, filter_id: str | None, size: str
+    ) -> bytes:
         source, _, _ = self._edit_source(photo_id, target)
         try:
             return edit_preview(source, filter_id, size)

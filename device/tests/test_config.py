@@ -101,16 +101,13 @@ def test_hardware_profiles_load(
 
 
 def test_pi3_touch_orientation_matches_landscape_display() -> None:
-    profile = load_profile(
-        "pi3bplus-imx415-tft35", Path(__file__).parents[1] / "profiles"
-    )
+    profile = load_profile("pi3bplus-imx415-tft35", Path(__file__).parents[1] / "profiles")
 
     assert profile.touch_swap_xy is True
     assert profile.touch_invert_x is True
     assert profile.touch_invert_y is False
     assert profile.camera_fps == 15
     assert profile.preview_fps == 6
-
 
 
 def clear_mode_settings(monkeypatch) -> None:

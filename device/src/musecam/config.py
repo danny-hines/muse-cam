@@ -129,7 +129,10 @@ def load_profile(
     profile_id: str, profiles_dir: Path | None = None, *, power_backend: str | None = None
 ) -> HardwareProfile:
     if power_backend is not None and power_backend not in {
-        "none", "pisugar-s-plus", "pisugar2", "pisugar3"
+        "none",
+        "pisugar-s-plus",
+        "pisugar2",
+        "pisugar3",
     }:
         raise ValueError(f"Unknown power backend {power_backend!r}")
     profiles_dir = profiles_dir or default_profiles_dir()

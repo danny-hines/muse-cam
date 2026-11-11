@@ -73,8 +73,16 @@ def test_standalone_submit_transforms_a_local_file(tmp_path, monkeypatch, capsys
     output = tmp_path / "out.jpg"
 
     code, printed = run_cli(
-        monkeypatch, capsys, "--config", str(config), "submit", str(photo),
-        "--preset", "claymation", "--output", str(output),
+        monkeypatch,
+        capsys,
+        "--config",
+        str(config),
+        "submit",
+        str(photo),
+        "--preset",
+        "claymation",
+        "--output",
+        str(output),
     )
 
     assert code == 0

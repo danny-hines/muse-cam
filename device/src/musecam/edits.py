@@ -92,8 +92,10 @@ def adjust(image: Image.Image, edit: Edit) -> Image.Image:
         image = image.point(curve * 3)
     # Pillow's matrix works in 0–255 and rounds, like the screen's 8-bit filter.
     return image.convert(
-        "RGB", tuple(value * 255 if col == 3 else value for row in matrix
-                     for col, value in enumerate(row))
+        "RGB",
+        tuple(
+            value * 255 if col == 3 else value for row in matrix for col, value in enumerate(row)
+        ),
     )
 
 
@@ -118,9 +120,7 @@ def apply(image: Image.Image, edit: Edit) -> Image.Image:
 
 def render(source: Path, destination: Path, edit: Edit) -> None:
     """Write ``source`` with ``edit`` applied to ``destination`` as a JPEG."""
-    apply(open_photo(source, MAX_SIDE), edit).save(
-        destination, "JPEG", quality=90, optimize=True
-    )
+    apply(open_photo(source, MAX_SIDE), edit).save(destination, "JPEG", quality=90, optimize=True)
 
 
 @lru_cache(maxsize=24)

@@ -113,8 +113,11 @@ def test_surprise_photos_keep_the_style_the_server_used(tmp_path: Path) -> None:
         assert store.get("old").preset_name is None  # type: ignore[union-attr]
         store.enqueue("surprise", "surprise", tmp_path / "capture.jpg")
         store.mark_complete(
-            "surprise", "generation_1", tmp_path / "result.jpg",
-            preset_id="party-hats", preset_name="Party Hats",
+            "surprise",
+            "generation_1",
+            tmp_path / "result.jpg",
+            preset_id="party-hats",
+            preset_name="Party Hats",
         )
         job = store.get("surprise")
         assert (job.preset_id, job.preset_name) == ("party-hats", "Party Hats")  # type: ignore[union-attr]
@@ -123,7 +126,6 @@ def test_surprise_photos_keep_the_style_the_server_used(tmp_path: Path) -> None:
         assert store.get("plain").preset_id == "storybook"  # type: ignore[union-attr]
     finally:
         store.close()
-
 
 
 def test_photos_group_versions_and_prune_keeps_shared_originals(tmp_path: Path) -> None:

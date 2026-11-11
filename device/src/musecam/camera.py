@@ -253,13 +253,18 @@ class Picamera2Camera:
             )
             camera.options["quality"] = 90
             camera.configure(config)
-            self.focus = FocusState(supported=self._profile.camera_autofocus and all(
-                key in camera.camera_controls for key in ("AfWindows", "AfMetering", "AfPause")
-            ))
+            self.focus = FocusState(
+                supported=self._profile.camera_autofocus
+                and all(
+                    key in camera.camera_controls for key in ("AfWindows", "AfMetering", "AfPause")
+                )
+            )
             camera.start()
             LOGGER.info(
                 "Camera %s started: %sx%s, autofocus=%s",
-                model, self._profile.capture_width, self._profile.capture_height,
+                model,
+                self._profile.capture_width,
+                self._profile.capture_height,
                 "continuous" if self._profile.camera_autofocus else "off",
             )
         except Exception:

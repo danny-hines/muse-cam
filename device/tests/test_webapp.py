@@ -72,9 +72,17 @@ def test_http_focus_validation_and_unavailable_camera(tmp_path):
         async with TestClient(TestServer(create_web_app(controller))) as client:
             controller._start_camera()
             headers = {"X-MuseCam-Request": "1"}
-            for values in [{}, {"x": 0.5}, {"x": -1, "y": 1}, {"x": 1.1, "y": 0},
-                           {"x": True, "y": 0.5}, {"x": "0.5", "y": 0.5},
-                           {"x": None, "y": 0}, {"x": 0, "y": 0, "extra": 1}, []]:
+            for values in [
+                {},
+                {"x": 0.5},
+                {"x": -1, "y": 1},
+                {"x": 1.1, "y": 0},
+                {"x": True, "y": 0.5},
+                {"x": "0.5", "y": 0.5},
+                {"x": None, "y": 0},
+                {"x": 0, "y": 0, "extra": 1},
+                [],
+            ]:
                 response = await client.post("/api/actions/focus", json=values, headers=headers)
                 assert response.status == 400
             for values in [{"x": 0, "y": 0}, {"x": 1, "y": 1}]:
@@ -244,10 +252,11 @@ def test_capture_remains_available_during_generation(tmp_path: Path, monkeypatch
         controller.dispatch("capture")
         # Enqueue publishes the gallery entry just before capture returns to live.
         # Wait for that completed transition while generation is still blocked.
-        wait_until(lambda: (
-            controller.state()["galleryCount"] == 2
-            and controller.state()["status"] == "live"
-        ))
+        wait_until(
+            lambda: (
+                controller.state()["galleryCount"] == 2 and controller.state()["status"] == "live"
+            )
+        )
         state = controller.state()
         assert state["status"] == "live"
         assert state["processingId"] == first
@@ -289,13 +298,12 @@ def test_gallery_retry_replaces_and_restyle_adds_a_version(tmp_path: Path) -> No
         assert controller.version_path(retried["id"], "source") == source
         # The camera shows the new version on the photo the guest is looking at.
         assert controller.state()["view"]["versionId"] == retried["id"]
-        controller.dispatch(
-            "remix", {"photoId": "old", "presetId": controller._presets[2].id}
-        )
+        controller.dispatch("remix", {"photoId": "old", "presetId": controller._presets[2].id})
         wait_until(lambda: controller._store.counts().get("complete") == 2)
         detail = controller.photo_detail("old")
         assert [v["presetId"] for v in detail["versions"]] == [
-            style, controller._presets[2].id,
+            style,
+            controller._presets[2].id,
         ]
         assert detail["cover"]["presetId"] == controller._presets[2].id
         assert controller.state()["galleryCount"] == 1
@@ -453,14 +461,18 @@ def test_restyled_copies_from_before_photos_are_grouped_on_startup(tmp_path: Pat
         "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, preset_name TEXT)"
     )
     for index, (capture_id, status) in enumerate(
-        [("first", "failed"), ("other", "complete"), ("retry", "complete"),
-         ("restyle", "queued"), ("missing", "failed")]
+        [
+            ("first", "failed"),
+            ("other", "complete"),
+            ("retry", "complete"),
+            ("restyle", "queued"),
+            ("missing", "failed"),
+        ]
     ):
         connection.execute(
             "INSERT INTO captures (capture_id, preset_id, source_path, status, created_at) "
             "VALUES (?, 'kid-drawing', ?, ?, ?)",
-            (capture_id, str(captures / f"{capture_id}.jpg"), status,
-             f"2026-10-01 10:00:0{index}"),
+            (capture_id, str(captures / f"{capture_id}.jpg"), status, f"2026-10-01 10:00:0{index}"),
         )
     connection.commit()
     connection.close()
@@ -470,7 +482,9 @@ def test_restyled_copies_from_before_photos_are_grouped_on_startup(tmp_path: Pat
         items = controller.gallery()["items"]
         assert [p["id"] for p in items] == ["missing", "other", "first"]
         assert [v["id"] for v in controller.photo_detail("first")["versions"]] == [
-            "first", "retry", "restyle",
+            "first",
+            "retry",
+            "restyle",
         ]
         assert controller.photo_detail("first")["status"] == "queued"
         assert controller.state()["galleryCount"] == 3
@@ -732,7 +746,9 @@ def test_deleted_photo_retraction_retries_after_restart(tmp_path, monkeypatch):
     source.write_bytes(b"local photo")
     controller._store.enqueue("capture-sync", "kid-drawing", source)
     controller._store.mark_complete(
-        "capture-sync", "generation-sync", tmp_path / "results" / "sync.jpg",
+        "capture-sync",
+        "generation-sync",
+        tmp_path / "results" / "sync.jpg",
         "https://camera.example/p/shared",
     )
 
@@ -804,8 +820,13 @@ def test_auto_shared_generation_is_recorded_in_camera_gallery(tmp_path):
     class AutoShareClient:
         def generate(self, image, capture_id, preset_id):
             return Generation(
-                "generation-auto", capture_id, "complete", preset_id,
-                "https://camera.example/image", "https://camera.example/p/auto", None,
+                "generation-auto",
+                capture_id,
+                "complete",
+                preset_id,
+                "https://camera.example/image",
+                "https://camera.example/p/auto",
+                None,
             )
 
         def download_result(self, url, output):
@@ -864,8 +885,11 @@ def test_random_style_resolves_each_shot_and_retry_keeps_the_choice(tmp_path, mo
 def test_a_single_server_style_has_no_random_entry(tmp_path):
     controller = make_controller(tmp_path)
     surprise = Preset(
-        id="surprise", version=1, name="Surprise",
-        description="A different style for every photo, picked for you.", accent="#d6b8ff",
+        id="surprise",
+        version=1,
+        name="Surprise",
+        description="A different style for every photo, picked for you.",
+        accent="#d6b8ff",
     )
     controller._store.save_presets([surprise])
     controller._store.set_setting("presetId", "random")
@@ -889,8 +913,11 @@ def test_a_single_server_style_has_no_random_entry(tmp_path):
 def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
     controller = make_controller(tmp_path)
     surprise = Preset(
-        id="surprise", version=1, name="Surprise",
-        description="A different style for every photo, picked for you.", accent="#d6b8ff",
+        id="surprise",
+        version=1,
+        name="Surprise",
+        description="A different style for every photo, picked for you.",
+        accent="#d6b8ff",
     )
     controller._store.save_presets([surprise])
     controller._load_presets()
@@ -899,8 +926,14 @@ def test_surprise_photos_are_labeled_with_the_style_the_server_picked(tmp_path):
         def generate(self, image, capture_id, preset_id):
             assert preset_id == "surprise"
             return Generation(
-                "generation-surprise", capture_id, "complete", "party-hats",
-                "https://camera.example/image", None, None, preset_name="Party Hats",
+                "generation-surprise",
+                capture_id,
+                "complete",
+                "party-hats",
+                "https://camera.example/image",
+                None,
+                None,
+                preset_name="Party Hats",
             )
 
         def download_result(self, url, output):
@@ -1040,7 +1073,9 @@ def test_gallery_shutter_returns_to_camera_before_capturing(tmp_path, monkeypatc
         controller.dispatch("capture")
         controller._poll_actions()
         assert controller.state()["view"] == {
-            "screen": "camera", "photoId": None, "versionId": None,
+            "screen": "camera",
+            "photoId": None,
+            "versionId": None,
         }
         assert controller.state()["galleryCount"] == 1
         assert controller.state()["lastCaptureId"] is None
@@ -1072,7 +1107,9 @@ def test_view_action_validates_screens_and_photos(tmp_path):
         with pytest.raises(ValueError, match="Photo was not found"):
             controller.dispatch("view", {"screen": "photo", "photoId": "missing"})
         assert controller.state()["view"] == {
-            "screen": "camera", "photoId": None, "versionId": None,
+            "screen": "camera",
+            "photoId": None,
+            "versionId": None,
         }
         controller._store.enqueue("one", "kid-drawing", tmp_path / "one.jpg")
         controller._store.enqueue("two", "kid-drawing", tmp_path / "two.jpg")
@@ -1084,7 +1121,9 @@ def test_view_action_validates_screens_and_photos(tmp_path):
         controller.dispatch("view", {"screen": "photo", "photoId": "one", "versionId": "one"})
         controller._poll_actions()
         assert controller.state()["view"] == {
-            "screen": "photo", "photoId": "one", "versionId": "one",
+            "screen": "photo",
+            "photoId": "one",
+            "versionId": "one",
         }
     finally:
         controller.close()

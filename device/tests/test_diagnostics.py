@@ -7,13 +7,20 @@ from musecam.config import DeviceConfig, load_profile
 from musecam.diagnostics import _camera_check, _camera_overlay_check, _image_model_check
 
 
-@pytest.mark.parametrize("detected,expected_status", [
-    ("imx708", "ok"), ("imx708_wide", "ok"), ("imx415", "failed"),
-])
+@pytest.mark.parametrize(
+    "detected,expected_status",
+    [
+        ("imx708", "ok"),
+        ("imx708_wide", "ok"),
+        ("imx415", "failed"),
+    ],
+)
 def test_doctor_checks_sensor_against_selected_profile(monkeypatch, detected, expected_status):
     monkeypatch.setattr("musecam.diagnostics.shutil.which", lambda _: "/usr/bin/rpicam-hello")
     result = SimpleNamespace(
-        stdout=f"Available cameras\n0 : {detected} [4656x3496]\n", stderr="", returncode=0,
+        stdout=f"Available cameras\n0 : {detected} [4656x3496]\n",
+        stderr="",
+        returncode=0,
     )
     monkeypatch.setattr("musecam.diagnostics.subprocess.run", lambda *args, **kwargs: result)
     profile = load_profile("pi3bplus-cam3-dsi43", Path(__file__).parents[1] / "profiles")
@@ -23,11 +30,14 @@ def test_doctor_checks_sensor_against_selected_profile(monkeypatch, detected, ex
         assert "expects imx708" in result.detail
 
 
-@pytest.mark.parametrize("settings,status", [
-    ("# dtoverlay=imx708\n", "warning"),
-    ("dtoverlay=imx708,rotation=180\n# dtoverlay=imx415\n", "ok"),
-    ("dtoverlay=imx708\ndtoverlay=imx519\n", "failed"),
-])
+@pytest.mark.parametrize(
+    "settings,status",
+    [
+        ("# dtoverlay=imx708\n", "warning"),
+        ("dtoverlay=imx708,rotation=180\n# dtoverlay=imx415\n", "ok"),
+        ("dtoverlay=imx708\ndtoverlay=imx519\n", "failed"),
+    ],
+)
 def test_doctor_ignores_comments_and_reports_conflicting_overlays(tmp_path, settings, status):
     config = tmp_path / "config.txt"
     config.write_text(settings)
@@ -35,15 +45,21 @@ def test_doctor_ignores_comments_and_reports_conflicting_overlays(tmp_path, sett
     assert _camera_overlay_check(config, profile).status == status
 
 
-@pytest.mark.parametrize("provider,environment,status", [
-    ("meta", {"META_API_KEY": "key"}, "ok"),
-    ("openai", {"META_API_KEY": "key"}, "failed"),
-    ("mock", {}, "warning"),
-])
+@pytest.mark.parametrize(
+    "provider,environment,status",
+    [
+        ("meta", {"META_API_KEY": "key"}, "ok"),
+        ("openai", {"META_API_KEY": "key"}, "failed"),
+        ("mock", {}, "warning"),
+    ],
+)
 def test_doctor_checks_standalone_model_without_calling_it(provider, environment, status):
     config = DeviceConfig(
-        server_url="", device_token="", mode="standalone",
-        model_provider=provider, environment=environment,
+        server_url="",
+        device_token="",
+        mode="standalone",
+        model_provider=provider,
+        environment=environment,
     )
     check = _image_model_check(config)
     assert check.status == status

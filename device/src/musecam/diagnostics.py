@@ -54,7 +54,8 @@ def _camera_check(profile: HardwareProfile) -> DiagnosticCheck:
         sensor = re.match(r"0\s*:\s*(\S+)", summary)
         if not profile.matches_camera_model(sensor[1] if sensor else "unknown"):
             return DiagnosticCheck(
-                "camera", "failed",
+                "camera",
+                "failed",
                 f"{profile.id} expects {profile.camera_model}; detected {summary[:100]}. "
                 "Choose the matching hardware profile and reboot.",
             )
@@ -62,9 +63,7 @@ def _camera_check(profile: HardwareProfile) -> DiagnosticCheck:
     return DiagnosticCheck("camera", "failed", output[-180:] or "No camera detected")
 
 
-def _camera_overlay_check(
-    boot_config: Path | None, profile: HardwareProfile
-) -> DiagnosticCheck:
+def _camera_overlay_check(boot_config: Path | None, profile: HardwareProfile) -> DiagnosticCheck:
     if boot_config is None:
         return DiagnosticCheck("camera overlay", "warning", "Boot configuration is not available")
     else:
@@ -73,7 +72,8 @@ def _camera_overlay_check(
             for line in boot_config.read_text(encoding="utf-8", errors="replace").splitlines()
         }
         manual = {
-            name for name in CAMERA_OVERLAYS
+            name
+            for name in CAMERA_OVERLAYS
             if any(re.fullmatch(rf"dtoverlay={name}([,:].*)?", line) for line in lines)
         }
         automatic = profile.camera_overlay == "auto"
@@ -92,7 +92,6 @@ def _camera_overlay_check(
         return DiagnosticCheck("camera overlay", status, detail)
 
 
-
 def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[DiagnosticCheck]:
     checks: list[DiagnosticCheck] = []
     model_path = Path("/proc/device-tree/model")
@@ -106,11 +105,15 @@ def run_diagnostics(config: DeviceConfig, profile: HardwareProfile) -> list[Diag
 
     checks.append(_camera_overlay_check(_boot_config(), profile))
 
-    checks.append(DiagnosticCheck(
-        "focus configuration", "ok",
-        "Continuous autofocus requested; camera startup verifies driver support."
-        if profile.camera_autofocus else "Fixed-focus camera; no autofocus controls requested.",
-    ))
+    checks.append(
+        DiagnosticCheck(
+            "focus configuration",
+            "ok",
+            "Continuous autofocus requested; camera startup verifies driver support."
+            if profile.camera_autofocus
+            else "Fixed-focus camera; no autofocus controls requested.",
+        )
+    )
 
     if profile.display_backend == "displayhatmini":
         device = Path("/dev/spidev0.1")

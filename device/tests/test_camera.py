@@ -108,12 +108,19 @@ def fake_picamera(monkeypatch):
 
     fake = FakePicamera2()
     monkeypatch.setitem(sys.modules, "picamera2", SimpleNamespace(Picamera2=lambda: fake))
-    monkeypatch.setitem(sys.modules, "libcamera", SimpleNamespace(controls=SimpleNamespace(
-        AfModeEnum=SimpleNamespace(Continuous=2), AfStateEnum=SimpleNamespace(Scanning=1),
-        AfMeteringEnum=SimpleNamespace(Auto=0, Windows=1),
-        AfPauseEnum=SimpleNamespace(Immediate=0, Resume=2),
-        AfPauseStateEnum=SimpleNamespace(Running=0, Paused=2),
-    )))
+    monkeypatch.setitem(
+        sys.modules,
+        "libcamera",
+        SimpleNamespace(
+            controls=SimpleNamespace(
+                AfModeEnum=SimpleNamespace(Continuous=2),
+                AfStateEnum=SimpleNamespace(Scanning=1),
+                AfMeteringEnum=SimpleNamespace(Auto=0, Windows=1),
+                AfPauseEnum=SimpleNamespace(Immediate=0, Resume=2),
+                AfPauseStateEnum=SimpleNamespace(Running=0, Paused=2),
+            )
+        ),
+    )
     return fake
 
 
@@ -190,11 +197,16 @@ def test_picamera_releases_device_on_failed_start_and_cancels_timed_out_jobs(fak
     assert fake_picamera.cancelled and camera._camera is None
 
 
-@pytest.mark.parametrize("model,profile_id", [
-    ("imx519", "pi3bplus-imx519-dsi43"), ("imx708", "pi3bplus-cam3-dsi43"),
-    ("imx708_wide", "pi3bplus-cam3-dsi43"), ("imx708_noir", "pi3bplus-cam3-dsi43"),
-    ("imx708_wide_noir", "pi3bplus-cam3-dsi43"),
-])
+@pytest.mark.parametrize(
+    "model,profile_id",
+    [
+        ("imx519", "pi3bplus-imx519-dsi43"),
+        ("imx708", "pi3bplus-cam3-dsi43"),
+        ("imx708_wide", "pi3bplus-cam3-dsi43"),
+        ("imx708_noir", "pi3bplus-cam3-dsi43"),
+        ("imx708_wide_noir", "pi3bplus-cam3-dsi43"),
+    ],
+)
 def test_autofocus_cameras_settle_without_reconfiguring(fake_picamera, tmp_path, model, profile_id):
     fake_picamera.camera_properties = {"Model": model}
     fake_picamera.camera_controls = {"AfMode": (0, 2, 0)}
@@ -239,11 +251,14 @@ def test_wrong_sensor_or_missing_af_controls_fails_clearly(fake_picamera, wrong_
     assert fake_picamera.closed and camera._camera is None
 
 
-@pytest.mark.parametrize("point,expected", [
-    ((0.5, 0.5), (850, 700, 300, 180)),
-    ((0, 0), (0, 190, 300, 180)),
-    ((1, 1), (1700, 1210, 300, 180)),
-])
+@pytest.mark.parametrize(
+    "point,expected",
+    [
+        ((0.5, 0.5), (850, 700, 300, 180)),
+        ((0, 0), (0, 190, 300, 180)),
+        ((1, 1), (1700, 1210, 300, 180)),
+    ],
+)
 def test_focus_window_respects_sensor_crop_offset_and_edges(point, expected):
     assert focus_window(point, (0, 190, 2000, 1200)) == expected
 
@@ -266,11 +281,13 @@ def autofocus_camera(fake_picamera, request):
 
 def finish_focus_scan(camera, fake, result=2):
     # Old focused frames must never acknowledge the new target.
-    fake.metadata = ([{"AfState": 2, "AfPauseState": 0}] * 3
-                     + [{"AfState": 0, "AfPauseState": 2}]
-                     + [{"AfState": 2, "AfPauseState": 2}] * 3
-                     + [{"AfState": 1, "AfPauseState": 0}]
-                     + [{"AfState": result, "AfPauseState": 0}])
+    fake.metadata = (
+        [{"AfState": 2, "AfPauseState": 0}] * 3
+        + [{"AfState": 0, "AfPauseState": 2}]
+        + [{"AfState": 2, "AfPauseState": 2}] * 3
+        + [{"AfState": 1, "AfPauseState": 0}]
+        + [{"AfState": result, "AfPauseState": 0}]
+    )
     for _ in range(8):
         camera.preview()
         assert camera.focus.status == "scanning"
@@ -284,7 +301,9 @@ def test_tap_waits_for_fresh_focus_and_preserves_area_after_capture(
     assert camera.focus.supported
     camera.focus_at((0.5, 0.5))
     assert fake_picamera.control_changes[-1] == {
-        "AfMetering": 1, "AfPause": 0, "AfWindows": [(850, 700, 300, 180)],
+        "AfMetering": 1,
+        "AfPause": 0,
+        "AfWindows": [(850, 700, 300, 180)],
     }
     finish_focus_scan(camera, fake_picamera)
     assert camera.focus.status == "focused"

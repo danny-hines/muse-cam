@@ -109,4 +109,3 @@ FILTERS: dict[str, tuple[Preset, Callable[[Image.Image], Image.Image]]] = {
     )
 }
 FILTER_PRESETS = [preset for preset, _ in FILTERS.values()]
-

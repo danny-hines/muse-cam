@@ -73,16 +73,16 @@ def test_standalone_camera_calls_the_model_directly(tmp_path: Path) -> None:
 
     controller = make_standalone(tmp_path)
     # A server style list cached while the camera was connected has no prompts here.
-    controller._store.save_presets(
-        [Preset("party-hats", 1, "Party Hats", "Event only", "#ffffff")]
-    )
+    controller._store.save_presets([Preset("party-hats", 1, "Party Hats", "Event only", "#ffffff")])
     controller._image_model = meta_api(handler)
     controller.start()
     try:
         state = controller.state()
         assert state["canShare"] is False
         assert [p["id"] for p in state["presets"]] == [
-            "original", "random", *(p.id for p in FALLBACK_PRESETS),
+            "original",
+            "random",
+            *(p.id for p in FALLBACK_PRESETS),
         ]
         assert [p["kind"] for p in state["presets"][:3]] == ["original", "random", "imagined"]
         assert state["preset"]["id"] == "random"
@@ -100,9 +100,7 @@ def test_standalone_camera_calls_the_model_directly(tmp_path: Path) -> None:
         [request] = requests
         assert json.loads(request.content)["prompt"].startswith("Restyle the supplied photograph")
         assert request.headers["Authorization"] == f"Bearer {API_KEY}"
-        wait_until(lambda: any(
-            n["kind"] == "success" for n in controller.state()["notifications"]
-        ))
+        wait_until(lambda: any(n["kind"] == "success" for n in controller.state()["notifications"]))
         assert controller.state()["networkOnline"] is True
     finally:
         controller.close()
@@ -361,7 +359,11 @@ def test_an_edit_adds_an_edited_version_and_editing_it_again_updates_it(
         assert version["id"] == saved["versionId"]
         assert (version["presetName"], version["status"]) == ("Edited", "complete")
         assert version["edit"] == {
-            "look": "look-warm-film", "light": 20, "contrast": 0, "color": 0, "warmth": 0,
+            "look": "look-warm-film",
+            "light": 20,
+            "contrast": 0,
+            "color": 0,
+            "warmth": 0,
             "from": None,
         }
         assert controller.state()["view"]["versionId"] == version["id"]

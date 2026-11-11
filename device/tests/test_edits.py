@@ -66,7 +66,11 @@ def test_black_and_white_has_no_color_and_the_other_filters_change_it(tmp_path: 
 
 def test_filters_have_names() -> None:
     assert [preset.name for preset in FILTER_PRESETS] == [
-        "Black & White", "Warm Film", "Faded", "Punchy", "Vintage",
+        "Black & White",
+        "Warm Film",
+        "Faded",
+        "Punchy",
+        "Vintage",
     ]
 
 
@@ -90,7 +94,11 @@ def test_edits_are_checked(values: object, message: str) -> None:
 def test_an_edit_round_trips_through_its_recipe() -> None:
     edit = Edit.parse({"look": "look-faded", "light": 20, "warmth": -40})
     assert edit.to_json() == {
-        "look": "look-faded", "light": 20, "contrast": 0, "color": 0, "warmth": -40,
+        "look": "look-faded",
+        "light": 20,
+        "contrast": 0,
+        "color": 0,
+        "warmth": -40,
     }
     assert Edit.parse(edit.to_json()) == edit
     assert edit.adjusted and not Edit(look="look-bw").adjusted
@@ -138,17 +146,24 @@ def test_the_screen_uses_the_same_numbers() -> None:
     assert exponent == pytest.approx(0.80107, abs=1e-5)
     assert sum(matrix, []) == pytest.approx(
         [
-            1.159569, -0.247327, -0.024468, 0.069552,
-            -0.074991, 0.963025, -0.024468, 0.067655,
-            -0.074991, -0.247327, 1.161677, 0.065759,
+            1.159569,
+            -0.247327,
+            -0.024468,
+            0.069552,
+            -0.074991,
+            0.963025,
+            -0.024468,
+            0.067655,
+            -0.074991,
+            -0.247327,
+            1.161677,
+            0.065759,
         ],
         abs=1e-5,
     )
     exponent, matrix = adjustment(Edit(light=-100, contrast=100, color=-100, warmth=-100))
     assert exponent == pytest.approx(1.741101, abs=1e-5)
-    assert sum(matrix, []) == pytest.approx(
-        [0.310833, 1.161846, 0.129018, -0.307868] * 3, abs=1e-5
-    )
+    assert sum(matrix, []) == pytest.approx([0.310833, 1.161846, 0.129018, -0.307868] * 3, abs=1e-5)
 
 
 def test_previews_are_small_jpegs_with_the_filter(tmp_path: Path) -> None:

@@ -80,7 +80,8 @@ def test_client_retracts_by_capture_id_and_keeps_failures_retryable():
     client = MuseCamClient(DeviceConfig(server_url="https://camera.example", device_token="secret"))
     client._client.close()
     client._client = httpx.Client(
-        base_url="https://camera.example", headers={"Authorization": "Bearer secret"},
+        base_url="https://camera.example",
+        headers={"Authorization": "Bearer secret"},
         transport=httpx.MockTransport(handler),
     )
     try:

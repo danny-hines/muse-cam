@@ -25,9 +25,11 @@ def test_camera_switch_replaces_conflicts_and_is_idempotent(overlay):
     assert "arm_boost=1" in lines
     assert f"camera_auto_detect={int(overlay == 'auto')}" in lines
     camera_lines = [line for line in lines if line.startswith("dtoverlay=imx")]
-    expected = [] if overlay == "auto" else [
-        "dtoverlay=imx415,rotation=180" if overlay == "imx415" else f"dtoverlay={overlay}"
-    ]
+    expected = (
+        []
+        if overlay == "auto"
+        else ["dtoverlay=imx415,rotation=180" if overlay == "imx415" else f"dtoverlay={overlay}"]
+    )
     assert camera_lines == expected
     assert lines.index("[all]", lines.index("[pi4]")) > lines.index("arm_boost=1")
 
@@ -66,22 +68,29 @@ def test_malformed_managed_block_is_not_overwritten():
         camera_boot_config("# BEGIN Muse Cam camera\ndtoverlay=imx415\n", "imx519")
 
 
-@pytest.mark.parametrize("existing", [
-    "dtoverlay=vc4-kms-v3d,cma-256\n", "# dtoverlay=vc4-kms-v3d\n",
-])
+@pytest.mark.parametrize(
+    "existing",
+    [
+        "dtoverlay=vc4-kms-v3d,cma-256\n",
+        "# dtoverlay=vc4-kms-v3d\n",
+    ],
+)
 def test_installer_preserves_display_memory_parameters(tmp_path, existing):
     config = tmp_path / "config.txt"
     original = existing + "dtoverlay=musecam-i2s-output\n"
     config.write_text(original)
     installer = Path(__file__).parents[2] / "scripts/install-device.sh"
-    functions = installer.read_text().split('\nwhile [[ $# -gt 0 ]]; do')[0]
+    functions = installer.read_text().split("\nwhile [[ $# -gt 0 ]]; do")[0]
     # Override the path without running the installer's apt/systemd/boot operations.
-    command = functions + '''
+    command = (
+        functions
+        + """
 boot_config_path() { printf '%s\\n' "$TEST_BOOT_CONFIG"; }
 TEST_BOOT_CONFIG="$1"
 ensure_boot_config_overlay vc4-kms-v3d
 ensure_boot_config_overlay vc4-kms-v3d
-'''
+"""
+    )
     subprocess.run(["bash", "-c", command, "test-installer", str(config)], check=True)
     if existing.startswith("#"):
         assert config.read_text() == original + "\ndtoverlay=vc4-kms-v3d\n"

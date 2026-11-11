@@ -158,7 +158,7 @@ def _run_claim(args: argparse.Namespace) -> int:
     import httpx
 
     existing = load_config(args.config, require_credentials=False)
-    server_url = (args.server or (existing.server_url if args.config.exists() else None))
+    server_url = args.server or (existing.server_url if args.config.exists() else None)
     server_url = (server_url or "https://www.muse-cam.com").rstrip("/")
     payload = {"code": args.code}
     if args.name:

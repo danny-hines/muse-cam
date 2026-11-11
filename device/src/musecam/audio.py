@@ -30,7 +30,11 @@ def sound_wave(cue: str, volume: int) -> bytes:
         raise ValueError("Unknown sound")
     rate = SAMPLE_RATE
     duration = {
-        "shutter": 0.19, "countdown": 0.12, "processing": 0.38, "success": 0.55, "error": 0.42
+        "shutter": 0.19,
+        "countdown": 0.12,
+        "processing": 0.38,
+        "success": 0.55,
+        "error": 0.42,
     }[cue]
     gain = 0.20 * (max(0, min(100, volume)) / 100) ** 2
     # The success melody carries much more strongly on the enclosure's speaker.
